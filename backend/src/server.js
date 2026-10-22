@@ -1,6 +1,8 @@
-﻿import 'dotenv/config';
-import app from './app.js';
+import { loadBackendEnvironment } from './config/load-environment.js';
 
+loadBackendEnvironment();
+
+const { default: app } = await import('./app.js');
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
