@@ -1,4 +1,3 @@
-@'
 # Dependencies
 node_modules/
 
@@ -26,4 +25,24 @@ Thumbs.db
 
 # Database backups
 database/backups/
-'@ | Set-Content -Path .gitignore -Encoding UTF8
+
+# Template dependencies
+docs/**/node_modules/
+
+# Intermediate ETL and Staging Data
+data/staging_*
+data/interim/
+data/raw/
+data/generated/
+data/processed/evaluation/
+data/processed/staged/
+
+# Historical and Deprecated Releases (Only DATA-03.4B is kept)
+data/processed/releases/DATA-02B*
+data/processed/releases/DATA-03.2*
+data/processed/releases/DATA-03.3B*
+
+# Binary Documents & Sample Reference Markdown
+docs/Nhom8_BaoCao_NoSQL_Phase3.docx
+docs/markdown/
+

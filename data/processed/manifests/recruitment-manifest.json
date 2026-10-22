@@ -1,0 +1,76 @@
+{
+  "release_id": "release:DATA-03.3B:3f911f461e886e98",
+  "release_digest": "3f911f461e886e9835675bc1dc03ca4be0460e512ad610cb1719564401db7ec2",
+  "transform_version": "DATA-03.3B",
+  "allocation_policy_version": "STRATIFIED_COMPANY_TOP4_V1",
+  "generator_seed": "recruithub:data:v1:20261021",
+  "scenario_base_clock": "2026-10-21T00:00:00Z",
+  "scenario_snapshot_cutoff": "2026-11-20T23:59:59Z",
+  "scenario_policy": {
+    "job_opening_effective_at": "2026-10-21T00:00:00Z",
+    "job_deadline": "2026-11-30T23:59:59Z",
+    "application_window": "2026-10-22 to 2026-11-03"
+  },
+  "input_foundation_release_digest": "e38798adc4f8e1ee1f5c0badf496727bea0a8b6eb61d033e7d50ce2a2a0db396",
+  "immutable_release_dir": "data/processed/releases/DATA-03.3B_3f911f461e886e98",
+  "active_pointer_status": "ACTIVE",
+  "output_files": {
+    "candidates.jsonl": {
+      "record_count": 10000,
+      "sha256": "D87224E3DDF48B30B93739AD38D8FA097BA4ACC1074017448E3BBDC83706794F"
+    },
+    "jobs.jsonl": {
+      "record_count": 2500,
+      "sha256": "00CAE02034BC5D9C4BEB0A873B6D637D5DFC8D154ABB9D08CB38EF38B0C2E7C1"
+    },
+    "users.jsonl": {
+      "record_count": 10150,
+      "sha256": "3ADA393936E71CDFF15B0750C190C86B9CF6796669FB8579E2E787200412F649"
+    },
+    "companies.jsonl": {
+      "record_count": 50,
+      "sha256": "4236513CF36090FB28A6537F8D7B74EEC72673662557B6939BC63723A932049D"
+    },
+    "departments.jsonl": {
+      "record_count": 150,
+      "sha256": "33E0B9FB6AC2C98C770B76E69A91F055F335EA6E9C4996470560D6EE0821BF96"
+    },
+    "recruiters.jsonl": {
+      "record_count": 150,
+      "sha256": "9E9CB48735909A98CF3EFA4123D7C41BA42E162E5E1BE47005196608A7E7202B"
+    },
+    "applications.jsonl": {
+      "record_count": 1200,
+      "sha256": "CAD7BF093D28A96CC5A754246D89D29768032258965DB50D32473931D4C8E495"
+    },
+    "interviews.jsonl": {
+      "record_count": 350,
+      "sha256": "C3B6ACA01E1D920CCC455F03CCD73216917E7B19E55D8577B35DDD1B80F9CE32"
+    }
+  },
+  "record_counts": {
+    "candidates": 10000,
+    "jobs": 2500,
+    "open_jobs": 200,
+    "draft_jobs": 2300,
+    "users": 10150,
+    "candidate_users": 10000,
+    "recruiter_users": 150,
+    "companies": 50,
+    "departments": 150,
+    "recruiters": 150,
+    "applications": 1200,
+    "interviews": 350,
+    "total_documents": 24550
+  },
+  "integrity_summary": {
+    "all_records_valid": true,
+    "duplicate_ids": 0,
+    "duplicate_pairs": 0,
+    "orphan_references": 0,
+    "scoping_violations": 0,
+    "stage_history_violations": 0,
+    "interview_evidence_violations": 0,
+    "source_facts_preserved": true
+  }
+}

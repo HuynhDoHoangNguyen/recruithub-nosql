@@ -1,0 +1,58 @@
+{
+  "release_id": "release:DATA-02B.2:157f09f09a9acd4d",
+  "release_digest": "157f09f09a9acd4d32fe699334eb98a3b2fe5acfa7afb09001659d8bca199a88",
+  "transform_version": "DATA-02B.2",
+  "scenario_clock": "2026-10-21T00:00:00Z",
+  "source_dataset": "michaelozon/candidate-matching-synthetic",
+  "active_release_dir": "data/processed/releases/DATA-02B.2_157f09f09a9acd4d",
+  "active_pointer_status": "ACTIVE",
+  "source_files": {
+    "resumes.parquet": {
+      "size_bytes": 277342,
+      "sha256": "4A25ADD9C3A620C4C396E867063E390FC8084F9B53ED8135DEF049303A29D7A4"
+    },
+    "jobs.parquet": {
+      "size_bytes": 56026,
+      "sha256": "C13D7C7E0AB510E81117974027DE1364F973A27B3CACC8FABFBD8851C352C871"
+    },
+    "matches.parquet": {
+      "size_bytes": 274261,
+      "sha256": "DAB24E40948B2DA348C6DF7072B5B5FE3BB6EF8CAB335F88EEF5D5667EE79A92"
+    }
+  },
+  "output_files": {
+    "data/processed/staged/candidates.jsonl": {
+      "record_count": 10000,
+      "sha256": "95EFE53AAF92CC91CDA926610E316E868DFE969C61DE5EE32B6E43CA3F9A0039"
+    },
+    "data/processed/staged/jobs.jsonl": {
+      "record_count": 2500,
+      "sha256": "B3ECC3AF3AD563AC06476D3F4B31E4200D3FAF44122789FC044F8927705D9890"
+    },
+    "data/processed/evaluation/matches.jsonl": {
+      "record_count": 75000,
+      "sha256": "D794C8524BC747C3C8B3E0953A58BC05A142205E866A097531DCC09AE7FDB5CB"
+    }
+  },
+  "record_counts": {
+    "candidates": 10000,
+    "jobs": 2500,
+    "match_pairs": 75000
+  },
+  "integrity_summary": {
+    "all_records_valid": true,
+    "duplicate_candidate_ids": 0,
+    "duplicate_job_ids": 0,
+    "duplicate_match_pairs": 0,
+    "orphan_evaluation_pairs": 0,
+    "unmatched_resumes_preserved": 29,
+    "staged_vs_final_boundary_verified": true
+  },
+  "transform_rules": {
+    "skill_normalization": "lowercase, trim, collapse whitespace, versioned alias map v1",
+    "degree_normalization": "approved 4-tier degree mapping table (DATA-02A Section 7)",
+    "experience_months_derivation": "years_experience * 12",
+    "availability_assignment": "skills: AVAILABLE, experience: PARTIAL, education: PARTIAL, projects: UNAVAILABLE",
+    "nested_requirements_status": "experience/education/project status UNAVAILABLE (omitting unapproved thresholds)"
+  }
+}

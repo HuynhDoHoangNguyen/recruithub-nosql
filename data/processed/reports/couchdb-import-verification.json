@@ -1,0 +1,30 @@
+{
+  "verification_status": "PASS",
+  "verified_at": "2026-10-22T03:28:34.669Z",
+  "duration_seconds": 1.38,
+  "database": "recruitment_db",
+  "server_version": "3.5.2",
+  "release_id": "release:DATA-03.4B:7fdd3b34c4636367",
+  "release_digest": "7fdd3b34c46363670994c20a868a774d2200679282797755f4066272238905a4",
+  "document_counts": {
+    "users": 10150,
+    "companies": 50,
+    "departments": 150,
+    "recruiters": 150,
+    "candidates": 10000,
+    "jobs": 2500,
+    "applications": 1200,
+    "interviews": 350,
+    "resume_analyses": 1200,
+    "unknown": 0,
+    "total": 25750
+  },
+  "integrity_summary": {
+    "all_counts_match": true,
+    "missing_documents": 0,
+    "extra_documents": 0,
+    "content_parity_verified": true,
+    "spot_checked_count": 135,
+    "referential_integrity_valid": true
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "release_id": "release:DATA-03.4B:7fdd3b34c4636367",
+  "release_digest": "7fdd3b34c46363670994c20a868a774d2200679282797755f4066272238905a4",
+  "transform_version": "DATA-03.4B",
+  "scoring_algorithm_version": "recruithub-scoring-mvp-v1",
+  "synthetic_requirements_policy_version": "recruithub-synthetic-requirements-v1",
+  "generator_seed": "recruithub:data:v1:20261021",
+  "scenario_base_clock": "2026-10-21T00:00:00Z",
+  "scenario_snapshot_cutoff": "2026-11-20T23:59:59Z",
+  "scenario_policy": {
+    "job_opening_effective_at": "2026-10-21T00:00:00Z",
+    "job_deadline": "2026-11-30T23:59:59Z",
+    "application_window": "2026-10-22 to 2026-11-03",
+    "requirement_policy_effective_at": "2026-10-21T00:00:00Z"
+  },
+  "input_recruitment_release_digest": "3f911f461e886e9835675bc1dc03ca4be0460e512ad610cb1719564401db7ec2",
+  "immutable_release_dir": "data/processed/releases/DATA-03.4B_7fdd3b34c4636367",
+  "active_pointer_status": "ACTIVE",
+  "output_files": {
+    "users.jsonl": {
+      "record_count": 10150,
+      "sha256": "3ADA393936E71CDFF15B0750C190C86B9CF6796669FB8579E2E787200412F649"
+    },
+    "candidates.jsonl": {
+      "record_count": 10000,
+      "sha256": "D87224E3DDF48B30B93739AD38D8FA097BA4ACC1074017448E3BBDC83706794F"
+    },
+    "companies.jsonl": {
+      "record_count": 50,
+      "sha256": "4236513CF36090FB28A6537F8D7B74EEC72673662557B6939BC63723A932049D"
+    },
+    "departments.jsonl": {
+      "record_count": 150,
+      "sha256": "33E0B9FB6AC2C98C770B76E69A91F055F335EA6E9C4996470560D6EE0821BF96"
+    },
+    "recruiters.jsonl": {
+      "record_count": 150,
+      "sha256": "9E9CB48735909A98CF3EFA4123D7C41BA42E162E5E1BE47005196608A7E7202B"
+    },
+    "jobs.jsonl": {
+      "record_count": 2500,
+      "sha256": "5815C52ED2470BDC22397605BC9FDC92F2663F3D5205D91578FBB4D1738BBA3B"
+    },
+    "applications.jsonl": {
+      "record_count": 1200,
+      "sha256": "CAD7BF093D28A96CC5A754246D89D29768032258965DB50D32473931D4C8E495"
+    },
+    "interviews.jsonl": {
+      "record_count": 350,
+      "sha256": "C3B6ACA01E1D920CCC455F03CCD73216917E7B19E55D8577B35DDD1B80F9CE32"
+    },
+    "resume_analyses.jsonl": {
+      "record_count": 1200,
+      "sha256": "6C4A4F292D22017F90B59C68527E0B81F5BA760DC5B006AD8A81D7C3DF6EE277"
+    }
+  },
+  "record_counts": {
+    "users": 10150,
+    "candidate_users": 10000,
+    "recruiter_users": 150,
+    "candidates": 10000,
+    "companies": 50,
+    "departments": 150,
+    "recruiters": 150,
+    "jobs": 2500,
+    "open_jobs": 200,
+    "draft_jobs": 2300,
+    "enriched_jobs": 150,
+    "untouched_jobs": 2350,
+    "applications": 1200,
+    "interviews": 350,
+    "resume_analyses": 1200,
+    "complete_analyses": 591,
+    "incomplete_analyses": 609,
+    "recommendation_counts": {
+      "HIGH": 23,
+      "MEDIUM": 65,
+      "LOW": 503
+    },
+    "total_documents": 25750
+  },
+  "integrity_summary": {
+    "all_records_valid": true,
+    "duplicate_ids": 0,
+    "duplicate_emails": 0,
+    "orphan_references": 0,
+    "freshness_violations": 0,
+    "ranking_verified": true,
+    "source_facts_preserved": true
+  }
+}

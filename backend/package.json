@@ -4,7 +4,23 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test tests/data/*.test.js",
+    "etl:extract": "python ../scripts/dataset/extract-parquet.py",
+    "etl:transform": "node ../scripts/dataset/transform-staged.js",
+    "etl:validate": "node ../scripts/dataset/validate-staged.js",
+    "etl": "npm run etl:extract && npm run etl:transform && npm run etl:validate",
+    "foundation:generate": "node ../scripts/dataset/generate-foundation.js",
+    "foundation:validate": "node ../scripts/dataset/validate-final-foundation.js",
+    "foundation": "npm run foundation:generate && npm run foundation:validate",
+    "recruitment:generate": "node ../scripts/dataset/generate-recruitment-demo.js",
+    "recruitment:validate": "node ../scripts/dataset/validate-recruitment-demo.js",
+    "recruitment": "npm run recruitment:generate && npm run recruitment:validate",
+    "corpus:generate": "node ../scripts/dataset/generate-resume-analyses.js",
+    "corpus:validate": "node ../scripts/dataset/validate-final-corpus.js",
+    "corpus": "npm run corpus:generate && npm run corpus:validate",
+    "db:import": "node ../scripts/database/import-couchdb.js",
+    "db:verify": "node ../scripts/database/verify-couchdb.js",
+    "db:load": "npm run db:import && npm run db:verify",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js"
   },
@@ -15,7 +31,8 @@
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^18.0.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

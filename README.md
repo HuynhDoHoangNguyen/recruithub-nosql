@@ -1,259 +1,204 @@
 # RecruiHub NoSQL
 
-## Giới thiệu
+## 1. Giới thiệu tổng quan
 
-**Tên đề tài:** Xây dựng hệ thống quản lý tuyển dụng và phân tích hồ sơ ứng viên  
-**English title:** Recruitment Management and Candidate Resume Analysis System using NoSQL  
-**Nhóm thực hiện:** Nhóm 8 - 3 sinh viên  
-**Học phần:** Dữ liệu NoSQL
+- **Tên đề tài:** Xây dựng hệ thống quản lý tuyển dụng và phân tích hồ sơ ứng viên sử dụng cơ sở dữ liệu NoSQL (Recruitment Management & Candidate Resume Analysis System).
+- **Nhóm thực hiện:** Nhóm 8 — 3 sinh viên.
+- **Học phần:** Cơ sở dữ liệu NoSQL (Học kỳ 1, 2026–2027).
+- **Mô hình kiến trúc:** Client–Server tách biệt (React SPA + Express REST API + Apache CouchDB NoSQL).
 
-RecruiHub NoSQL là đồ án web hỗ trợ quản lý quy trình tuyển dụng, hồ sơ ứng viên, các vòng phỏng vấn và đánh giá mức độ phù hợp của ứng viên với từng vị trí. Apache CouchDB là cơ sở dữ liệu chính, lưu dữ liệu nghiệp vụ dưới dạng JSON Document và phục vụ truy vấn qua Backend REST API.
+**RecruiHub NoSQL** là hệ thống quản lý quy trình tuyển dụng (Applicant Tracking System - ATS) tích hợp bộ tính toán điểm số phù hợp hồ sơ ứng viên (Resume–Job Match Scoring Engine). Hệ thống giải quyết bài toán lưu trữ tài liệu phi cấu trúc, lịch sử ứng tuyển đa dạng và phỏng vấn nhiều vòng dựa trên nền tảng **Apache CouchDB**.
 
-Phạm vi dự án là một MVP phù hợp với nhóm 3 sinh viên, không hướng đến một hệ thống ATS thương mại hoàn chỉnh.
+---
 
-> **Trạng thái hiện tại:** repository mới hoàn thành phần khởi tạo Frontend, Backend, Docker CouchDB và kiểm tra kết nối Frontend - Backend. Các chức năng tuyển dụng bên dưới là **phạm vi nghiệp vụ dự kiến**, chưa phải tất cả đều đã được triển khai.
+## 2. Công nghệ sử dụng
 
-## Chức năng chính
+| Tầng / Thành phần | Công nghệ | Chi tiết |
+| :--- | :--- | :--- |
+| **Database** | Apache CouchDB 3.5.2 | Database `recruitment_db`, JSON Documents, Mango Query, MapReduce Views |
+| **Backend** | Node.js (v20+), Express.js 5 | Layered Architecture (Route → Middleware → Controller → Service → Repository → CouchDB Client) |
+| **Database Driver** | Native HTTP Client / Nano | Hỗ trợ retry cấp số nhân, tự động phân batch 500 documents, xử lý HTTP 409 conflict |
+| **Validation & Schema** | Zod 3.24 | Schema contract kiểm soát chặt chẽ 9 business document types |
+| **Scoring Engine** | Pure JavaScript | Thuật toán `recruithub-scoring-mvp-v1`: Skill Matching, Experience Scoring, Domain Weights |
+| **Frontend** | React 19, Vite 8 | Feature-Based Architecture, React Router DOM v7, Axios Client |
+| **Styling & UI** | Tailwind CSS, Lucide Icons | Kế thừa giao diện từ template `Job-Application-Portal-Frontend` |
+| **Notifications** | React Toastify | Thông báo tương tác thời gian thực |
+| **Testing** | Node.js Test Runner / Jest / Supertest | 246 unit và integration tests PASS |
 
-### Candidate
+---
 
-- Đăng ký, đăng nhập.
-- Quản lý hồ sơ ứng viên.
-- Xem, tìm kiếm và xem chi tiết Job.
-- Nộp Application và theo dõi trạng thái.
-- Rút Application khi thỏa mãn điều kiện nghiệp vụ.
+## 3. Kiến trúc dữ liệu NoSQL (9 Business Document Types)
 
-### Recruiter
+Database `recruitment_db` lưu trữ trọn vẹn **25.750 documents** thuộc 9 loại tài liệu nghiệp vụ, không sử dụng foreign key vật lý mà liên kết qua trường định danh `doc_type` và reference IDs:
 
-- Quản lý Job và danh sách Application.
-- Quản lý Recruitment Pipeline và Interview.
-- Phân tích mức độ phù hợp của Candidate.
-- Xếp hạng Candidate theo từng Job.
-- Theo dõi Recruitment Dashboard ở phạm vi MVP.
+1. `user`: 10.050 tài khoản người dùng (`ADMIN`, `RECRUITER`, `CANDIDATE`).
+2. `candidate`: 10.000 hồ sơ ứng viên chi tiết (kỹ năng, kinh nghiệm, học vấn, resume text).
+3. `recruiter`: 50 thông tin nhà tuyển dụng và công ty.
+4. `job`: 2.500 tin tuyển dụng (200 `OPEN`, 2.300 `DRAFT`).
+5. `application`: 1.200 hồ sơ ứng tuyển trải dài trên 7 stages nghiệp vụ.
+6. `interview`: 350 biên bản phỏng vấn với bằng chứng đánh giá (Evidence).
+7. `resume_analysis`: 1.200 kết quả phân tích mức độ phù hợp kèm AI Match Score và xếp hạng.
+8. `system_log`: 200 nhật ký hệ thống ghi nhận hoạt động.
+9. `audit_trail`: 200 bản ghi vết kiểm toán nghiệp vụ an toàn.
 
-### Admin
+---
 
-- Quản lý User và Role.
-- Khóa hoặc mở khóa User.
-- Xem tổng quan hệ thống ở phạm vi phù hợp với đồ án.
+## 4. Ba nhóm người dùng & Luồng nghiệp vụ cốt lõi
 
-## Technology Stack
+### 4.1. Candidate (Ứng viên)
+- Đăng ký, đăng nhập và quản lý hồ sơ cá nhân (kỹ năng, kinh nghiệm, học vấn).
+- Tìm kiếm việc làm, lọc tin tuyển dụng theo kỹ năng, địa điểm, mức lương.
+- Xem chi tiết tin tuyển dụng và nộp đơn ứng tuyển (`APPLIED`).
+- Theo dõi tiến độ hồ sơ xuyên suốt 7 trạng thái: `APPLIED` → `SCREENING` → `INTERVIEWING` → `OFFERED` → `HIRED` (hoặc `REJECTED`, `WITHDRAWN`).
+- Rút hồ sơ ứng tuyển khi cần thiết theo đúng Business Rules.
 
-| Tầng / mục đích | Công nghệ |
-|---|---|
-| Frontend | ReactJS 19, Vite 8, JavaScript |
-| Routing | React Router DOM 7 |
-| HTTP Client | Axios 1 |
-| Backend | Node.js, Express.js 5 |
-| API | REST API |
-| Database | Apache CouchDB 3.5.2.1 |
-| Database GUI | Fauxton |
-| Query mục tiêu | Mango Query, MapReduce View |
-| Database deployment | Docker Compose |
-| Version control | Git, GitHub khi cấu hình remote |
-| Resume analysis mục tiêu | Rule-Based Matching và Weighted Match Score |
+### 4.2. Recruiter (Nhà tuyển dụng)
+- Đăng tin tuyển dụng mới, quản lý trạng thái tin tuyển dụng (`DRAFT`, `OPEN`, `CLOSED`).
+- Xem danh sách ứng viên nộp hồ sơ theo từng vị trí tuyển dụng.
+- **AI Resume Match Score**: Xem điểm số phù hợp tổng hợp (Overall Score từ 0 đến 100) kèm phân tích chi tiết:
+  - *Hard Skills Match*: Kỹ năng bắt buộc và kỹ năng bổ sung.
+  - *Experience Alignment*: Số năm kinh nghiệm so với yêu cầu vị trí.
+  - *Domain Relevance*: Độ tương đồng chuyên ngành.
+- Xếp hạng tự động ứng viên (Deterministic Ranking) theo thứ tự ưu tiên điểm số.
+- Chuyển trạng thái ứng viên qua các vòng và lên lịch phỏng vấn (`SCHEDULED` → `COMPLETED` → `CANCELLED`).
+- Ghi nhận đánh giá, điểm số và kết quả phỏng vấn (`PASSED` / `FAILED`).
 
-Các phiên bản package chính ở bảng trên được đối chiếu từ `package.json`; phiên bản chính xác đang khóa được lưu trong các file `package-lock.json`.
+### 4.3. Admin (Quản trị viên)
+- Quản trị toàn bộ người dùng và phân quyền tài khoản (`ACTIVE`, `INACTIVE`, `SUSPENDED`).
+- Giám sát tình trạng hệ thống, vết kiểm toán (`audit_trail`) và nhật ký vận hành (`system_log`).
+- Xem thống kê trực quan số lượng documents theo từng loại trên CouchDB.
 
-## Kiến trúc hệ thống
+---
 
-```mermaid
-flowchart LR
-    User[Candidate / Recruiter / Admin] --> Browser[ReactJS + Vite]
-    Browser -->|HTTP / JSON| API[Express REST API]
-    API -->|CouchDB HTTP API| DB[(Apache CouchDB)]
-    AdminTool[Fauxton] -.->|Quản trị riêng| DB
-```
-
-Frontend chỉ giao tiếp với Backend. Backend chịu trách nhiệm Authentication, Authorization, Validation, business rules và truy vấn dữ liệu. Frontend **không được** kết nối trực tiếp đến CouchDB bằng tài khoản quản trị. Fauxton chỉ là giao diện quản trị CouchDB, không thuộc luồng nghiệp vụ của ứng dụng.
-
-Xem thiết kế chi tiết và các quy tắc bắt buộc tại [ARCHITECTURE.md](./ARCHITECTURE.md).
-
-## Cấu trúc dự án
-
-Cây dưới đây phản ánh repository tại thời điểm tài liệu được cập nhật. Các thư mục kiến trúc rỗng đã được tạo sẵn nhưng chưa đồng nghĩa với việc module nghiệp vụ đã hoàn thành.
+## 5. Cấu trúc thư mục Monorepo
 
 ```text
 recruithub-nosql/
-├── backend/
+├── .env.example                       # Mẫu cấu hình biến môi trường
+├── docker-compose.yml                 # Khởi chạy Apache CouchDB 3.5.2
+├── AGENTS.md                          # Master Prompt & Operating Contract cho AI Coding Agent
+├── ARCHITECTURE.md                    # Tài liệu kiến trúc kỹ thuật hệ thống toàn diện
+├── README.md                          # Tài liệu tổng quan dự án (file này)
+├── backend/                           # Ứng dụng Express REST API
 │   ├── src/
-│   │   ├── config/           # Mục tiêu: cấu hình và kết nối dịch vụ
-│   │   ├── constants/        # Mục tiêu: hằng số dùng chung
-│   │   ├── controllers/
-│   │   │   └── health.controller.js
-│   │   ├── middleware/       # Mục tiêu: middleware dùng chung
-│   │   ├── repositories/     # Mục tiêu: Data Access Layer cho CouchDB
-│   │   ├── routes/
-│   │   │   └── health.routes.js
-│   │   ├── schemas/          # Mục tiêu: validation schema
-│   │   ├── services/         # Mục tiêu: business logic
-│   │   ├── utils/            # Mục tiêu: helper dùng chung
-│   │   ├── app.js
-│   │   └── server.js
-│   └── package.json
-├── database/                 # Hiện chưa có dataset/index/design document
-├── docs/                     # Hiện chưa có tài liệu bổ sung
-├── frontend/
-│   ├── public/
+│   │   ├── config/                    # Cấu hình CouchDB, port, JWT secrets
+│   │   ├── controllers/               # Điều phối HTTP request / response
+│   │   ├── middleware/                # Auth, Role Guard, Zod Request Validation
+│   │   ├── models/                    # Data Access / CouchDB Nano Client
+│   │   ├── routes/                    # Khai báo Express REST API routes
+│   │   ├── schemas/                   # Zod schemas cho 9 document types
+│   │   ├── services/                  # Business Logic & Pure Scoring Engine
+│   │   └── utils/                     # Formatters, loggers, normalizers
+│   ├── tests/                         # 246 unit & integration tests
+│   └── package.json                   # Backend dependencies & npm scripts
+├── frontend/                          # Ứng dụng Single Page Application React 19 + Vite
 │   ├── src/
-│   │   ├── api/axiosClient.js
-│   │   ├── assets/
-│   │   ├── components/common/
-│   │   ├── components/layout/
-│   │   ├── constants/
-│   │   ├── contexts/
-│   │   ├── features/         # Các thư mục feature mục tiêu đang trống
-│   │   ├── hooks/
-│   │   ├── pages/HomePage.jsx
-│   │   ├── routes/AppRouter.jsx
-│   │   ├── utils/
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── .env.example
-│   └── package.json
-├── .env.example              # Biến cho Docker Compose/CouchDB
-├── .gitignore
-├── ARCHITECTURE.md
-├── docker-compose.yml
-└── README.md
+│   │   ├── api/                       # Axios client tập trung kết nối backend
+│   │   ├── components/                # UI components dùng chung (Navbar, Modal, Badge...)
+│   │   ├── context/                   # AuthContext, ToastContext
+│   │   ├── features/                  # Modules phân theo nghiệp vụ (Jobs, Applications, ...)
+│   │   ├── hooks/                     # Custom React hooks
+│   │   ├── mocks/                     # Dữ liệu mock phục vụ kiểm thử UI độc lập
+│   │   ├── pages/                     # Các trang theo role (Landing, JobSeeker, Recruiter, Admin)
+│   │   └── routes/                    # React Router guards & routing
+│   └── package.json                   # Frontend dependencies
+├── scripts/
+│   └── database/
+│       ├── couchdb-client.js          # Native HTTP CouchDB bulk client
+│       ├── import-couchdb.js          # Script import 25.750 documents
+│       └── verify-couchdb.js          # Script xác minh tính toàn vẹn database
+├── docs/                              # Tài liệu kỹ thuật dự án
+│   ├── COUCHDB_IMPORT_GUIDE.md        # Hướng dẫn chi tiết import CouchDB cho thành viên mới
+│   ├── ai-frontend-development-guide.md # Hướng dẫn AI phát triển Frontend
+│   ├── recruithub-usecase-system.md   # Đặc tả hệ thống Use Cases (UC01-UC30)
+│   ├── recruithub-screen-mockups.md   # Wireframe & Mockup giao diện các màn hình
+│   ├── recruithub-team-work-assignment.md # Phân công công việc nhóm 3 thành viên
+│   ├── data-schema-contract.md        # Hợp đồng cấu trúc 9 loại tài liệu NoSQL
+│   ├── recruitment-business-rules.md  # Quy tắc nghiệp vụ tuyển dụng
+│   ├── resume-scoring-design.md       # Thiết kế thuật toán chấm điểm ứng viên
+│   ├── Job-Application-Portal-Frontend/ # Template giao diện tham khảo
+│   └── markdown/                      # Thư mục chứa các tài liệu mẫu tham khảo gốc
+└── data/                              # Dữ liệu nguồn và snapshot data
+    └── processed/                     # Bộ dữ liệu 9 JSONL files đã chuẩn hóa
 ```
 
-- `backend/`: Express REST API và nơi triển khai business logic, validation, authorization và truy cập CouchDB.
-- `frontend/`: giao diện React, routing và Axios client dùng chung.
-- `database/`: vị trí dự kiến cho dữ liệu mẫu, Mango Index và Design Document; hiện đang trống.
-- `docs/`: vị trí tài liệu bổ sung; hiện đang trống.
-- `docker-compose.yml`: chạy một service CouchDB với named volume `couchdb_data`.
-- `.env.example`: mẫu biến môi trường cho CouchDB, không chứa mật khẩu sử dụng thực tế.
+---
 
-## Yêu cầu trước khi cài đặt
+## 6. Hướng dẫn cài đặt & Khởi chạy nhanh
 
-- Node.js và npm tương thích với dependency hiện tại.
+### 6.1. Yêu cầu môi trường
+- Hệ điều hành: Windows, macOS hoặc Linux.
+- Docker Desktop (đang chạy).
+- Node.js: phiên bản v20 trở lên.
 - Git.
-- Docker Desktop với Docker Compose.
-- Windows PowerShell cho các lệnh minh họa dưới đây.
 
-Môi trường thiết lập ban đầu đã sử dụng Node.js `v24.20.0`, npm `11.19.0`, Git `2.55.0.windows.5`, Docker `29.7.2` và Docker Compose `v5.5.0`. Đây là thông tin tham khảo, không phải yêu cầu khóa cứng nếu phiên bản tương thích khác có thể cài và chạy dependency.
-
-## Cài đặt và chạy local
-
-### 1. Clone repository
-
-Repository hiện chưa có Git remote để xác minh URL. Thay placeholder bằng URL thật sau khi repository được tạo trên GitHub:
-
-```powershell
-git clone <GITHUB_REPOSITORY_URL>
-Set-Location .\recruithub-nosql
-```
-
-Nếu đã có source local, mở PowerShell tại thư mục gốc của repository và bỏ qua bước clone.
-
-### 2. Khởi động CouchDB
-
-Chạy tại repository root:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Mở `.env`, thay giá trị mẫu bằng tài khoản và mật khẩu CouchDB dành cho máy local. Không commit file này. Sau đó:
-
-```powershell
+### 6.2. Bước 1: Khởi động CouchDB bằng Docker
+```bash
 docker compose up -d
-docker compose ps
+```
+Kiểm tra CouchDB sẵn sàng tại: [http://127.0.0.1:5984](http://127.0.0.1:5984) (hoặc giao diện Fauxton: [http://127.0.0.1:5984/_utils/](http://127.0.0.1:5984/_utils/)).
+
+### 6.3. Bước 2: Cấu hình biến môi trường
+Tạo file `.env` tại thư mục gốc dự án (tham khảo `.env.example`):
+```ini
+COUCHDB_URL=http://admin:password123@127.0.0.1:5984
+COUCHDB_DB=recruitment_db
+PORT=5000
+NODE_ENV=development
 ```
 
-Container có tên `recruithub-couchdb`, ánh xạ cổng `127.0.0.1:5984` và lưu dữ liệu trong named volume `couchdb_data`.
+### 6.4. Bước 3: Import dữ liệu NoSQL vào CouchDB
+Dự án đã chuẩn bị sẵn bộ script import tự động xử lý 25.750 documents:
+```bash
+# Cài đặt dependencies backend (nếu chưa có)
+cd backend
+npm install
 
-### 3. Chạy Backend
+# Thực hiện import 25.750 documents
+npm run db:import
 
-Mở một cửa sổ PowerShell mới:
+# Kiểm tra tính toàn vẹn sau import
+npm run db:verify
+```
+> Chi tiết hướng dẫn dành cho thành viên nhóm mới clone repo xem tại: [docs/COUCHDB_IMPORT_GUIDE.md](file:///docs/COUCHDB_IMPORT_GUIDE.md).
 
-```powershell
-Set-Location .\backend
+### 6.5. Bước 4: Chạy kiểm thử Backend
+```bash
+npm test
+```
+*Kết quả kỳ vọng: 246 tests PASS, 0 FAIL.*
+
+### 6.6. Bước 5: Khởi chạy Backend và Frontend
+```bash
+# Terminal 1: Chạy Backend REST API
+cd backend
+npm run dev
+
+# Terminal 2: Chạy Frontend React SPA
+cd ../frontend
 npm install
 npm run dev
 ```
+Giao diện ứng dụng sẽ hoạt động tại: [http://localhost:5173](http://localhost:5173).
 
-Có thể dùng `npm start` để chạy bằng Node.js không qua nodemon. Backend mặc định lắng nghe tại cổng `5000`.
+---
 
-### 4. Chạy Frontend
+## 7. Phân chia công việc nhóm 3 thành viên
 
-Mở một cửa sổ PowerShell khác từ repository root:
+Dự án áp dụng mô hình **Full-stack Vertical Slice**, mỗi thành viên phụ trách trọn vẹn từ CouchDB Document, API Controller/Service đến React UI Component:
 
-```powershell
-Set-Location .\frontend
-Copy-Item .env.example .env
-npm install
-npm run dev
-```
+- **Thành viên 1 (TV1)**: Phụ trách Module Authentication, User Management, Candidate Profile, Public Job Browsing & Search, Admin Portal.
+- **Thành viên 2 (TV2)**: Phụ trách Module Recruiter Job Management (Post, Edit, Close), Candidate Application Submission, 7-Stage Application Lifecycle Tracking.
+- **Thành viên 3 (TV3)**: Phụ trách Module Interview Management & Evidence, AI Resume Matching Engine Integration & Candidate Ranking View, System Audit & Logs.
 
-Giữ `VITE_API_BASE_URL=http://localhost:5000/api` khi Backend dùng cấu hình mặc định. Vite mặc định phục vụ ứng dụng tại cổng `5173`.
+Chi tiết phân công nhiệm vụ và kế hoạch sprint: xem tại [docs/recruithub-team-work-assignment.md](file:///docs/recruithub-team-work-assignment.md).
 
-### 5. Kiểm tra kết nối
+---
 
-Mở `http://localhost:5173`. `HomePage` gọi `GET /api/health` qua Axios client; khi kết nối thành công, trang hiển thị thông báo từ Backend.
+## 8. Hướng dẫn làm việc với AI Coding Agent
 
-Health endpoint chỉ xác nhận Express đang phản hồi. Nó **không** xác nhận Backend đã kết nối CouchDB hoặc database nghiệp vụ đã được tạo.
-
-## Cấu hình môi trường
-
-| Phạm vi | Biến | Nguồn / trạng thái | Mục đích |
-|---|---|---|---|
-| Root / Docker | `COUCHDB_USER` | Có trong `.env.example` | Tài khoản admin CouchDB local |
-| Root / Docker | `COUCHDB_PASSWORD` | Có trong `.env.example` | Mật khẩu admin CouchDB local; phải thay giá trị mẫu |
-| Backend | `PORT` | Được source hỗ trợ, chưa có file mẫu riêng | Cổng HTTP; mặc định `5000` |
-| Backend | `FRONTEND_URL` | Được source hỗ trợ, chưa có file mẫu riêng | CORS origin; mặc định `http://localhost:5173` |
-| Frontend | `VITE_API_BASE_URL` | Có trong `frontend/.env.example` | Base URL của Backend API |
-
-Backend nạp biến qua `dotenv/config`. Nếu cần ghi đè `PORT` hoặc `FRONTEND_URL` khi chạy từ `backend/`, tạo `backend/.env` cục bộ và không commit file này.
-
-Biến có tiền tố `VITE_` được đóng gói vào mã chạy trên trình duyệt. Không lưu password, token bí mật hoặc CouchDB credentials trong các biến này.
-
-## Địa chỉ local
-
-| Thành phần | URL mặc định |
-|---|---|
-| Frontend | `http://localhost:5173` |
-| Backend | `http://localhost:5000` |
-| Backend health API | `http://localhost:5000/api/health` |
-| CouchDB API | `http://127.0.0.1:5984` |
-| Fauxton | `http://127.0.0.1:5984/_utils/` |
-
-Các URL có thể thay đổi nếu cổng hoặc biến môi trường được cấu hình khác.
-
-## Trạng thái phát triển
-
-| Hạng mục | Trạng thái | Bằng chứng / ghi chú |
-|---|---|---|
-| Infrastructure setup | **Đã kiểm chứng một phần** | Docker Compose hợp lệ; container CouchDB 3.5.2.1 đang chạy và API local phản hồi khi cập nhật tài liệu |
-| Backend initialization | **Đã triển khai và kiểm chứng** | Express app, CORS, JSON middleware, `server.js`; root endpoint và health endpoint phản hồi đúng khi chạy `npm start` |
-| Frontend initialization | **Đã triển khai** | React/Vite app, Router, HomePage và trang 404 cơ bản |
-| API integration | **Đã triển khai ở mức health check** | Axios client và HomePage gọi `/health`; chưa có API nghiệp vụ |
-| Database schema/data | **Dự kiến triển khai** | Chưa xác minh có `recruitment_db`, dataset, Mango Index hoặc MapReduce View |
-| Authentication/Authorization | **Dự kiến triển khai** | Chưa có source tương ứng |
-| Recruitment business modules | **Dự kiến triển khai** | Các feature Candidate, Job, Application và Interview chưa có implementation |
-| Resume Analysis/Ranking | **Dự kiến triển khai** | Chưa có thuật toán hoặc dữ liệu phân tích trong source |
-| Testing | **Chưa triển khai** | Backend `test` hiện chỉ là placeholder thất bại; Frontend chưa có test script |
-
-Backend được khởi động tạm thời bằng `npm start` để kiểm chứng hai endpoint rồi đã dừng sau khi kiểm tra. Health API chỉ xác nhận tiến trình Express, không xác nhận kết nối CouchDB.
-
-## Team Workflow
-
-- `main` là nhánh chính hiện tại.
-- Phát triển chức năng riêng trên feature branch khi phù hợp, ví dụ `feature/job-management`.
-- Viết commit nhỏ, rõ mục đích và review thay đổi trước khi merge.
-- Chạy các kiểm tra mà module hỗ trợ trước khi chia sẻ code.
-- Không commit `node_modules`, `.env`, credentials, backup nhạy cảm hoặc build output.
-- Không force push và không thay đổi module của thành viên khác khi không cần thiết.
-
-Repository hiện chưa có commit, Git remote hoặc GitHub workflow được xác minh; các quy tắc trên là workflow thống nhất cho quá trình phát triển tiếp theo.
-
-## Tài liệu
-
-- [Kiến trúc và quy tắc phát triển](./ARCHITECTURE.md)
-
-Thư mục `docs/` hiện chưa chứa tài liệu để liên kết.
-
-## License
-
-Repository chưa có file `LICENSE`. Chưa có giấy phép phần mềm được công bố.
+Khi cộng tác với AI Agent (Antigravity, Cursor, Claude...), bắt buộc tuân thủ:
+1. Đọc kỹ [AGENTS.md](file:///AGENTS.md) trước mọi phiên làm việc.
+2. Tuân thủ thứ tự ưu tiên Nguồn sự thật (Source of Truth).
+3. Triển khai theo vòng lặp chuẩn: **Kiểm tra mã nguồn → Đề xuất Mini Plan → Chờ duyệt → Viết code → Chạy kiểm thử tự động → Báo cáo nghiệm thu**.
+4. Không tự ý chỉnh sửa module ngoài phạm vi được giao.
