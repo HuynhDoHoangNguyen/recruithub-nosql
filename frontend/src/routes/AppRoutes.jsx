@@ -11,6 +11,7 @@ import JobSeekerDashboard from "../pages/Dashboard/JobSeekerDashboard";
 import JobList from "../pages/Jobs/JobList";
 import JobDetails from "../pages/Jobs/JobDetails";
 import CreateJob from "../pages/Jobs/CreateJob";
+import JobApplicantsPage from "../pages/Jobs/JobApplicantsPage";
 
 const AppRoutes = () => {
 	return (
@@ -34,6 +35,8 @@ const AppRoutes = () => {
 			<Route element={<ProtectedRoute allowedRoles={['recruiter']} />}>
 				<Route path="/recruiter/dashboard" element={<RecruiterDashboard />} />
 				<Route path="/recruiter/jobs/create" element={<CreateJob />} />
+				<Route path="/recruiter/jobs/:id/edit" element={<CreateJob />} />
+				<Route path="/recruiter/jobs/:id/applicants" element={<JobApplicantsPage />} />
 			</Route>
 
 			<Route element={<ProtectedRoute allowedRoles={['job-seeker']} />}>

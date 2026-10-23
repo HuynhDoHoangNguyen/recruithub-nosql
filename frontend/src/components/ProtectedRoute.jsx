@@ -2,6 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { getAccessToken } from '../utils/authHelper';
 import { jwtDecode } from 'jwt-decode';
 import dayjs from 'dayjs';
+import { normalizeRole } from '../features/applications/applicationPresentation';
 
 const ProtectedRoute = ({ allowedRoles }) => {
 	const token = getAccessToken();
@@ -18,7 +19,7 @@ const ProtectedRoute = ({ allowedRoles }) => {
 	const isExpired = !decoded?.exp || dayjs.unix(decoded.exp).isBefore(dayjs());
 	if (isExpired) return <Navigate to="/login" />;
 
-	if (!allowedRoles.includes(decoded.role)) {
+	if (!allowedRoles.map(normalizeRole).includes(normalizeRole(decoded.role))) {
 		return <Navigate to="/" replace />;
 	}
 

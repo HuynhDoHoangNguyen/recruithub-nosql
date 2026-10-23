@@ -102,7 +102,7 @@ const Profile = () => {
 		return <div className="text-center py-10">Admins do not have a profile.</div>;
 	}
 
-	const isRecruiter = user.role === 'recruiter';
+	const isRecruiter = ['recruiter', 'RECRUITER'].includes(user.role);
 	const isMobile = window.innerWidth <= 768;
 
 	const sections = isRecruiter
