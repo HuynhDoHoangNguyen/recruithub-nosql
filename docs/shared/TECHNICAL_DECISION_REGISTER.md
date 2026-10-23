@@ -18,6 +18,17 @@ Use these labels precisely:
 
 An approval is official across the team only when an acknowledgement is recorded in this register with approver, date, and scope. Silence, a prior proposal, or a passing test is not approval.
 
+## 2.1 TV1 pre-merge safety amendment (2026-10-23)
+
+| Topic | Status | Current TV1 implementation / pending decision |
+|---|---|---|
+| Admin status mutation | **IMPLEMENTED — TV1 restricted MVP policy** | Status changes targeting any `ADMIN` return 403 `ADMIN_STATUS_CHANGE_FORBIDDEN`; operator manages Admin status/recovery outside MVP. Candidate/Recruiter targets still require current revision. This avoids a cross-document last-Admin race without adding coordination storage. |
+| Local CORS | **IMPLEMENTED** | Exact comma-separated `FRONTEND_URL` origins only; explicit methods and `Authorization`, `Content-Type`, `If-Match`; `ETag` is exposed. Local ignored `.env` contains observed development origins; tracked `.env.example` retains stable localhost:5173. No wildcard. |
+| Candidate self-registration provenance | **PENDING DATA/team acknowledgement** | Current document-level `SOURCE` label conflicts with DATA-02A's audited-source meaning because registration values are user-entered, derived, and unavailable. Proposed mapping is document-level `mixed`, field origins identifying user input, derived values, and unavailable arrays; do not change existing documents or implementation until approved. |
+| Candidate self-service ID | **IMPLEMENTED convention; PENDING contract acknowledgement** | Registration uses `candidate:<sha256(canonical user_id)>`; imported dataset IDs remain `candidate:cms:<resume_id>`. Current Candidate schema accepts both. This documents the implementation shape but does not amend DATA-02A. |
+
+Admin recovery is operator-managed in the university MVP. This is a TV1 implementation restriction, not a newly approved global identity policy.
+
 ## 2. Ownership and approved boundaries
 
 | Area | Owner | Current boundary |
@@ -117,3 +128,19 @@ Group members should reply with explicit status, scope and any amendment. Record
 3. Freeze status/error and cursor contracts DR-013/018 with TV2/TV3 query evidence.
 4. Agree index governance, readiness exposure, audit storage and test isolation DR-014..017.
 5. Record approvers, date, contract version and implementation owners. Keep every unanswered item marked PENDING.
+
+## 9. Stage 04B task-level implementation record
+
+**Recorded:** 2026-10-23. **Authority:** requester approved provisional choices for this Stage 04B implementation. **Team status:** pending TV2/TV3/group acknowledgement; this record does not convert any DR entry to group-approved policy.
+
+| Decision area | Stage 04B implementation | Register status |
+|---|---|---|
+| Session (DR-002/008/010/011/020) | Bearer HS256 access JWT, 15-minute expiry, memory-only frontend storage, no refresh/session store, and local logout. A copied token remains valid until expiry. This differs from the earlier cookie+CSRF TV1 direction. | PENDING team acknowledgement; provisional TV1 MVP only. |
+| Password hashing (DR-009) | Argon2id with 65,536 KiB memory, time cost 3, parallelism 1. Signing secret is environment-supplied; no secret is committed. | PENDING team acknowledgement; provisional TV1 MVP only. |
+| Registration (DR-003/012) | Public Candidate only. New User starts RESET_REQUIRED, then the Candidate document is created/validated, then that newly created User is activated. Existing RESET_REQUIRED users are not changed. | PENDING team acknowledgement; provisional TV1 MVP only. |
+| Registration consistency | Deterministic User/Candidate IDs; duplicate User creation maps to 409. Candidate/activation failure returns `REGISTRATION_INCOMPLETE` and leaves the staged account non-login-capable for operator reconciliation. No automatic delete or blind retry. | Compatible with the current nine-document schemas; recovery policy still pending. |
+| RBAC (DR-006) | Server verifies Bearer JWT, reloads User and checks ACTIVE status; role checks use canonical uppercase roles. | TV1 implementation; principal/scope contract remains pending cross-team acknowledgement. |
+| Tests (DR-015) | Auth writes are tested with in-memory fake repositories; the existing `recruitment_db` is not used for write verification. | Test isolation followed for this task; live-write policy remains pending. |
+| Auth database isolation | Runtime auth persistence requires explicit `AUTH_COUCHDB_DATABASE` and refuses the protected `recruitment_db`; it does not create the configured database. | Implemented safety guard; isolated database setup remains a separate approved operation. |
+
+No existing decision is represented as approved by TV2, TV3, or the whole group. Before wider integration or deployment, record explicit acknowledgements, resolve the Bearer/cookie conflict, and approve recovery/session semantics.

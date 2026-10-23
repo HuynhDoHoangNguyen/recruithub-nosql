@@ -1,178 +1,51 @@
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import api from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
-import {
-	FaBriefcase,
-	FaMapMarkerAlt,
-	FaCheckCircle,
-	FaMoneyBillWave,
-} from 'react-icons/fa';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { FaBriefcase, FaCheckCircle } from 'react-icons/fa';
+import { getPublicJob, isPublicJobsMockMode } from '../../services/publicJobsApi';
+import { useAuth } from '../../context/useAuth';
 
 const JobDetails = () => {
-	const { id } = useParams();
-	const [job, setJob] = useState(null);
-	const [applied, setApplied] = useState(false);
-	const [status, setStatus] = useState(null);
-	const [applicationId, setApplicationId] = useState(null);
-	const [loading, setLoading] = useState(true);
-	const [isProcessing, setIsProcessing] = useState(false);
-	const { user } = useAuth();
+  const { id } = useParams();
+  const { user } = useAuth();
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				const jobRes = await api.get(`/jobs/${id}`);
-				setJob(jobRes.data);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    getPublicJob(id)
+      .then((data) => { if (active) setJob(data); })
+      .catch((requestError) => { if (active) setError(requestError.message || 'Không tải được tin tuyển dụng.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [id]);
 
-				if (user?.role === 'job-seeker') {
-					const appRes = await api.get(`/apply/${id}/status`);
-					setApplied(appRes.data.applied);
-					setStatus(appRes.data.status);
-					setApplicationId(appRes.data.applicationId);
-				}
-			} catch (err) {
-				console.error('Error fetching job or application:', err);
-			} finally {
-				setLoading(false);
-			}
-		};
+  if (loading) return <div role="status" className="min-h-screen flex items-center justify-center text-blue-700">Đang tải chi tiết việc làm…</div>;
+  if (error) return <main className="mx-auto max-w-4xl p-6"><div role="alert" className="message-error">{error}</div><Link className="mt-4 inline-block text-blue-700 underline" to="/jobs">Quay lại danh sách</Link></main>;
+  if (!job) return <main className="mx-auto max-w-4xl p-6 text-center"><p className="text-gray-600">Không tìm thấy tin tuyển dụng đang mở.</p><Link className="mt-4 inline-block text-blue-700 underline" to="/jobs">Quay lại danh sách</Link></main>;
 
-		fetchData();
-	}, [id, user]);
-
-	const handleApply = async () => {
-		setIsProcessing(true);
-		try {
-			const res = await api.post(`/apply/${id}`, {
-				resumeUrl: 'https://example.com/my-resume.pdf',
-			});
-			setApplied(true);
-			setStatus(res.data?.application?.status || 'pending');
-			setApplicationId(res.data?.application?._id);
-		} catch (err) {
-			console.error('Application failed', err);
-			alert('Failed to apply. Please try again later.');
-		} finally {
-			setIsProcessing(false);
-		}
-	};
-
-	const handleWithdraw = async () => {
-		if (!applicationId) return;
-		setIsProcessing(true);
-		try {
-			await api.delete(`/apply/${applicationId}`);
-			setApplied(false);
-			setStatus(null);
-			setApplicationId(null);
-		} catch (err) {
-			console.error('Failed to withdraw application', err);
-			alert('Could not withdraw your application.');
-		} finally {
-			setIsProcessing(false);
-		}
-	};
-
-	if (loading) {
-		return (
-			<div className="flex justify-center items-center min-h-screen bg-white">
-				<div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-			</div>
-		);
-	}
-
-	if (!job) {
-		return <div className="text-center mt-20 text-gray-600">Job not found.</div>;
-	}
-
-	const statusBadgeClasses = {
-		accepted: 'bg-green-100 text-green-700',
-		rejected: 'bg-red-100 text-red-700',
-		pending: 'bg-yellow-100 text-yellow-700',
-	};
-
-	return (
-		<div className="min-h-screen bg-blue-50 p-6">
-			<div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8 relative">
-
-				{/* Status Badge */}
-				{applied && (
-					<div
-						className={`absolute top-6 right-6 text-sm font-semibold px-3 py-1 rounded-full uppercase tracking-wide ${statusBadgeClasses[status] || 'bg-gray-200 text-gray-700'}`}
-					>
-						{status}
-					</div>
-				)}
-
-				<h1 className="text-3xl font-bold text-blue-800 mb-2">{job.title}</h1>
-
-				<div className="text-gray-600 flex flex-wrap items-center gap-4 mb-4">
-					<p className="flex items-center gap-2"><FaBriefcase /> {job.company}</p>
-					<p className="flex items-center gap-2"><FaMapMarkerAlt /> {job.location}</p>
-					<p className="flex items-center gap-2"><FaMoneyBillWave /> ${job.salary?.toLocaleString() || 'N/A'} /year</p>
-				</div>
-
-				<div className="flex flex-wrap gap-4 text-sm text-blue-600 font-medium mb-4">
-					<p>Job Type: {job.jobType}</p>
-					<p>Experience: {job.experienceLevel}</p>
-					<p>Status: {job.status}</p>
-				</div>
-
-				<hr className="my-4" />
-
-				<div>
-					<h2 className="text-xl font-semibold text-blue-700 mb-2">Job Description</h2>
-					<p className="text-gray-700 leading-relaxed whitespace-pre-line">{job.description}</p>
-				</div>
-
-				{job.tags?.length > 0 && (
-					<div className="mt-6">
-						<h3 className="text-md font-semibold text-blue-700 mb-2">Skills Required</h3>
-						<div className="flex flex-wrap gap-2">
-							{job.tags.map((tag, idx) => (
-								<span
-									key={idx}
-									className="bg-blue-100 text-blue-700 text-sm px-3 py-1 rounded-full"
-								>
-									{tag}
-								</span>
-							))}
-						</div>
-					</div>
-				)}
-
-				{/* Apply / Withdraw */}
-				{user?.role === 'job-seeker' && !applied && (
-					<button
-						onClick={handleApply}
-						disabled={isProcessing}
-						className={`mt-8 px-6 py-2 rounded shadow text-white transition ${isProcessing ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-						aria-label="Apply for this job"
-					>
-						{isProcessing ? 'Applying...' : 'Apply Now'}
-					</button>
-				)}
-
-				{applied && (
-					<div className="mt-8 text-green-600 font-semibold flex flex-col sm:flex-row sm:items-center gap-4">
-						<p className="flex items-center">
-							<FaCheckCircle className="mr-2" />
-							You have already applied.
-						</p>
-						<button
-							onClick={handleWithdraw}
-							disabled={isProcessing}
-							className={`px-4 py-2 rounded shadow text-white transition ${isProcessing ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
-							aria-label="Withdraw your application"
-						>
-							{isProcessing ? 'Processing...' : 'Withdraw Application'}
-						</button>
-					</div>
-				)}
-			</div>
-		</div>
-	);
+  return (
+    <main className="min-h-screen bg-blue-50 p-4 sm:p-6">
+      <article className="mx-auto max-w-4xl rounded-xl bg-white p-6 shadow-md sm:p-8">
+        {isPublicJobsMockMode && <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">Dữ liệu fixture phát triển · API công khai do TV2 cung cấp đang chờ tích hợp.</div>}
+        <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">{job.status}</span>
+        <h1 className="mt-4 text-3xl font-bold text-blue-800">{job.title}</h1>
+        <p className="mt-2 flex items-center gap-2 text-gray-600"><FaBriefcase aria-hidden="true" />{job.company.name} · {job.industry}</p>
+        <div className="mt-4 flex flex-wrap gap-3 text-sm text-gray-600"><span>{job.seniority}</span><span>Hạn ứng tuyển: {job.deadline ? new Date(job.deadline).toLocaleDateString('vi-VN') : 'Chưa có thông tin'}</span></div>
+        <hr className="my-6" />
+        <section><h2 className="text-xl font-semibold text-blue-700">Mô tả công việc</h2><p className="mt-3 whitespace-pre-line leading-relaxed text-gray-700">{job.description}</p></section>
+        <section className="mt-6"><h2 className="text-xl font-semibold text-blue-700">Trách nhiệm</h2><ul className="mt-3 list-disc space-y-2 pl-6 text-gray-700">{job.responsibilities.map((item) => <li key={item}>{item}</li>)}</ul></section>
+        <section className="mt-6"><h2 className="text-xl font-semibold text-blue-700">Kỹ năng yêu cầu</h2><div className="mt-3 flex flex-wrap gap-2">{job.requiredSkills.map((skill) => <span key={skill} className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800">{skill}</span>)}</div></section>
+        <section className="mt-6"><h2 className="text-xl font-semibold text-blue-700">Kỹ năng ưu tiên</h2><div className="mt-3 flex flex-wrap gap-2">{job.optionalSkills.length ? job.optionalSkills.map((skill) => <span key={skill} className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">{skill}</span>) : <p className="text-gray-500">Không có thông tin.</p>}</div></section>
+        <div className="mt-8 rounded-lg bg-blue-50 p-4">
+          <div className="flex items-start gap-3"><FaCheckCircle className="mt-1 text-blue-700" aria-hidden="true" /><div><p className="font-semibold text-gray-900">Nộp hồ sơ</p>{user?.role === 'CANDIDATE' ? <p className="mt-1 text-sm text-gray-700">Luồng ứng tuyển do TV2 phát triển và chưa được tích hợp vào cổng công khai.</p> : user ? <p className="mt-1 text-sm text-gray-700">Chỉ tài khoản ứng viên mới có thể nộp hồ sơ.</p> : <p className="mt-1 text-sm text-gray-700">Đăng nhập hoặc tạo tài khoản ứng viên để tiếp tục khi luồng ứng tuyển sẵn sàng.</p>}</div></div>
+          {!user && <div className="mt-4 flex gap-3"><Link className="btn-primary" to="/login">Đăng nhập</Link><Link className="btn-secondary" to="/register">Đăng ký ứng viên</Link></div>}
+        </div>
+        <Link className="mt-6 inline-block text-blue-700 underline" to="/jobs">Quay lại danh sách việc làm</Link>
+      </article>
+    </main>
+  );
 };
 
 export default JobDetails;

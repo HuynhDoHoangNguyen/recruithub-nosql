@@ -28,6 +28,13 @@ export class BaseRepository {
     return this.client.find(query);
   }
 
+  async listByIdPrefix(prefix, options = {}) {
+    if (typeof this.client.listDocumentsByIdPrefix !== 'function') {
+      throw new TypeError('The configured client does not support ID-prefix scans.');
+    }
+    return this.client.listDocumentsByIdPrefix(prefix, options);
+  }
+
   async create(document) {
     this.validate(document);
     return this.client.createDocument(document);

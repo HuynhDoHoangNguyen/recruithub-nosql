@@ -221,3 +221,8 @@ TV2/TV3 integration checklist:
 - [ ] Keep authorization/ownership checks in the business service; the base repository does not enforce them.
 
 Known test limitation: `npm.cmd test` runs only `tests/data/*.test.js` and includes legacy data pipeline, release publication and CouchDB acceptance cases. That suite has previously failed on missing release inputs/checksum mismatches and failure-injection assertions. It also creates and removes shared scratch paths under `data/`, so rerun only after verifying those paths and any pointer/release side effects are safe. Foundation and runtime route tests are run explicitly with `node --test tests/foundation/*.test.js`.
+
+
+## Read-only ID-prefix scans (TV1 Stage 05?10)
+
+`CouchDbClient.listDocumentsByIdPrefix(prefix, { afterId, limit })` is a read-only GET wrapper for CouchDB built-in `_all_docs`. It requires a colon-terminated safe prefix, validates `afterId` belongs to that prefix, and caps pages at 1,000 rows (default 250). It returns `{docs,lastId,hasMore}`; reads include full documents and should be limited to trusted backend service use. `BaseRepository.listByIdPrefix` delegates to it; UserRepository and CandidateRepository pin the prefix to their own document types. This does not create Mango indexes or views. Full-range scans cost more than indexed queries and should be replaced only after a separately reviewed index/query proposal.

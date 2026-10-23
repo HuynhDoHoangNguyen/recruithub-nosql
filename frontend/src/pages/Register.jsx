@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
 
 const Register = () => {
 	const navigate = useNavigate();
-	const { login } = useAuth();
 	const [form, setForm] = useState({
-		name: '',
+		full_name: '',
 		email: '',
 		password: '',
-		role: 'job-seeker',
+		candidate_role: '',
+		industry: '',
+		seniority: 'JUNIOR',
+		years_experience: '0',
 	});
 	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(false);
@@ -48,19 +49,13 @@ const Register = () => {
 
 		try {
 			setLoading(true);
-			const res = await api.post('/auth/register', form);
-			const accessToken = res.data?.accessToken;
-			if (accessToken) {
-				login(accessToken);
-				navigate('/');
-				return;
-			}
-
-			// Fallback: if backend didn't return accessToken for some reason
-			setError('Registration succeeded but no access token returned. Please log in.');
-			navigate('/login');
+			await api.post('/v1/auth/register', {
+				...form,
+				years_experience: Number(form.years_experience),
+			});
+			navigate('/login', { state: { registered: true } });
 		} catch (err) {
-			setError(err.response?.data?.message || err.response?.data?.error || 'Registration failed');
+			setError(err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Registration failed');
 		} finally {
 			setLoading(false);
 		}
@@ -99,16 +94,16 @@ const Register = () => {
 					
 					<form onSubmit={handleSubmit} className="space-y-6">
 						<div>
-							<label htmlFor="name" className="form-label">
+							<label htmlFor="full_name" className="form-label">
 								Full Name
 							</label>
 							<div className="relative">
 								<input
-									name="name"
-									id="name"
+									name="full_name"
+									id="full_name"
 									type="text"
 									placeholder="Enter your full name"
-									value={form.name}
+									value={form.full_name}
 									onChange={handleChange}
 									required
 									className="input-field pl-10"
@@ -211,53 +206,25 @@ const Register = () => {
 						</div>
 
 						<div>
-							<label htmlFor="role" className="form-label">
-								I am a
-							</label>
-							<div className="grid grid-cols-2 gap-3">
-								<label className={`relative flex cursor-pointer rounded-lg p-4 border-2 ${
-									form.role === 'job-seeker' 
-										? 'border-blue-500 bg-blue-50' 
-										: 'border-gray-200 bg-white hover:border-gray-300'
-								} transition-all`}>
-									<input
-										type="radio"
-										name="role"
-										value="job-seeker"
-										checked={form.role === 'job-seeker'}
-										onChange={handleChange}
-										className="sr-only"
-									/>
-									<div className="flex items-center">
-										<div className="text-2xl mr-3">👤</div>
-										<div>
-											<div className="font-medium text-gray-900">Job Seeker</div>
-											<div className="text-sm text-gray-500">Looking for opportunities</div>
-										</div>
-									</div>
-								</label>
-
-								<label className={`relative flex cursor-pointer rounded-lg p-4 border-2 ${
-									form.role === 'recruiter' 
-										? 'border-blue-500 bg-blue-50' 
-										: 'border-gray-200 bg-white hover:border-gray-300'
-								} transition-all`}>
-									<input
-										type="radio"
-										name="role"
-										value="recruiter"
-										checked={form.role === 'recruiter'}
-										onChange={handleChange}
-										className="sr-only"
-									/>
-									<div className="flex items-center">
-										<div className="text-2xl mr-3">🏢</div>
-										<div>
-											<div className="font-medium text-gray-900">Recruiter</div>
-											<div className="text-sm text-gray-500">Hiring talent</div>
-										</div>
-									</div>
-								</label>
+							<label htmlFor="candidate_role" className="form-label">Desired role</label>
+							<input name="candidate_role" id="candidate_role" type="text" placeholder="e.g. Product Designer" value={form.candidate_role} onChange={handleChange} required maxLength={120} className="input-field" />
+						</div>
+						<div>
+							<label htmlFor="industry" className="form-label">Industry</label>
+							<input name="industry" id="industry" type="text" placeholder="e.g. Technology" value={form.industry} onChange={handleChange} required maxLength={120} className="input-field" />
+						</div>
+						<div className="grid grid-cols-2 gap-3">
+							<div>
+								<label htmlFor="seniority" className="form-label">Seniority</label>
+								<select name="seniority" id="seniority" value={form.seniority} onChange={handleChange} className="input-field">
+									<option value="JUNIOR">Junior</option>
+									<option value="MID">Mid-level</option>
+									<option value="SENIOR">Senior</option>
+								</select>
+							</div>
+							<div>
+								<label htmlFor="years_experience" className="form-label">Years experience</label>
+								<input name="years_experience" id="years_experience" type="number" min="0" max="80" step="1" value={form.years_experience} onChange={handleChange} required className="input-field" />
 							</div>
 						</div>
 

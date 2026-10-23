@@ -35,6 +35,10 @@
     @apply p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-lg text-sm font-medium;
   }
 
+  .message-success {
+    @apply p-4 bg-green-50 border-l-4 border-green-500 text-green-700 rounded-lg text-sm font-medium;
+  }
+
   /* Loading Spinner */
   .loading-spinner {
     @apply inline-block w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin;

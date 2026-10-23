@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 
 const Login = () => {
-	const { user, login } = useAuth();
+	const { user, login, refreshMe } = useAuth();
 	const navigate = useNavigate();
+	const location = useLocation();
 	const [form, setForm] = useState({ email: '', password: '' });
 	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(false);
@@ -19,11 +20,13 @@ const Login = () => {
 		setError('');
 		setLoading(true);
 		try {
-			const res = await api.post('/auth/login', form);
-			const { accessToken, refreshToken } = res.data;
-			login(accessToken, refreshToken);
+			const res = await api.post('/v1/auth/login', form);
+			const { accessToken, user: authenticatedUser } = res.data?.data ?? {};
+			if (!accessToken || !authenticatedUser) throw new Error('Invalid sign-in response.');
+			login(accessToken, authenticatedUser);
+			await refreshMe();
 		} catch (err) {
-			setError(err.response?.data?.message || 'Login failed');
+			setError(err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Login failed');
 		} finally {
 			setLoading(false);
 		}
@@ -56,6 +59,9 @@ const Login = () => {
 
 				{/* Form */}
 				<div className="card p-8">
+					{location.state?.registered && (
+						<div className="message-success mb-6">Account created. Please sign in to continue.</div>
+					)}
 					{error && (
 						<div className="message-error mb-6">
 							{error}

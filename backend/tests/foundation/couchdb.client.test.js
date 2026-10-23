@@ -38,6 +38,26 @@ test('readiness and database metadata only issue GET requests', async () => {
   assert.equal(calls[0].options.headers.Authorization.startsWith('Basic '), true);
 });
 
+test('ID-prefix document scan uses CouchDB built-in all_docs read endpoint', async () => {
+  const calls = [];
+  const client = new CouchDbClient({
+    config,
+    fetchImpl: async (url, options) => {
+      calls.push({ url: new URL(url), options });
+      return response(200, { rows: [{ id: 'user:abc', key: 'user:abc', doc: { _id: 'user:abc', type: 'user' } }] });
+    },
+  });
+  const page = await client.listDocumentsByIdPrefix('user:', { limit: 10 });
+  assert.equal(calls[0].options.method, 'GET');
+  assert.equal(calls[0].url.pathname, '/recruitment_db/_all_docs');
+  assert.equal(calls[0].url.searchParams.get('include_docs'), 'true');
+  assert.deepEqual(page.docs, [{ _id: 'user:abc', type: 'user' }]);
+  assert.equal(page.lastId, 'user:abc');
+  assert.equal(page.hasMore, false);
+  await assert.rejects(() => client.listDocumentsByIdPrefix('user:', { afterId: 'candidate:abc' }), TypeError);
+  await assert.rejects(() => client.listDocumentsByIdPrefix('user:', { limit: 1001 }), TypeError);
+});
+
 test('CRUD uses deterministic ids and expected revision without mutating input', async () => {
   const calls = [];
   const client = new CouchDbClient({

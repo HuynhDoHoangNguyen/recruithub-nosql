@@ -1,28 +1,16 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { getAccessToken } from '../utils/authHelper';
-import { jwtDecode } from 'jwt-decode';
-import dayjs from 'dayjs';
+import { useAuth } from '../context/useAuth';
 
-const ProtectedRoute = ({ allowedRoles }) => {
-	const token = getAccessToken();
-
-	if (!token) return <Navigate to="/login" />;
-
-	let decoded;
-	try {
-		decoded = jwtDecode(token);
-	} catch {
-		return <Navigate to="/login" />;
-	}
-
-	const isExpired = !decoded?.exp || dayjs.unix(decoded.exp).isBefore(dayjs());
-	if (isExpired) return <Navigate to="/login" />;
-
-	if (!allowedRoles.includes(decoded.role)) {
-		return <Navigate to="/" replace />;
-	}
-
-	return <Outlet />;
+const ProtectedRoute = ({ allowedRoles = [] }) => {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return <div className="flex justify-center items-center min-h-screen"><div className="loading-spinner" /></div>;
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (allowedRoles.length && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

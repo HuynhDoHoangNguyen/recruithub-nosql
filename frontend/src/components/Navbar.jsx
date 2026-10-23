@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 const Navbar = () => {
 	const { user, logout } = useAuth();
@@ -19,11 +19,11 @@ const Navbar = () => {
 	const getDashboardRoute = () => {
 		if (!user) return "/";
 		switch (user.role) {
-			case "admin":
+			case "ADMIN":
 				return "/admin/dashboard";
-			case "recruiter":
+			case "RECRUITER":
 				return "/recruiter/dashboard";
-			case "job-seeker":
+			case "CANDIDATE":
 				return "/user/dashboard";
 			default:
 				return "/";
@@ -31,7 +31,7 @@ const Navbar = () => {
 	};
 
 	const getProfileRoute = () => {
-		if (!user || user.role === "admin") return null;
+		if (!user || user.role === "ADMIN") return null;
 		return "/profile";
 	};
 
@@ -89,11 +89,11 @@ const Navbar = () => {
 								<div className="flex items-center space-x-2">
 									<div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
 										<span className="text-blue-600 font-semibold text-sm">
-											{user.name?.charAt(0).toUpperCase()}
+											{(user.name || user.email || '?').charAt(0).toUpperCase()}
 										</span>
 									</div>
 									<span className="text-gray-700 font-medium text-sm">
-										{user.name}
+										{user.name || user.email}
 									</span>
 								</div>
 								<button
@@ -156,11 +156,11 @@ const Navbar = () => {
 										<div className="flex items-center space-x-3">
 											<div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
 												<span className="text-blue-600 font-semibold">
-													{user.name?.charAt(0).toUpperCase()}
+													{(user.name || user.email || '?').charAt(0).toUpperCase()}
 												</span>
 											</div>
 											<div>
-												<p className="text-gray-900 font-medium">{user.name}</p>
+												<p className="text-gray-900 font-medium">{user.name || user.email}</p>
 												<p className="text-gray-500 text-sm capitalize">{user.role}</p>
 											</div>
 										</div>

@@ -121,6 +121,35 @@ export class CouchDbClient {
     );
   }
 
+  async listDocumentsByIdPrefix(prefix, { afterId, limit = 250 } = {}) {
+    if (typeof prefix !== 'string' || !/^[a-z][a-z0-9_-]*:$/.test(prefix)) {
+      throw new TypeError('Document ID prefix is invalid.');
+    }
+    if (afterId !== undefined && (typeof afterId !== 'string' || !afterId.startsWith(prefix))) {
+      throw new TypeError('afterId must belong to the requested document ID prefix.');
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+      throw new TypeError('limit must be an integer from 1 to 1000.');
+    }
+    const params = new URLSearchParams({
+      include_docs: 'true',
+      limit: String(limit),
+      startkey: JSON.stringify(afterId ?? prefix),
+      endkey: JSON.stringify(`${prefix}\ufff0`),
+    });
+    if (afterId) params.set('skip', '1');
+    const result = await this.#request(`/${encodePathSegment(this.config.database)}/_all_docs?${params}`, {
+      operation: 'list-documents-by-id-prefix',
+      databaseRequest: false,
+    });
+    const rows = result.rows ?? [];
+    return {
+      docs: rows.map((row) => row.doc).filter(Boolean),
+      lastId: rows.at(-1)?.id ?? afterId ?? null,
+      hasMore: rows.length === limit,
+    };
+  }
+
   async createDocument(document) {
     this.assertDocument(document);
     if (typeof document._id !== 'string' || document._id.length === 0) {

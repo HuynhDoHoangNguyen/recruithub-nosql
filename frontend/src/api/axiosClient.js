@@ -1,8 +1,3 @@
-﻿import axios from 'axios';
-
-const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-  timeout: 10000,
-});
-
-export default axiosClient;
+// Compatibility re-export for existing imports. All requests share the same
+// configured Axios instance and in-memory Bearer token interceptor.
+export { default } from '../services/api';

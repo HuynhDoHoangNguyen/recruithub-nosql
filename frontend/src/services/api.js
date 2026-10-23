@@ -1,54 +1,26 @@
 import axios from 'axios';
-import { jwtDecode } from 'jwt-decode';
-import dayjs from 'dayjs';
-import { getAccessToken, setAccessToken, logout } from '../utils/authHelper';
-import { toast } from 'react-toastify'; // Make sure react-toastify is installed and set up
-
-let accessToken = getAccessToken();
+import { getAccessToken } from '../utils/authHelper';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1',
-  withCredentials: true,
-  headers: {
-    Authorization: `Bearer ${accessToken}`
-  }
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5002/api',
+  timeout: 10000,
 });
 
-api.interceptors.request.use(async (req) => {
-  accessToken = getAccessToken();
+api.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  else delete config.headers.Authorization;
+  return config;
+});
 
-  if (!accessToken) return req;
-
-  try {
-    const decoded = jwtDecode(accessToken);
-    const isExpired = dayjs.unix(decoded.exp).diff(dayjs()) < 1000;
-
-    if (!isExpired) {
-      req.headers.Authorization = `Bearer ${accessToken}`;
-      return req;
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('auth:unauthorized'));
     }
-
-    // Token expired - attempt to refresh
-    const res = await axios.post(
-      ' ',
-      {},
-      { withCredentials: true }
-    );
-
-    const newAccessToken = res.data.accessToken;
-    setAccessToken(newAccessToken);
-    req.headers.Authorization = `Bearer ${newAccessToken}`;
-    return req;
-
-  } catch (err) {
-    logout();
-
-    // 👇 Notify the user before redirecting
-    toast.error('Session expired. Please log in again.');
-
-    window.location.href = '/login';
-    return Promise.reject(err);
-  }
-});
+    return Promise.reject(error);
+  },
+);
 
 export default api;

@@ -1,264 +1,61 @@
-// src/pages/Jobs/JobList.jsx
-import React, { useEffect, useState } from 'react';
-import api from '../../services/api';
-import { Link } from 'react-router-dom';
-
-const SDE_SKILLS = [
-	"JavaScript", "React", "TypeScript", "HTML", "CSS", "Node.js", "MongoDB", "Docker", "Python", "Django", "AWS", "Express", "Redux", "Bash", "CI/CD", "Git", "Swagger", "Figma", "Communication", "Problem Solving", "React Native"
-
-];
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { isPublicJobsMockMode, listPublicJobs } from '../../services/publicJobsApi';
 
 const JobList = () => {
-	const [jobs, setJobs] = useState([]);
-	const [search, setSearch] = useState('');
-	const [loading, setLoading] = useState(false);
-	const [showAllSkills, setShowAllSkills] = useState(false);
-	const [showFilters, setShowFilters] = useState(false);
-	const [filters, setFilters] = useState({
-		workMode: '',
-		location: '',
-		company: '',
-		skills: [],
-	});
+  const [params, setParams] = useSearchParams();
+  const [search, setSearch] = useState(params.get('q') || '');
+  const [industry, setIndustry] = useState('');
+  const [seniority, setSeniority] = useState('');
+  const [sort, setSort] = useState('newest');
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState({ jobs: [], total: 0, nextPage: null });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-	const fetchJobs = async (search = '') => {
-		setLoading(true);
-		try {
-			let url = '/jobs/all';
-			if (search.trim()) {
-				url += `?q=${encodeURIComponent(search.trim())}`;
-			}
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    listPublicJobs({ search: params.get('q') || search, industry, seniority, sort, page })
+      .then((data) => { if (active) setResult(data); })
+      .catch((requestError) => { if (active) setError(requestError.message || 'Không tải được việc làm.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [params, search, industry, seniority, sort, page]);
 
-			const res = await api.get(url);
-			setJobs(res.data || []);
-		} catch (err) {
-			console.error(err);
-		}
-		setLoading(false);
-	};
+  const submitSearch = (event) => {
+    event.preventDefault();
+    setPage(1);
+    setParams(search.trim() ? { q: search.trim() } : {});
+  };
 
-
-
-	useEffect(() => {
-		fetchJobs(search);
-	}, [search]);
-
-
-	const handleFilterChange = (e) => {
-		const { name, value, checked } = e.target;
-		if (name === 'skills') {
-			setFilters((prev) => ({
-				...prev,
-				skills: checked
-					? [...prev.skills, value]
-					: prev.skills.filter((s) => s !== value),
-			}));
-		} else {
-			setFilters((prev) => ({ ...prev, [name]: value }));
-		}
-	};
-
-	const clearFilters = () => {
-		setFilters({
-			workMode: '',
-			location: '',
-			company: '',
-			skills: [],
-		});
-	};
-
-	const applyFilters = async () => {
-		setLoading(true);
-		await fetchJobs();
-		setLoading(false);
-	};
-
-	const filteredJobs = jobs.filter((job) => {
-		const loc = job.location?.toLowerCase() || '';
-		const comp = job.company?.toLowerCase() || '';
-		const skills = job.skills || [];
-
-		const matchesLocation = filters.location
-			? loc.includes(filters.location.toLowerCase())
-			: true;
-
-		const matchesCompany = filters.company
-			? comp.includes(filters.company.toLowerCase())
-			: true;
-
-		const matchesSkills =
-			filters.skills.length > 0
-				? filters.skills.every((skill) =>
-					skills.map((t) => t.toLowerCase()).includes(skill.toLowerCase())
-				)
-				: true;
-
-		let matchesWorkMode = true;
-		if (filters.workMode === 'remote') {
-			matchesWorkMode = loc.includes('remote');
-		} else if (filters.workMode === 'onsite') {
-			matchesWorkMode = !loc.includes('remote');
-		}
-
-		return matchesLocation && matchesCompany && matchesSkills && matchesWorkMode;
-	});
-
-	return (
-		<div className="min-h-screen bg-blue-50 p-4 md:p-6 relative">
-			<div className="max-w-7xl mx-auto flex flex-col md:grid md:grid-cols-4 gap-6">
-
-				{/* Mobile Filters Toggle */}
-				<div className="md:hidden flex justify-between items-center mb-2">
-					<h2 className="text-xl font-semibold text-blue-700">Filters</h2>
-					<button
-						className="text-blue-700 font-medium text-base bg-blue-100 px-4 py-2 rounded hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
-						onClick={() => setShowFilters((prev) => !prev)}
-					>
-						{showFilters ? 'Hide Filters' : 'Show Filters'}
-					</button>
-				</div>
-
-				{/* Filters Sidebar */}
-				{(showFilters || window.innerWidth >= 768) && (
-					<div className="bg-white p-5 rounded shadow space-y-5 md:block">
-						<div className="flex justify-between items-center">
-							<h2 className="text-lg font-semibold text-blue-700">All Filters</h2>
-							<button
-								className="text-sm text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-300 px-2 py-1 rounded"
-								onClick={clearFilters}
-							>
-								Clear
-							</button>
-						</div>
-
-						{/* Work Mode */}
-						<div>
-							<h3 className="font-medium text-gray-700 mb-2">Work Mode</h3>
-							{['remote', 'onsite', 'hybrid'].map((mode) => (
-								<label key={mode} className="flex items-center text-sm text-gray-600 mb-1 space-x-2">
-									<input
-										type="radio"
-										name="workMode"
-										value={mode}
-										checked={filters.workMode === mode}
-										onChange={handleFilterChange}
-										className="accent-blue-600"
-									/>
-									<span>{mode.charAt(0).toUpperCase() + mode.slice(1)}</span>
-								</label>
-							))}
-						</div>
-
-						{/* Skills */}
-						<div>
-							<h3 className="font-medium text-gray-700 mb-2">Skills</h3>
-							{(showAllSkills ? SDE_SKILLS : SDE_SKILLS.slice(0, 5)).map((skill) => (
-								<label key={skill} className="flex items-center text-sm text-gray-600 mb-1 space-x-2">
-									<input
-										type="checkbox"
-										name="skills"
-										value={skill}
-										checked={filters.skills.includes(skill)}
-										onChange={handleFilterChange}
-										className="accent-blue-600"
-									/>
-									<span>{skill}</span>
-								</label>
-							))}
-							<button
-								className="text-blue-600 text-sm mt-1 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-300 px-2 py-1 rounded"
-								onClick={() => setShowAllSkills((prev) => !prev)}
-							>
-								{showAllSkills ? 'Show Less' : 'Show More'}
-							</button>
-						</div>
-
-						{/* Location */}
-						<div>
-							<h3 className="font-medium text-gray-700 mb-2">Location</h3>
-							<input
-								name="location"
-								value={filters.location}
-								onChange={handleFilterChange}
-								placeholder="Enter location"
-								className="w-full p-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-							/>
-						</div>
-
-						{/* Company */}
-						<div>
-							<h3 className="font-medium text-gray-700 mb-2">Company</h3>
-							<input
-								name="company"
-								value={filters.company}
-								onChange={handleFilterChange}
-								placeholder="Enter company"
-								className="w-full p-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-							/>
-						</div>
-
-						<button
-							onClick={applyFilters}
-							className="mt-4 w-full bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 text-white font-semibold text-base py-2 rounded transition"
-						>
-							Apply Filters
-						</button>
-					</div>
-				)}
-
-				{/* Job Listings */}
-				<div className="md:col-span-3 space-y-4">
-					<div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
-						<h1 className="text-2xl font-bold text-blue-800">Job Listings</h1>
-						<input
-							className="border p-3 rounded w-full md:w-64 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-							placeholder="Search jobs..."
-							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-						/>
-					</div>
-
-					{filteredJobs.length === 0 ? (
-						<p className="text-gray-500 mt-6">No jobs found.</p>
-					) : (
-						filteredJobs.map((job) => (
-							<Link
-								to={`/jobs/${job._id}`}
-								key={job._id}
-								className="block bg-white p-6 rounded shadow group hover:shadow-lg hover:ring-2 hover:ring-blue-300 focus:ring-2 focus:ring-blue-300 transition"
-							>
-								<h3 className="text-xl font-bold text-blue-700 group-hover:text-blue-900">
-									{job.title}
-								</h3>
-								<p className="text-gray-600">{job.company} • {job.location}</p>
-								<p className="text-gray-500 mt-1">
-									Salary: ${job.salary?.toLocaleString() || 'N/A'}
-								</p>
-								<div className="mt-2 flex flex-wrap gap-2">
-									{job.skills?.map((skill, idx) => (
-										<span
-											key={idx}
-											className="bg-blue-100 text-blue-700 text-sm px-2 py-1 rounded-full"
-										>
-											{skill}
-										</span>
-									))}
-								</div>
-
-							</Link>
-						))
-					)}
-				</div>
-			</div>
-
-			{/* Fullscreen Loader */}
-			{loading && (
-				<div className="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center">
-					<div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-				</div>
-			)}
-		</div>
-	);
+  return (
+    <main className="min-h-screen bg-blue-50 p-4 md:p-6">
+      <div className="mx-auto max-w-7xl">
+        {isPublicJobsMockMode && <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">Chế độ xem thử: đang hiển thị dữ liệu fixture phát triển. Tích hợp API việc làm TV2 đang chờ contract.</div>}
+        <header className="mb-6"><h1 className="text-3xl font-bold text-blue-800">Việc làm đang mở</h1><p className="mt-2 text-gray-600">Chỉ hiển thị tin có trạng thái OPEN.</p></header>
+        <form onSubmit={submitSearch} className="mb-6 grid gap-3 rounded-xl bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-5">
+          <label className="form-label lg:col-span-2">Tìm kiếm<input className="input-field" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Vị trí, công ty, kỹ năng" /></label>
+          <label className="form-label">Ngành<select className="input-field" value={industry} onChange={(event) => { setIndustry(event.target.value); setPage(1); }}><option value="">Tất cả</option><option>Technology</option><option>Finance</option><option>Healthcare</option></select></label>
+          <label className="form-label">Cấp độ<select className="input-field" value={seniority} onChange={(event) => { setSeniority(event.target.value); setPage(1); }}><option value="">Tất cả</option><option value="JUNIOR">Junior</option><option value="MID">Mid</option><option value="SENIOR">Senior</option></select></label>
+          <label className="form-label">Sắp xếp<select className="input-field" value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }}><option value="newest">Mới nhất</option><option value="title">Tên vị trí</option></select></label>
+          <button className="btn-primary sm:col-span-2 lg:col-span-5" type="submit">Tìm việc</button>
+        </form>
+        {loading ? <div role="status" className="py-16 text-center text-blue-700">Đang tải danh sách việc làm…</div> : error ? <div role="alert" className="message-error">{error}</div> : result.jobs.length === 0 ? <div className="rounded-xl bg-white py-16 text-center text-gray-500 shadow-sm">Không có việc làm phù hợp.</div> : (
+          <section className="space-y-4" aria-label="Danh sách việc làm">
+            <p className="text-sm text-gray-600">{result.total} vị trí phù hợp</p>
+            {result.jobs.map((job) => <Link to={`/jobs/${encodeURIComponent(job.id)}`} key={job.id} className="block rounded-xl bg-white p-5 shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row"><div><h2 className="text-xl font-semibold text-blue-800">{job.title}</h2><p className="mt-1 text-gray-600">{job.company.name} · {job.industry}</p></div><span className="h-fit rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">OPEN</span></div>
+              <p className="mt-3 line-clamp-2 text-gray-700">{job.description}</p><div className="mt-3 flex flex-wrap gap-2">{job.requiredSkills.map((skill) => <span key={skill} className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800">{skill}</span>)}</div>
+              <p className="mt-3 text-sm text-gray-500">{job.seniority} · Hạn ứng tuyển: {job.deadline ? new Date(job.deadline).toLocaleDateString('vi-VN') : 'Chưa có thông tin'}</p>
+            </Link>)}
+            <div className="flex justify-center gap-3 pt-3"><button className="btn-secondary" disabled={page <= 1 || loading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Trang trước</button><span className="self-center text-sm text-gray-600">Trang {page}</span><button className="btn-secondary" disabled={!result.nextPage || loading} onClick={() => setPage(result.nextPage)}>Trang tiếp</button></div>
+          </section>
+        )}
+      </div>
+    </main>
+  );
 };
 
 export default JobList;
