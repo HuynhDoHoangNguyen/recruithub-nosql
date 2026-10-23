@@ -31,6 +31,40 @@ const application = { _id: 'application:pair:test', _rev: '1-fixture', current_s
 
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); applicationApi.context.mockResolvedValue({ candidate, email: application.email }); });
 
+describe('deadline precision when editing jobs', () => {
+  const precise = { ...job, deadline: '2026-11-30T23:59:59.123Z' };
+  it.each(['title', 'description'])('preserves seconds and milliseconds when only %s changes', field => {
+    const form = fromJob(precise);
+    form[field] = 'Nội dung mới';
+    expect(jobPayload(form, precise).deadline).toBe(precise.deadline);
+  });
+  it('restores the original timestamp after changing then restoring the displayed input', () => {
+    const form = fromJob(precise);
+    const original = form.deadline;
+    form.deadline = '2026-12-02T09:30';
+    expect(jobPayload(form, precise).deadline).toBe('2026-12-02T02:30:00.000Z');
+    form.deadline = original;
+    expect(jobPayload(form, precise).deadline).toBe(precise.deadline);
+  });
+  it('converts a new job deadline from Vietnam time across the UTC date boundary', () => {
+    const form = fromJob(job);
+    form.deadline = '2026-12-02T02:30';
+    expect(jobPayload(form).deadline).toBe('2026-12-01T19:30:00.000Z');
+    expect(jobPayload(form).status).toBe('OPEN');
+  });
+  it('submits the original deadline through the actual edit form', async () => {
+    jobApi.edit.mockResolvedValue(precise);
+    const saved = vi.fn();
+    render(<JobForm job={precise} onSaved={saved} />);
+    fireEvent.change(screen.getByLabelText('Tiêu đề công việc *'), { target: { value: 'Tiêu đề đã sửa' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    expect(jobApi.edit).toHaveBeenCalledWith(precise._id, expect.objectContaining({
+      title: 'Tiêu đề đã sửa', deadline: precise.deadline, expected_rev: precise._rev,
+    }));
+  });
+});
+
 describe('Apply and submission', () => {
   it('loads the real profile, validates text, submits a strict DTO and disables while pending', async () => {
     const user = userEvent.setup();

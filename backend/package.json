@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/data/*.test.js tests/recruitment/*.test.js",
+    "test": "node --test tests/data/*.test.js tests/foundation/*.test.js tests/recruitment/*.test.js",
     "test:recruitment": "node --test tests/recruitment/*.test.js",
     "db:job-application": "node src/repositories/setup-job-application.js",
     "etl:extract": "python ../scripts/dataset/extract-parquet.py",

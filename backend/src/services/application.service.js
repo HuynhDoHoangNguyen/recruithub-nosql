@@ -32,6 +32,7 @@ export class ApplicationService {
       stage_history: [{ from_stage: null, to_stage: 'APPLIED', timestamp: appliedAt, actor_role: 'CANDIDATE', actor_id: user._id }],
       provenance: runtimeProvenance(['submission']),
     });
+    const response = await this.dto(document, 'CANDIDATE');
     let saved;
     try { saved = await this.repo.put(document); }
     catch (error) {
@@ -43,7 +44,7 @@ export class ApplicationService {
       try { await this.analyzeApplication(saved._id); analysisStatus = 'REQUESTED'; }
       catch { analysisStatus = 'PENDING_RETRY'; }
     }
-    return { ...(await this.dto(saved, 'CANDIDATE')), analysis_status: analysisStatus };
+    return { ...response, _rev: saved._rev, analysis_status: analysisStatus };
   }
   async authorize(user, id) {
     const application = parseStored(applicationDocumentSchema, await requireDocument(this.repo, id, 'application'));
@@ -140,12 +141,16 @@ export class ApplicationService {
     };
     const document = { ...application, current_stage: toStage, updated_at: timestamp, stage_history: [...application.stage_history, event] };
     if (!validateStageHistory(document.stage_history, document.applied_at, document.current_stage, timestamp).valid) throw new ApiError(409, 'INVALID_HISTORY', 'Lịch sử hồ sơ không hợp lệ.');
+    const validated = validateWrite(applicationDocumentSchema, document);
+    // Resolve response references before committing; a successful write must not
+    // be followed by the first business validation of Candidate/User references.
+    const response = await this.dto(validated, user.role);
     let saved;
-    try { saved = await this.repo.put(validateWrite(applicationDocumentSchema, document)); }
+    try { saved = await this.repo.put(validated); }
     catch (error) {
       if (error.status === 409) await this.authorize(user, id); // Re-read scope; never overwrite the winning history.
       throw error;
     }
-    return this.dto(saved, user.role);
+    return { ...response, _rev: saved._rev };
   }
 }

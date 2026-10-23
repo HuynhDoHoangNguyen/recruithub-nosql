@@ -42,7 +42,8 @@ export function jobPayload(form, job) {
       experience: { status: form.experience_status, ...(form.experience_status === 'REQUIRED' ? { required_months: Number(form.required_months) } : {}) },
       education: { status: form.education_status, ...(form.education_status === 'REQUIRED' ? { minimum_degree: form.minimum_degree } : {}) },
       project: { status: form.project_status, ...(form.project_status === 'REQUIRED' ? { required_technologies: skills(form.required_technologies) } : {}) },
-    }, ...(form.deadline ? { deadline: new Date(`${form.deadline}:00+07:00`).toISOString() } : {}),
+    }, ...(form.deadline ? { deadline: job && form.deadline === toVietnamInput(job.deadline)
+      ? job.deadline : new Date(`${form.deadline}:00+07:00`).toISOString() } : {}),
   };
   return job ? { ...payload, expected_rev: job._rev } : { ...payload, status: form.status };
 }

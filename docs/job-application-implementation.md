@@ -1,12 +1,12 @@
 # Quản lý tuyển dụng và vòng đời hồ sơ ứng tuyển
 
-Ngày kiểm tra: 22/10/2026. Phạm vi: UC08, UC09, UC10, UC11, UC12, UC13, UC16.
+Ngày cập nhật: 23/10/2026. Phạm vi: UC08, UC09, UC10, UC11, UC12, UC13, UC16. Đã sửa P1/P2/P3 sau merge trên HEAD `a832b08`; xem mục 9.
 
 ## 1. Kết quả và giới hạn nghiệm thu
 
 Đã triển khai API và giao diện cho tạo/sửa/đăng/đóng Job; nộp và đọc lại CV văn bản; theo dõi/rút đơn; duyệt ứng viên và chuyển stage có kiểm tra bằng chứng. Các thao tác dùng CouchDB thật trong production. Fixture store chỉ nằm trong tests.
 
-Đã kiểm chứng bằng Express HTTP + JWT ký thật trên repository test có kiểm tra revision, cùng kiểm thử React với API mock. **Chưa kiểm chứng end-to-end với CouchDB thật**: Docker Desktop Linux Engine chưa chạy, endpoint CouchDB không kết nối được và máy chưa có credentials. Chưa đo `_explain`, execution statistics hoặc giao diện trên trình duyệt/mobile thật.
+Đã kiểm chứng bằng Express HTTP + JWT ký trong tests trên repository fixture có kiểm tra revision, cùng kiểm thử React với API mock. **Lượt xác minh sau sửa ngày 23/10 chưa kiểm chứng end-to-end với CouchDB/Identity thật**: cấu hình database parse hợp lệ, Express health 200 nhưng database health 503 NETWORK_ERROR. Không in credentials/token. Không có browser tool để kiểm tra responsive/focus thật. Không dùng kết quả đo dữ liệu hay live integration từ phiên trước làm bằng chứng của bản sửa này.
 
 Identity chưa có endpoint cấp token/provisioning; Interview chưa có service lên lịch; Scoring chưa có application service để gọi sau Apply. Đây là các điểm phối hợp, không phải tính năng đã hoàn thành trong phân hệ này.
 
@@ -195,11 +195,11 @@ Setup chỉ ghi indexes/design document, không tạo database hoặc sửa busi
 
 ## 7. Kiểm thử và kết quả thực tế
 
-| Lệnh | Kết quả ngày 22/10/2026 |
+| Lệnh | Kết quả sau sửa ngày 23/10/2026 |
 |---|---|
-| Backend `npm run test:recruitment` | 21/21 PASS: Job/Application/JWT/repository; cùng 21 test được discover trong npm test |
-| Backend `npm test` | 250 tests: 226 PASS, 24 FAIL; tên các test lỗi giống hệt baseline trước triển khai |
-| Frontend `npm test` | 10/10 PASS, Vitest + React Testing Library + jsdom, API mock chỉ trong tests |
+| Backend `node --test tests/foundation/*.test.js tests/recruitment/*.test.js` | 46/46 PASS: 18 Foundation + 28 Recruitment, gồm 7 regression tests mới |
+| Backend `npm test` | 275 tests: 251 PASS, 24 FAIL; discovery gồm data/foundation/recruitment, không skip |
+| Frontend `npm test` | 15/15 PASS, gồm 5 ca deadline mới với helper và form thực tế |
 | Frontend `npm run lint` | Exit 0; không có errors, còn 8 warnings đã có ở các file template/shared |
 | Frontend `npm run build` | PASS với Vite 8.3.3 |
 | `git diff --check` | PASS |
@@ -208,7 +208,7 @@ Baseline Backend: 229 tests, 205 PASS, 24 FAIL. Nguyên nhân lỗi cũ: không 
 
 Các test mới bao phủ Job scope/normalization/publish/close; inclusive deadline; duplicate tuần tự/đồng thời/sau terminal; CV round-trip/legacy/injection/limits; quyền riêng tư; stage skips/backward/terminal; Interview evidence/offer acceptance; concurrency và response loss; pagination/stats; JWT signature/algorithm/expiry/issuer/audience/ACTIVE; repository HTTP request shape và error sanitization. UI tests kiểm tra form, loading/empty/error/success/retry, duplicate feedback, disabled submit, xác nhận rút đơn, CV, reason validation, reload sau conflict, route thật và đọc lại sau remount.
 
-Backend fixtures độc lập, không ghi recruitment_db; không xóa/skip test cũ. DOM tests không thay thế kiểm thử browser native dialog/focus trap hoặc responsive thủ công. Docker/CouchDB, Identity provisioning và Interview scheduling còn thiếu nên không tuyên bố đã demo toàn luồng thật.
+Backend fixtures độc lập, không ghi recruitment_db; không xóa/skip test cũ. DOM tests không thay thế kiểm thử browser native dialog/focus trap hoặc responsive thủ công. CouchDB không kết nối được trong lần xác minh này; Identity provisioning và Interview scheduling còn thiếu nên không tuyên bố đã demo toàn luồng thật.
 
 ## 8. Demo sau khi các phụ thuộc sẵn sàng
 
@@ -221,3 +221,62 @@ Backend fixtures độc lập, không ghi recruitment_db; không xóa/skip test 
 7. Mở hai tab cùng hồ sơ, thực hiện hai hành động cạnh tranh; tab thua nhận 409 và tải trạng thái mới, không mất sự kiện thắng.
 
 Không commit/push, chuyển nhánh, thay template hoặc regenerate/import dữ liệu trong phiên triển khai này.
+
+## 9. Sửa lỗi sau merge — 23/10/2026
+
+### P1: chuẩn bị response trước write
+
+`ApplicationService.transition()` validate document/history và dựng DTO của trạng thái dự kiến trước `repo.put()`. Reference Candidate/User, email và thông tin Interview cần cho response được đọc trước persist. Sau khi ghi thành công, response lấy DTO đã chuẩn bị cộng `_rev` trả về từ repository, không đọc lại reference để dựng response. Giữ expected_rev/expected_stage, kiểm tra ownership/evidence và cập nhật history/current_stage trong một write. Conflict vẫn đọc lại scope và trả lỗi, không overwrite lịch sử thắng.
+
+Đã kiểm tra đường `create()` có cùng mẫu: sau write vẫn đọc Job để dựng DTO, có thể trả lỗi kết nối dù đơn đã tạo. Đường này cũng chuẩn bị DTO trước write, sau write chỉ ghép revision và kết quả hook phân tích. Hook lỗi vẫn trả PENDING_RETRY như contract cũ.
+
+File test mới `backend/tests/recruitment/application-response.test.js`: ba ca Candidate→User sai role, Candidate thiếu, User thiếu xác minh HTTP 409 INVALID_SCOPE hoặc 404 NOT_FOUND và toàn bộ document/revision/history không đổi, số writes không tăng. Trước sửa, cả ba ca đều thất bại do document đã thay đổi. Hai ca response dựng trước write cho Apply/transition cũng thất bại trước sửa; sau sửa pass. Thêm ca cạnh tranh cùng revision (một 200, một 409, đúng một event mới) và ca PATCH deadline chính xác.
+
+Không có transaction liên User/Candidate/Job/Application/Interview. Reference có thể thay đổi sau preflight; response phản ánh dữ liệu đọc trước write. Lỗi truyền mạng sau CouchDB commit vẫn có thể tạo kết quả không chắc chắn ở client; client phải reload/reconcile theo ID/revision hiện có, không coi lỗi mạng là rollback.
+
+### P2: giữ nguyên timestamp nếu input deadline cuối cùng không đổi
+
+`jobFormModel.jobPayload()` so sánh deadline hiện tại với giá trị hiển thị ban đầu theo UTC+7. Nếu bằng nhau, gửi timestamp gốc nguyên vẹn, gồm giây/millisecond. Nếu người dùng sửa thật, chuyển input sang UTC bằng offset `+07:00` tường minh, không phụ thuộc timezone máy. Đổi rồi phục hồi input về giá trị ban đầu cũng giữ timestamp gốc.
+
+PATCH backend thực sự hỗ trợ partial fields (`editJobRequestSchema` và merge changes vào document); bản sửa vẫn gửi deadline gốc để giữ contract form hiện có. Không thay đổi create validation, hạn tương lai hoặc Apply nhận đúng thời điểm deadline. Tests kiểm tra title/description, giây/millisecond, đổi rồi phục hồi input, UTC đổi ngày khi tạo mới và payload qua JobForm thực tế.
+
+### P3: test discovery
+
+`backend/package.json` thêm `tests/foundation/*.test.js` vào npm test, giữ nguyên data/recruitment. Node runner hiện tại chạy được glob trên PowerShell. Output full suite có 18 Foundation và 7 regression tests mới; tổng tăng từ 250 lên 275.
+
+### Phân loại lỗi full suite bằng chứng hiện tại
+
+Log tại `$env:TEMP/recruithub-lifecycle-fixes-tests.log`; đã đối chiếu tên các mục `not ok` với log baseline trước sửa `$env:TEMP/recruithub-postmerge-backend.log`: không có tên lỗi mới. Đây là đối chiếu bằng output thực tế, không mặc định tất cả lỗi là lỗi cũ. Runner báo 24 failed tests; TAP còn có mục suite cha bị fail, không cộng các dòng `not ok` thành số test độc lập.
+
+| Nhóm/test lỗi | Bằng chứng và phân loại |
+|---|---|
+| DATA-04B: V04 Missing database, V05 Empty database, V06 Non-empty database | `fetch failed`; health database riêng cũng 503 NETWORK_ERROR → môi trường kết nối |
+| DATA-04B: V15 Source release files remain immutable | SHA-256 users.jsonl thực tế khác expected → dữ liệu/checksum |
+| DATA-02B.3: N-01 Wrong source hash; N-02 Missing source | Python ModuleNotFoundError pyarrow xuất hiện trước assertion dự kiến → môi trường Python |
+| DATA-02B.3: N-14 distinct immutable release; N-15 active release readable | Không có content-addressed release folder, existence false → input release thiếu |
+| DATA-02B.2: 11/12/13 Published dataset counts; 15 Deterministic rerun | candidates.jsonl phải tồn tại / ENOENT staged/candidates.jsonl → dữ liệu thiếu |
+| DATA-03.2: 1&2 Counts; 3&6 User references; 4&5 Job scope; 7&8 Duplicates; 9/10/11 Orphans/provenance; 12/13/14/15 Source facts; 16 Deterministic rerun | ENOENT DATA-03.2 hoặc DATA-02B.2 candidates/users/companies.jsonl → release lịch sử thiếu |
+| DATA-03.2: Negative Input manifest checksum mismatch | Active release directory does not exist trước assertion checksum → dữ liệu thiếu |
+| DATA-03.3B Recruitment Acceptance & Verification | ENOENT DATA-03.3B candidates.jsonl → release lịch sử thiếu |
+| DATA-03.4B: 9 Real publication failure injection; 10 Publication idempotent | candidates.jsonl SHA-256 altered, expected khác actual → dữ liệu/checksum |
+
+Không phát hiện regression mới trong các checks đã chạy; không tuyên bố full suite pass. Không sửa snapshot/manifests/checksum, không skip assertions. Artifact tạm `data/scratch_bad_manifest.json` do test tạo được dọn sau chạy.
+
+### Điều kiện bàn giao và demo
+
+- **Đủ bàn giao phần sửa P1/P2/P3** với regression tests, discovery và lint/build đã xác minh.
+- Express thật trên cổng tạm: `/api/health` 200; `/api/health/database` 503 NETWORK_ERROR; chỉ đọc, không chạy setup/index/import vì kết nối chưa sẵn sàng.
+- Các luồng tạo/sửa/đăng Job, Apply/readback, SCREENING/INTERVIEW, duplicate/terminal/withdraw, revision conflict và evidence OFFER/HIRED được kiểm chứng bằng Express + memory repository/JWT fixture và React API mock, không phải Identity/CouchDB demo thật.
+- Chưa nghiệm thu end-to-end: cần CouchDB truy cập được, Identity cấp token và tài khoản/profile test hợp lệ, Interview/evidence thật để thử OFFER/HIRED. Chưa có browser tool trong phiên để kiểm tra responsive và keyboard/focus thật. Không tạo token demo hoặc Interview giả để vượt phụ thuộc.
+- Scoring production chưa nối hook; không có điểm giả, không mở rộng core của thành viên khác. Khi các phụ thuộc sẵn sàng, thực hiện kịch bản ở mục 8 và cập nhật bằng chứng.
+
+Commit đề xuất (chưa thực hiện):
+
+```text
+fix(recruitment): validate responses before writes and preserve job deadlines
+
+Prepare Application DTO references before persistence and return the saved revision.
+Preserve original deadline precision when edit form input is unchanged.
+Include Foundation tests in npm test and add API/UI regression coverage.
+Document verification results and remaining environment/integration blockers.
+```
