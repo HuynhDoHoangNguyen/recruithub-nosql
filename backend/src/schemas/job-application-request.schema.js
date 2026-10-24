@@ -39,7 +39,19 @@ export const stageRequestSchema = z.object({ ...concurrency, to_stage: z.enum(st
 }).strict();
 const pagination = { limit: z.coerce.number().int().min(1).max(50).default(20), bookmark: z.string().max(8192).optional() };
 export const jobListQuerySchema = z.object({ ...pagination, status: z.enum(['DRAFT', 'OPEN', 'CLOSED']).optional() }).strict();
-export const publicJobQuerySchema = z.object(pagination).strict();
+const publicSkills = z.string().trim().max(600).optional().transform(value => value
+  ? [...new Set(value.split(',').map(skill => skill.trim()).filter(Boolean).map(normalizeSkill))]
+  : []);
+export const publicJobQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+  bookmark: z.string().max(2048).optional(),
+  q: z.string().trim().max(120).default(''),
+  industry: z.string().trim().max(120).default(''),
+  seniority: z.enum(['JUNIOR', 'MID', 'SENIOR']).optional(),
+  skills: publicSkills,
+}).strict().superRefine((query, context) => {
+  if (query.skills.length > 8) context.addIssue({ code: 'custom', path: ['skills'], message: 'Tối đa 8 kỹ năng.' });
+});
 export const applicationListQuerySchema = z.object({ ...pagination, stage: z.enum(stages).optional(),
   job_id: applyRequestSchema.shape.job_id.optional(),
 }).strict();

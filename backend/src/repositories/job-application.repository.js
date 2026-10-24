@@ -72,6 +72,18 @@ export class JobApplicationRepository {
     if (!next) throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'Database is not initialized.');
     return { items: result.docs, bookmark: result.bookmark, has_more: next.docs.length > 0 };
   }
+  async scanPublicJobs({ afterId, limit = 100 } = {}) {
+    const params = new URLSearchParams({
+      include_docs: 'true',
+      startkey: JSON.stringify(afterId || 'job:'),
+      endkey: JSON.stringify('job:\ufff0'),
+      limit: String(limit),
+      ...(afterId ? { skip: '1' } : {}),
+    });
+    const result = await this.http(`_all_docs?${params}`);
+    if (!result || !Array.isArray(result.rows)) throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'Không thể đọc danh sách việc làm.');
+    return result.rows.filter(row => row.doc?.type === 'job').map(row => row.doc);
+  }
   async profile(type, userId) {
     const result = await this.find({ type, user_id: userId }, { limit: 2, index: 'profile_user' });
     if (result.items.length !== 1) throw new ApiError(403, 'PROFILE_REQUIRED', 'Hồ sơ tài khoản chưa được thiết lập hợp lệ.');

@@ -2416,3 +2416,15 @@ TV1/TV2 cần thống nhất cách Job/Application đọc Company/Department t�
 Báo cáo đầy đủ: [RP-TV1-auth-recruiter-registration-login-ui.md](RP-TV1-auth-recruiter-registration-login-ui.md). Files UI chính: `frontend/src/components/auth/AuthLayout.jsx`, `frontend/src/pages/Login.jsx`, `frontend/src/pages/Register.jsx`, `frontend/src/components/auth/RecruiterRegistrationFields.jsx`, `frontend/src/utils/recruiterRegistration.js` và hai test file Auth liên quan.
 
 ---
+
+## TV1 UC06 — Job Search, Filter & Pagination (2026-10-24)
+
+Đã triển khai tìm kiếm và lọc Public Job ở Backend + Frontend. Xác minh schema và mẫu CouchDB: skills là mảng; không có location/salary; chỉ có `_all_docs`, không tạo index. Backend dùng ID range `job:` theo lô, trả cursor ổn định theo `_id`; UI theo bố cục search phía trên, filter sidebar desktop/mobile, URL restore, debounce, reset, loading/empty/error/retry. Bộ lọc location/salary không hiển thị như tính năng khả dụng; không trả count tổng giả. `recruitment_db` chỉ được đọc và giữ 25.750 documents.
+
+Chi tiết fields, API, query strategy, giới hạn, tests và hướng dẫn tự kiểm thử: [RP-TV1-UC06-job-search-filter-pagination.md](RP-TV1-UC06-job-search-filter-pagination.md).
+
+---
+
+### Cập nhật UI template (2026-10-25)
+
+Tinh chỉnh `/jobs` theo ảnh tham khảo: sidebar tìm kiếm bên trái, panel kết quả bên phải, Job cards ngang có metadata/icon/skill chips, màu và khoảng cách thống nhất, phân trang cursor ở cuối panel; tablet/mobile giữ search dễ truy cập và bộ lọc dạng panel. Không thêm location/salary filters, relevance sort hoặc tổng count giả vì schema/API hiện chưa hỗ trợ. Frontend production build PASS; báo cáo chi tiết và giới hạn: [RP-TV1-UC06-job-search-filter-pagination.md](RP-TV1-UC06-job-search-filter-pagination.md).
