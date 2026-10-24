@@ -1,3 +1,2 @@
-// Compatibility re-export for existing imports. All requests share the same
-// configured Axios instance and in-memory Bearer token interceptor.
+// Compatibility export: TV1 Auth/Profile and TV2 Job/Application share one client.
 export { default } from '../services/api';

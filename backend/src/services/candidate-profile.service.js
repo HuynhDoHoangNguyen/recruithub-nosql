@@ -55,7 +55,11 @@ export class CandidateProfileService {
       ...(patch.projects ? { projects: patch.projects } : {}),
       ...(patch.experience_summary ? { experience_summary: patch.experience_summary } : {}),
       updated_at: new Date(this.now()).toISOString(),
-      provenance: { ...current.provenance, classification: 'mixed', field_origins: { ...(current.provenance?.field_origins ?? {}) } },
+      provenance: {
+        ...current.provenance,
+        classification: current.provenance?.classification === 'unavailable' ? 'unavailable' : 'mixed',
+        field_origins: { ...(current.provenance?.field_origins ?? {}) },
+      },
     };
     if (patch.profile) next.provenance.field_origins['profile'] = 'candidate_self_service';
     for (const key of ['skills', 'education', 'experience', 'experience_summary', 'projects']) {

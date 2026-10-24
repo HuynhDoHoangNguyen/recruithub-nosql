@@ -67,6 +67,11 @@ export const stageEventSchema = z
 /**
  * Application Business Document Schema
  */
+export const submissionSchema = z.object({
+  resume_text: z.string().trim().min(1).max(50000).optional(),
+  cover_letter: z.string().trim().min(1).max(10000).optional(),
+}).strict();
+
 export const applicationDocumentSchema = z
   .object({
     _id: z
@@ -95,6 +100,7 @@ export const applicationDocumentSchema = z
     applied_at: isoDateTimeSchema,
     updated_at: isoDateTimeSchema,
     recruiter_note: z.string().trim().min(1).optional(),
+    submission: submissionSchema.optional(),
     provenance: provenanceSchema,
   })
   .strict()

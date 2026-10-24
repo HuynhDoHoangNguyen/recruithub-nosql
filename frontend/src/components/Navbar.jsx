@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import { normalizeRole } from '../features/applications/applicationPresentation';
 
 const Navbar = () => {
 	const { user, logout } = useAuth();
@@ -18,7 +19,7 @@ const Navbar = () => {
 
 	const getDashboardRoute = () => {
 		if (!user) return "/";
-		switch (user.role) {
+		switch (normalizeRole(user.role)) {
 			case "ADMIN":
 				return "/admin/dashboard";
 			case "RECRUITER":
@@ -31,7 +32,7 @@ const Navbar = () => {
 	};
 
 	const getProfileRoute = () => {
-		if (!user || user.role === "ADMIN") return null;
+		if (!user || normalizeRole(user.role) === "ADMIN") return null;
 		return "/profile";
 	};
 

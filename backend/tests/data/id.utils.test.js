@@ -4,10 +4,12 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
   normalizeEmail,
   userIdFromEmail,
   candidateIdFromResumeId,
+  candidateIdFromUserId,
   jobIdFromSourceId,
   applicationIdFromPair,
 } from '../../src/utils/id.utils.js';
@@ -54,6 +56,18 @@ test('ID Utilities - Task D Acceptance Tests', async (t) => {
     // Invalid format throws
     assert.throws(() => candidateIdFromResumeId('INVALID_ID'), /Invalid source resume_id format/);
     assert.throws(() => jobIdFromSourceId('INVALID_ID'), /Invalid source job_id format/);
+  });
+
+  await t.test('Self-registration Candidate IDs are deterministic and separate from CMS IDs', () => {
+    const userId = userIdFromEmail('candidate.self@example.invalid');
+    const id = candidateIdFromUserId(userId);
+
+    const previousInlineFormula = `candidate:${createHash('sha256').update(userId).digest('hex')}`;
+    assert.equal(id, previousInlineFormula);
+    assert.equal(id, candidateIdFromUserId(userId));
+    assert.match(id, /^candidate:[a-f0-9]{64}$/);
+    assert.notEqual(id, candidateIdFromResumeId('R_000001'));
+    assert.throws(() => candidateIdFromUserId('candidate:cms:R_000001'), /canonical user/);
   });
 
   await t.test('4. Same Candidate–Job pair generates identical Application ID (deterministic)', () => {

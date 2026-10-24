@@ -1,15 +1,14 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
+import { normalizeRole } from '../features/applications/applicationPresentation';
 
+// JWT is only a credential transport: access decisions use the User verified by /auth/me.
 const ProtectedRoute = ({ allowedRoles = [] }) => {
   const { user, loading } = useAuth();
-  if (loading) {
-    return <div className="flex justify-center items-center min-h-screen"><div className="loading-spinner" /></div>;
-  }
+  if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="loading-spinner" /></div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (allowedRoles.length && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
-  }
+  const allowed = allowedRoles.map(normalizeRole);
+  if (allowed.length && !allowed.includes(normalizeRole(user.role))) return <Navigate to="/" replace />;
   return <Outlet />;
 };
 

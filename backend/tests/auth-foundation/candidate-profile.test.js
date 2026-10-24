@@ -55,6 +55,21 @@ test('profile update keeps unrelated availability values and marks supplied skil
   assert.equal(repository.updates[0].doc.data_availability.education, 'UNAVAILABLE');
 });
 
+test('profile PATCH preserves legacy unavailable classification, origins, and unrelated availability', async () => {
+  const historicalOrigins = { legacy_field: 'historical_import' };
+  const repository = makeRepo(candidate({
+    provenance: { classification: 'unavailable', field_origins: historicalOrigins },
+  }));
+  const service = new CandidateProfileService({ candidateRepository: repository });
+
+  await service.updateMyProfile(userId, { profile: { full_name: 'Updated Name' } }, '1-profile');
+  const updated = repository.updates[0].doc;
+  assert.equal(updated.provenance.classification, 'unavailable');
+  assert.equal(updated.provenance.field_origins.legacy_field, 'historical_import');
+  assert.equal(updated.provenance.field_origins.profile, 'candidate_self_service');
+  assert.deepEqual(updated.data_availability, candidate().data_availability);
+});
+
 test('profile update rejects data outside the approved Candidate schema and mismatched ownership', async () => {
   const repository = makeRepo(candidate({ user_id: `user:${'b'.repeat(64)}` }));
   const service = new CandidateProfileService({ candidateRepository: repository });

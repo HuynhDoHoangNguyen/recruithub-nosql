@@ -5,7 +5,9 @@ import { AuthService, AuthServiceError, PASSWORD_HASH_OPTIONS } from '../../src/
 import { UserRepository } from '../../src/repositories/user.repository.js';
 import { CandidateRepository } from '../../src/repositories/candidate.repository.js';
 import { USER_ACCOUNT_STATUSES, USER_ROLES } from '../../src/constants/document.constants.js';
-import { userIdFromEmail } from '../../src/utils/id.utils.js';
+import { candidateDocumentSchema } from '../../src/schemas/candidate.schema.js';
+import { newDocumentProvenanceSchema } from '../../src/schemas/common.schema.js';
+import { candidateIdFromUserId, userIdFromEmail } from '../../src/utils/id.utils.js';
 
 const secret = 'test-only-secret-with-at-least-32-bytes';
 
@@ -76,8 +78,31 @@ test('registration creates canonical User and Candidate documents and only then 
   assert.equal(user.email_normalized, 'new.candidate@example.test');
   assert.match(user.password_hash, /^\$argon2id\$/);
   assert.equal(candidate.user_id, userId);
+  assert.equal(candidate._id, candidateIdFromUserId(userId));
+  assert.equal(candidate.provenance.classification, 'mixed');
+  const legacyCandidate = {
+    ...candidate,
+    provenance: { ...candidate.provenance, classification: 'unavailable' },
+  };
+  assert.equal(candidateDocumentSchema.safeParse(legacyCandidate).success, true);
+  assert.equal(newDocumentProvenanceSchema.safeParse(legacyCandidate.provenance).success, false);
+  assert.equal(newDocumentProvenanceSchema.safeParse({ classification: 'mixed', field_origins: { profile: 42 } }).success, false);
+  assert.deepEqual(candidate.provenance.field_origins, {
+    'profile.full_name': 'candidate_self_registration',
+    'profile.role': 'candidate_self_registration',
+    'profile.industry': 'candidate_self_registration',
+    'profile.seniority': 'candidate_self_registration',
+    'profile.years_experience': 'candidate_self_registration',
+    'profile.experience_months': 'derived',
+  });
   assert.equal(candidate.profile.full_name, registration.full_name);
   assert.equal(candidate.profile.experience_months, 0);
+  assert.deepEqual(candidate.skills, []);
+  assert.deepEqual(candidate.education, []);
+  assert.deepEqual(candidate.experience, []);
+  assert.deepEqual(candidate.projects, []);
+  assert.equal(Object.hasOwn(candidate, 'experience_summary'), false);
+  assert.equal(JSON.stringify(candidate).includes(':null'), false);
   assert.deepEqual(candidate.data_availability, {
     skills: 'UNAVAILABLE', experience: 'PARTIAL', education: 'UNAVAILABLE', projects: 'UNAVAILABLE',
   });

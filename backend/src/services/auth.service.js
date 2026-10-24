@@ -1,8 +1,7 @@
 import argon2 from 'argon2';
-import { createHash } from 'node:crypto';
 import { PROVENANCE_CLASSIFICATIONS, USER_ACCOUNT_STATUSES, USER_ROLES } from '../constants/document.constants.js';
 import { candidateDocumentSchema } from '../schemas/candidate.schema.js';
-import { userIdFromEmail, normalizeEmail } from '../utils/id.utils.js';
+import { candidateIdFromUserId, userIdFromEmail, normalizeEmail } from '../utils/id.utils.js';
 import { toSafeUserDto } from './user.dto.js';
 import { issueAccessToken, verifyAccessToken } from './jwt-access-token.js';
 
@@ -46,7 +45,7 @@ export class AuthService {
     const email = input.email.trim();
     const emailNormalized = normalizeEmail(email);
     const userId = userIdFromEmail(emailNormalized);
-    const candidateId = `candidate:${createHash('sha256').update(userId).digest('hex')}`;
+    const candidateId = candidateIdFromUserId(userId);
 
     const existing = await this.#getExistingUser(emailNormalized);
     if (existing) {
@@ -103,13 +102,14 @@ export class AuthService {
       created_at: timestamp,
       updated_at: timestamp,
       provenance: {
-        classification: PROVENANCE_CLASSIFICATIONS.SOURCE,
+        classification: PROVENANCE_CLASSIFICATIONS.MIXED,
         field_origins: {
-          profile: 'candidate_self_registration',
-          skills: 'not_provided_at_registration',
-          education: 'not_provided_at_registration',
-          experience: 'years_self_reported_details_not_provided',
-          projects: 'not_provided_at_registration',
+          'profile.full_name': 'candidate_self_registration',
+          'profile.role': 'candidate_self_registration',
+          'profile.industry': 'candidate_self_registration',
+          'profile.seniority': 'candidate_self_registration',
+          'profile.years_experience': 'candidate_self_registration',
+          'profile.experience_months': 'derived',
         },
       },
     };

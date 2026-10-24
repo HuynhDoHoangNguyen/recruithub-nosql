@@ -51,3 +51,18 @@ test('repository does not manufacture a document type or id', async () => {
   assert.deepEqual(client.calls[0][1], document);
   assert.equal(document.type, undefined);
 });
+
+test('repository rejects unavailable provenance on create but preserves it for legacy updates', async () => {
+  const client = createFakeClient();
+  const provenance = { classification: 'unavailable', field_origins: { legacy: 'historical' } };
+  const repository = new BaseRepository({
+    client,
+    schema: z.object({ _id: z.string(), provenance: z.object({ classification: z.string(), field_origins: z.record(z.string(), z.string()) }) }).strict(),
+  });
+  const legacyDocument = { _id: 'candidate:legacy', provenance };
+
+  await assert.rejects(repository.create(legacyDocument), RepositoryValidationError);
+  assert.equal(client.calls.some(([name]) => name === 'createDocument'), false);
+  await repository.update(legacyDocument, '1-legacy');
+  assert.deepEqual(client.calls.at(-1), ['updateDocument', legacyDocument, '1-legacy']);
+});

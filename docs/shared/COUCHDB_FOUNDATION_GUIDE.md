@@ -43,6 +43,8 @@ Response helpers trong backend/src/utils/api-response.js là provisional. Chúng
 
 The backend entrypoint reads existing `backend/.env` first and then the repository-root `.env`. Values already present in the parent process are never replaced; if a key exists in both files, `backend/.env` wins. Files are read only and are not created or copied. The loader resolves paths from its own source location, so behavior does not depend on whether the process starts from the repository root or `backend/`.
 
+Auth and Job/Application runtime persistence share `AUTH_COUCHDB_DATABASE`, which must name an explicitly prepared isolated database. Those write-capable APIs reject an unset database and reject `recruitment_db`; they do not fall back to the generic `COUCHDB_DATABASE` default. The read-only database health diagnostic may still report the generic configured database.
+
 No credentials belong in source, this guide, terminal output or reports. Do not print environment objects or CouchDB client configuration.
 
 ## 5. Start CouchDB and Backend
@@ -191,7 +193,7 @@ TV3 owns interview lifecycle, round semantics, audit and scoring. The example do
 
 Run all backend tests from backend/: npm.cmd test.
 
-Foundation tests use fake Fetch responses for writes and do not modify CouchDB. Any live integration verification must be read-only against recruitment_db. Create/update/delete tests require a separately approved test database; do not create or drop one without approval.
+Foundation tests use fake Fetch responses for writes and do not modify CouchDB. Verification against `recruitment_db` must remain read-only. Live write integration checks may use only a separately approved, isolated test database; do not create or drop databases without approval.
 
 ## 16. Limits and open dependencies
 
