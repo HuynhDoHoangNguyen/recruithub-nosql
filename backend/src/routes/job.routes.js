@@ -8,6 +8,7 @@ export function createJobRoutes({ authenticate, jobs, applications }) {
   const router = Router();
   const controller = jobController(jobs);
   const recruiter = [authenticate, requireRoles('RECRUITER')];
+  router.get('/recruiter/context', ...recruiter, controller.context);
   router.get('/recruiter/jobs', ...recruiter, validate(jobListQuerySchema, 'query'), controller.list);
   router.get('/recruiter/stats', ...recruiter, controller.stats);
   router.get('/recruiter/jobs/:id', ...recruiter, validate(jobParamsSchema, 'params'), controller.detail);

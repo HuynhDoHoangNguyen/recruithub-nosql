@@ -1,5 +1,7 @@
 # RecruiHub NoSQL
 
+> Bàn giao TV2 mới nhất 25/10/2026: [đúng phiên bản JobPortal IT, menu/UC, dữ liệu live và kết quả test](docs/recruitment-it-template-handoff.md). Frontend 28/28 PASS; full backend 266/288 PASS, 22 lỗi dataset/ETL. Private chưa nghiệm thu với Identity thật. Các số liệu test khác bên dưới là thông tin lịch sử.
+
 ## 1. Giới thiệu tổng quan
 
 - **Tên đề tài:** Xây dựng hệ thống quản lý tuyển dụng và phân tích hồ sơ ứng viên sử dụng cơ sở dữ liệu NoSQL (Recruitment Management & Candidate Resume Analysis System).
@@ -141,8 +143,10 @@ Kiểm tra CouchDB sẵn sàng tại: [http://127.0.0.1:5984](http://127.0.0.1:5
 ### 6.3. Bước 2: Cấu hình biến môi trường
 Tạo file `.env` tại thư mục gốc dự án (tham khảo `.env.example`):
 ```ini
-COUCHDB_URL=http://admin:password123@127.0.0.1:5984
-COUCHDB_DB=recruitment_db
+COUCHDB_URL=http://127.0.0.1:5984
+COUCHDB_DATABASE=recruitment_db
+COUCHDB_USER=admin
+COUCHDB_PASSWORD=REPLACE_WITH_LONG_RANDOM_PASSWORD
 PORT=5000
 NODE_ENV=development
 ```
@@ -166,7 +170,7 @@ npm run db:verify
 ```bash
 npm test
 ```
-*Kết quả kỳ vọng: 246 tests PASS, 0 FAIL.*
+Kết quả phụ thuộc dữ liệu release và môi trường. Xem [bàn giao hiện tại](docs/frontend-template-restoration.md) để biết các checks đã chạy và lỗi còn tồn tại; không dùng số test lịch sử làm kết quả hiện tại.
 
 ### 6.6. Bước 5: Khởi chạy Backend và Frontend
 ```bash
@@ -180,6 +184,8 @@ npm install
 npm run dev
 ```
 Giao diện ứng dụng sẽ hoạt động tại: [http://localhost:5173](http://localhost:5173).
+
+Frontend dùng proxy `/api` tới Backend trong development. Hướng dẫn cấu hình và menu nằm ở [frontend/README.md](frontend/README.md). Việc import dữ liệu là bước chuẩn bị riêng, không chạy lại mỗi lần khởi động. Luồng đăng nhập cần API Identity, hiện chưa được tích hợp trên nhánh này.
 
 ---
 

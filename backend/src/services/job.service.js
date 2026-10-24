@@ -12,6 +12,14 @@ export function validateWrite(schema, value) {
 
 export class JobService {
   constructor(repository, now = () => new Date()) { this.repo = repository; this.now = now; }
+  async context(user) {
+    const recruiter = await recruiterScope(this.repo, user);
+    const company = await requireDocument(this.repo, recruiter.company_id, 'company');
+    const department = await requireDocument(this.repo, recruiter.department_id, 'department');
+    return { recruiter_id: recruiter._id, email: user.email,
+      company: { _id: company._id, name: company.name, industry: company.industry },
+      department: { _id: department._id, name: department.name } };
+  }
   checkOpen(job) {
     if (job.status === 'OPEN' && (!job.deadline || !Number.isFinite(Date.parse(job.deadline)) || Date.parse(job.deadline) <= this.now().getTime())) {
       throw new ApiError(400, 'INVALID_DEADLINE', 'Hạn nộp hồ sơ phải sau thời điểm hiện tại.', [{ field: 'deadline', message: 'Chọn hạn nộp trong tương lai.' }]);
@@ -57,9 +65,13 @@ export class JobService {
     }
   }
   async publicList(query) {
-    const page = await this.repo.find({ type: 'job', status: 'OPEN', published_at: { $gte: '' } },
-      { ...query, index: 'public_jobs', sort: descendingSort(['type', 'status', 'published_at']) });
-    return { ...page, items: page.items.map(publicJobDto) };
+    // Historical jobs have no published_at. created_at is required by the schema;
+    // _id provides a stable order when several jobs share the same timestamp.
+    const page = await this.repo.find({ type: 'job', status: 'OPEN', created_at: { $gte: '' }, _id: { $gte: '' } },
+      { ...query, index: 'public_jobs_created_v2', sort: descendingSort(['type', 'status', 'created_at', '_id']) });
+    const companies = new Map(await Promise.all([...new Set(page.items.map(job => job.company_id))].map(async id => [id, await this.repo.get(id)])));
+    return { ...page, items: page.items.map(job => ({ ...publicJobDto(job),
+      ...(companies.get(job.company_id)?.type === 'company' ? { company_name: companies.get(job.company_id).name } : {}) })) };
   }
   async publicDetail(id) {
     const job = parseStored(jobDocumentSchema, await requireDocument(this.repo, id, 'job'));

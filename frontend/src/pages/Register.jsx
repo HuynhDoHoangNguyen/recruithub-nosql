@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { apiErrorMessage } from '../api/apiError';
+import { dashboardRoute } from '../features/applications/applicationPresentation';
 
 const Register = () => {
 	const navigate = useNavigate();
@@ -49,10 +51,10 @@ const Register = () => {
 		try {
 			setLoading(true);
 			const res = await api.post('/auth/register', form);
-			const accessToken = res.data?.accessToken;
+			const accessToken = (res.data.data || res.data)?.accessToken;
 			if (accessToken) {
 				login(accessToken);
-				navigate('/');
+				navigate(dashboardRoute(form.role));
 				return;
 			}
 
@@ -60,7 +62,7 @@ const Register = () => {
 			setError('Registration succeeded but no access token returned. Please log in.');
 			navigate('/login');
 		} catch (err) {
-			setError(err.response?.data?.message || err.response?.data?.error || 'Registration failed');
+			setError(apiErrorMessage(err));
 		} finally {
 			setLoading(false);
 		}
@@ -271,13 +273,13 @@ const Register = () => {
 							/>
 							<label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
 								I agree to the{' '}
-								<a href="#" className="text-blue-600 hover:text-blue-500">
+								<button type="button" onClick={() => setError("Nội dung chính sách đang được cập nhật.")} className="text-blue-600 hover:text-blue-500">
 									Terms of Service
-								</a>{' '}
+								</button>{' '}
 								and{' '}
-								<a href="#" className="text-blue-600 hover:text-blue-500">
+								<button type="button" onClick={() => setError("Nội dung chính sách đang được cập nhật.")} className="text-blue-600 hover:text-blue-500">
 									Privacy Policy
-								</a>
+								</button>
 							</label>
 						</div>
 
@@ -303,12 +305,12 @@ const Register = () => {
 								<div className="w-full border-t border-gray-300" />
 							</div>
 							<div className="relative flex justify-center text-sm">
-								<span className="px-2 bg-white text-gray-500">Or continue with</span>
+								<span className="px-2 bg-white text-gray-500">Đăng nhập mạng xã hội (chưa hỗ trợ)</span>
 							</div>
 						</div>
 
 						<div className="mt-6 grid grid-cols-2 gap-3">
-							<button className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+							<button type="button" disabled title="Đăng nhập mạng xã hội chưa được hỗ trợ" className="disabled:opacity-50 disabled:cursor-not-allowed w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
 								<svg className="w-5 h-5" viewBox="0 0 24 24">
 									<path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
 									<path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -318,7 +320,7 @@ const Register = () => {
 								<span className="ml-2">Google</span>
 							</button>
 
-							<button className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+							<button type="button" disabled title="Đăng nhập mạng xã hội chưa được hỗ trợ" className="disabled:opacity-50 disabled:cursor-not-allowed w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
 								<svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
 									<path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
 								</svg>

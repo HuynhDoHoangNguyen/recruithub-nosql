@@ -1,12 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import api from '../services/api';
+import AccountHeader from '../components/AccountHeader';
+import { ErrorMessage } from '../features/applications/components/ApplicationUI';
+import { apiErrorMessage } from '../api/apiError';
+import { useAuth } from '../context/AuthContext';
+import { normalizeRole } from '../features/applications/applicationPresentation';
 
 
 const Profile = () => {
+	const { user: principal } = useAuth();
+	const organizationProfile = normalizeRole(principal?.role) === 'RECRUITER';
 	const [user, setUser] = useState(null);
 	const [formData, setFormData] = useState({});
 	const [editSection, setEditSection] = useState(null);
-	const [loading, setLoading] = useState(false);
+	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState(null);
 	const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -23,8 +30,7 @@ const Profile = () => {
 			setFormData(data);
 			setError(null);
 		} catch (err) {
-			console.error(err);
-			setError('Failed to load user profile');
+			setError({ message: err.response?.status === 404 ? 'Dịch vụ hồ sơ cá nhân chưa được tích hợp. Vui lòng thử lại sau.' : apiErrorMessage(err) });
 		} finally {
 			setLoading(false);
 		}
@@ -86,19 +92,14 @@ const Profile = () => {
 		sectionRefs.current[key]?.scrollIntoView({ behavior: 'smooth' });
 	};
 
-	if (loading) {
-		return (
-			<div className="flex justify-center items-center min-h-screen">
-				<div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-			</div>
-		);
-	}
+	if (loading || error) return <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-slate-50 min-h-screen space-y-6">
+		<p className="text-xs text-slate-400">Trang chủ / {organizationProfile ? 'Hồ Sơ Doanh Nghiệp' : 'Hồ Sơ & CV'}</p>
+		<div className="rounded-3xl overflow-hidden border-t-[6px] border-blue-600"><AccountHeader title={organizationProfile ? 'Hồ sơ doanh nghiệp' : 'Hồ sơ cá nhân'} /></div>
+		<div className="card p-5"><p className="text-xs text-slate-500">Độ hoàn thiện hồ sơ: Chưa xác định khi chưa tải được hồ sơ.</p></div>
+		<div className="grid lg:grid-cols-4 gap-6"><aside className="card p-4 self-start"><h2 className="text-xs uppercase font-bold text-slate-400 px-2 mb-3">Mục hồ sơ</h2>{(organizationProfile ? ['Thông tin doanh nghiệp', 'Phòng ban', 'Thông tin liên hệ'] : ['Thông tin chung', 'Kỹ năng & Chuyên môn', 'Kinh nghiệm & Dự án', 'Học vấn & Bằng cấp', 'CV Đính Kèm']).map(label => <p key={label} className="px-3 py-3 text-xs font-semibold text-slate-500">{label}</p>)}</aside><section className="lg:col-span-3 card p-6 sm:p-8 space-y-4"><h2 className="text-base font-bold text-slate-900">Thông Tin Hồ Sơ</h2><p className="text-xs text-slate-400">Thông tin sẽ hiển thị khi tải hồ sơ thành công.</p>{loading ? <div role="status" className="text-sm text-slate-500"><span className="loading-spinner mr-3" />Đang tải hồ sơ…</div> : <ErrorMessage error={error} retry={fetchProfile} />}</section></div>
+	</main>;
 
-	if (error) {
-		return <div className="text-center text-red-600 py-10">{error}</div>;
-	}
-
-	if (!user || user.role === 'admin') {
+	if (!user || ['admin', 'ADMIN'].includes(user.role)) {
 		return <div className="text-center py-10">Admins do not have a profile.</div>;
 	}
 

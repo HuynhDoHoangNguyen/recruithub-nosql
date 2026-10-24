@@ -48,6 +48,10 @@ export class MemoryRepository {
     return { items: structuredClone(values.slice(offset, offset + limit)), bookmark: String(offset + limit), has_more: offset + limit < values.length };
   }
   async allInterviews(id) { return structuredClone([...this.docs.values()].filter(doc => doc.type === 'interview' && doc.application_id === id)); }
+  async candidateStats(id) {
+    const apps = [...this.docs.values()].filter(doc => doc.type === 'application' && doc.candidate_id === id);
+    return { total_applications: apps.length, by_stage: apps.reduce((result, app) => ({ ...result, [app.current_stage]: (result[app.current_stage] || 0) + 1 }), {}) };
+  }
   async stats(id) {
     const jobs = [...this.docs.values()].filter(doc => doc.type === 'job' && doc.recruiter_id === id);
     const apps = [...this.docs.values()].filter(doc => doc.type === 'application' && jobs.some(job => job._id === doc.job_id));

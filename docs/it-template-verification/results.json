@@ -1,0 +1,126 @@
+{
+  "generatedAt": "2026-10-24T18:01:23.101Z",
+  "referenceOrigin": "http://localhost:5174",
+  "viewport": {
+    "width": 1286,
+    "height": 1000
+  },
+  "mode": "Browser integration with isolated memory repository and signed test JWT; no production login or CouchDB writes",
+  "publicLive": [
+    {
+      "path": "/api/health",
+      "status": 200
+    },
+    {
+      "path": "/api/health/database",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/jobs",
+      "status": 200
+    }
+  ],
+  "screenshots": [
+    "app-jobs-network-error.png",
+    "app-login-mobile.png",
+    "app-jobs-mobile.png",
+    "app-jobs-tablet.png",
+    "app-recruiter-desktop.png",
+    "app-create-mobile.png",
+    "app-create-desktop.png",
+    "app-apply-modal-desktop.png",
+    "app-job-detail-desktop.png",
+    "app-candidate-mobile.png",
+    "app-candidate-desktop.png",
+    "reference-landing-desktop.png",
+    "app-landing-desktop.png",
+    "reference-jobs-desktop.png",
+    "app-jobs-desktop.png",
+    "reference-create-desktop.png",
+    "app-create-desktop.png",
+    "reference-candidate-desktop.png",
+    "app-candidate-desktop.png",
+    "app-applicant-modal-desktop.png",
+    "app-applicants-desktop.png",
+    "app-applicants-mobile.png",
+    "app-profile-unavailable.png",
+    "app-admin-unavailable.png",
+    "app-candidate-withdrawn-readback.png"
+  ],
+  "checks": [
+    "Network error preserves filters/navigation; Retry restores API data",
+    "Mobile menu opens, navigates and closes",
+    "Recruiter navigation → create DRAFT → edit → publish OPEN",
+    "Candidate apply text CV + cover letter → reload → tracker; native dialog focus stays inside",
+    "Recruiter reads persisted CV → SCREENING → INTERVIEW; stale second tab gets 409 and reloads",
+    "Escape closes native modal and returns focus to triggering button",
+    "Withdraw from INTERVIEW preserves history and prevents lifetime duplicate after terminal",
+    "No browser runtime errors in tested application routes"
+  ],
+  "comparisons": [
+    {
+      "page": "landing",
+      "role": "guest",
+      "reference": {
+        "fontFamily": "\"Plus Jakarta Sans\", Inter, system-ui, sans-serif",
+        "navbarHeight": 65,
+        "viewport": 1286
+      },
+      "application": {
+        "fontFamily": "\"Plus Jakarta Sans\", Inter, system-ui, sans-serif",
+        "navbarHeight": 65,
+        "viewport": 1286
+      },
+      "content": "Same fixture Job title/company/skills and one APPLIED application (reference pending). Salary/location absent in application schema; reference legacy fields are not copied.",
+      "productionIdentity": false
+    },
+    {
+      "page": "jobs",
+      "role": "guest",
+      "reference": {
+        "fontFamily": "\"Plus Jakarta Sans\", Inter, system-ui, sans-serif",
+        "navbarHeight": 65,
+        "viewport": 1286
+      },
+      "application": {
+        "fontFamily": "\"Plus Jakarta Sans\", Inter, system-ui, sans-serif",
+        "navbarHeight": 65,
+        "viewport": 1286
+      },
+      "content": "Same fixture Job title/company/skills and one APPLIED application (reference pending). Salary/location absent in application schema; reference legacy fields are not copied.",
+      "productionIdentity": false
+    },
+    {
+      "page": "create",
+      "role": "recruiter",
+      "reference": {
+        "fontFamily": "\"Plus Jakarta Sans\", Inter, system-ui, sans-serif",
+        "navbarHeight": 65,
+        "viewport": 1286
+      },
+      "application": {
+        "fontFamily": "\"Plus Jakarta Sans\", Inter, system-ui, sans-serif",
+        "navbarHeight": 65,
+        "viewport": 1286
+      },
+      "content": "Same fixture Job title/company/skills and one APPLIED application (reference pending). Salary/location absent in application schema; reference legacy fields are not copied.",
+      "productionIdentity": false
+    },
+    {
+      "page": "candidate",
+      "role": "candidate",
+      "reference": {
+        "fontFamily": "\"Plus Jakarta Sans\", Inter, system-ui, sans-serif",
+        "navbarHeight": 65,
+        "viewport": 1286
+      },
+      "application": {
+        "fontFamily": "\"Plus Jakarta Sans\", Inter, system-ui, sans-serif",
+        "navbarHeight": 65,
+        "viewport": 1286
+      },
+      "content": "Same fixture Job title/company/skills and one APPLIED application (reference pending). Salary/location absent in application schema; reference legacy fields are not copied.",
+      "productionIdentity": false
+    }
+  ]
+}

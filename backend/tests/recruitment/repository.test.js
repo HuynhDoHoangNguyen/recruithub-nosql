@@ -50,3 +50,17 @@ test('Repository converts network/auth/conflict errors without exposing raw URLs
   const noAccess = new JobApplicationRepository(config, async () => json({}, 401));
   await assert.rejects(() => noAccess.get('job:one'), error => error.status === 503);
 });
+
+test('Candidate aggregate queries only its key range and fails explicitly if the view is missing', async () => {
+  const requests = [];
+  const repo = new JobApplicationRepository(config, async url => {
+    requests.push(new URL(url));
+    return json({ rows: [{ key: ['candidate:one', 'APPLIED'], value: 24 }, { key: ['candidate:one', 'WITHDRAWN'], value: 1 }] });
+  });
+  assert.deepEqual(await repo.candidateStats('candidate:one'), { total_applications: 25, by_stage: { APPLIED: 24, WITHDRAWN: 1 } });
+  assert.equal(requests[0].searchParams.get('group'), 'true');
+  assert.deepEqual(JSON.parse(requests[0].searchParams.get('startkey')), ['candidate:one']);
+  assert.deepEqual(JSON.parse(requests[0].searchParams.get('endkey')), ['candidate:one', {}]);
+  const missing = new JobApplicationRepository(config, async () => json({}, 404));
+  await assert.rejects(() => missing.candidateStats('candidate:one'), error => error.status === 503 && error.code === 'DATABASE_NOT_INITIALIZED');
+});

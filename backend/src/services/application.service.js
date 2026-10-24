@@ -16,6 +16,10 @@ export class ApplicationService {
   async context(user) {
     return { candidate: candidateDto(await candidateScope(this.repo, user)), email: user.email };
   }
+  async stats(user) {
+    const candidate = await candidateScope(this.repo, user);
+    return this.repo.candidateStats(candidate._id);
+  }
   async create(user, payload) {
     const candidate = await candidateScope(this.repo, user);
     const id = applicationIdFromPair(candidate._id, payload.job_id);
@@ -82,6 +86,10 @@ export class ApplicationService {
     const result = Object.fromEntries(fields.filter(key => application[key] !== undefined).map(key => [key, application[key]]));
     const job = await this.repo.get(application.job_id);
     result.job = job?.type === 'job' ? publicJobDto(job) : null;
+    if (result.job) {
+      const company = await this.repo.get(job.company_id);
+      if (company?.type === 'company') result.job.company_name = company.name;
+    }
     result.stage_history = application.stage_history.map(event => role === 'RECRUITER' ? event : {
       from_stage: event.from_stage, to_stage: event.to_stage, timestamp: event.timestamp, actor_role: event.actor_role,
     });

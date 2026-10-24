@@ -15,8 +15,8 @@ import AppRoutes from '../src/routes/AppRoutes';
 import { setAccessToken } from '../src/utils/authHelper';
 
 vi.mock('../src/api/jobApplicationApi', () => ({
-  jobApi: { list: vi.fn(), stats: vi.fn(), detail: vi.fn(), create: vi.fn(), edit: vi.fn(), status: vi.fn(), publicList: vi.fn(), publicDetail: vi.fn() },
-  applicationApi: { context: vi.fn(), apply: vi.fn(), mine: vi.fn(), detail: vi.fn(), applicants: vi.fn(), withdraw: vi.fn(), transition: vi.fn() },
+  jobApi: { context: vi.fn(), list: vi.fn(), stats: vi.fn(), detail: vi.fn(), create: vi.fn(), edit: vi.fn(), status: vi.fn(), publicList: vi.fn(), publicDetail: vi.fn() },
+  applicationApi: { stats: vi.fn(), context: vi.fn(), apply: vi.fn(), mine: vi.fn(), detail: vi.fn(), applicants: vi.fn(), withdraw: vi.fn(), transition: vi.fn() },
 }));
 vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'CANDIDATE' } }) }));
 vi.mock('react-toastify', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -29,7 +29,10 @@ const application = { _id: 'application:pair:test', _rev: '1-fixture', current_s
   submission: { resume_text: 'CV đã lưu', cover_letter: 'Thư giới thiệu đã lưu' },
   stage_history: [{ from_stage: null, to_stage: 'APPLIED', timestamp: '2026-10-22T12:00:00Z', actor_role: 'CANDIDATE' }] };
 
-beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); applicationApi.context.mockResolvedValue({ candidate, email: application.email }); });
+beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); applicationApi.context.mockResolvedValue({ candidate, email: application.email });
+  jobApi.context.mockResolvedValue({ company: { name: 'Công ty kiểm thử' }, department: { name: 'Kỹ thuật' } });
+  applicationApi.stats.mockResolvedValue({ total_applications: 25, by_stage: { APPLIED: 24, WITHDRAWN: 1 } });
+});
 
 describe('deadline precision when editing jobs', () => {
   const precise = { ...job, deadline: '2026-11-30T23:59:59.123Z' };
@@ -55,7 +58,7 @@ describe('deadline precision when editing jobs', () => {
   it('submits the original deadline through the actual edit form', async () => {
     jobApi.edit.mockResolvedValue(precise);
     const saved = vi.fn();
-    render(<JobForm job={precise} onSaved={saved} />);
+    render(<MemoryRouter><JobForm job={precise} onSaved={saved} /></MemoryRouter>);
     fireEvent.change(screen.getByLabelText('Tiêu đề công việc *'), { target: { value: 'Tiêu đề đã sửa' } });
     fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
     await waitFor(() => expect(saved).toHaveBeenCalled());
@@ -136,8 +139,8 @@ it('conflicting transition reports the error and reloads the actual application'
 });
 
 it('job form rejects missing fields and converts Vietnam deadline to UTC with canonical conditional paths', async () => {
-  render(<JobForm onSaved={vi.fn()} />);
-  fireEvent.submit(screen.getByText('Tạo tin tuyển dụng').closest('form'));
+  render(<MemoryRouter><JobForm onSaved={vi.fn()} /></MemoryRouter>);
+  fireEvent.submit(screen.getByRole('button', { name: 'Tạo tin tuyển dụng' }).closest('form'));
   expect((await screen.findAllByText('Vui lòng nhập thông tin này.')).length).toBe(4); expect(jobApi.create).not.toHaveBeenCalled();
   const form = fromJob(job); form.experience_status = 'REQUIRED'; form.required_months = '12';
   expect(validateJobForm(form)).toEqual({});
@@ -173,4 +176,20 @@ it('candidate tracker reloads persisted stage and CV after remount', async () =>
   const mount = () => render(<MemoryRouter initialEntries={['/user/dashboard']}><AppRoutes /></MemoryRouter>);
   const first = mount(); await screen.findByText('CV đã lưu'); expect(screen.queryByRole('button', { name: 'Rút đơn ứng tuyển' })).toBeNull(); first.unmount();
   mount(); await screen.findByText('CV đã lưu'); expect(applicationApi.mine).toHaveBeenCalledTimes(2);
+  expect(screen.getByRole('region', { name: 'Thống kê toàn bộ hồ sơ của tôi' }).textContent).toContain('25');
+  expect(screen.getByRole('button', { name: /Đã nộp/ }).textContent).toContain('24');
+});
+
+it('aggregate failure keeps saved applications visible and displays unknown totals with retry', async () => {
+  setAccessToken(tokenFor('CANDIDATE'));
+  applicationApi.mine.mockResolvedValue({ items: [application], has_more: false });
+  applicationApi.stats.mockRejectedValueOnce(new Error('Không tải được thống kê.'));
+  render(<MemoryRouter initialEntries={['/user/dashboard']}><AppRoutes /></MemoryRouter>);
+  await screen.findByText('CV đã lưu');
+  await screen.findByText('Không tải được thống kê.');
+  const stats = screen.getByRole('region', { name: 'Thống kê toàn bộ hồ sơ của tôi' });
+  expect(stats.textContent).toContain('—');
+  expect(stats.textContent).not.toContain('25');
+  fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+  await waitFor(() => expect(stats.textContent).toContain('25'));
 });

@@ -1,8 +1,10 @@
-import { useCallback, useState } from 'react';
+﻿import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FileText, Hourglass, CircleCheck, CircleX } from 'lucide-react';
 import { applicationApi } from '../../api/jobApplicationApi';
-import { formatDate, jobUrl } from '../../features/applications/applicationPresentation';
-import { Page, Pagination, Resource, StageBadge, StageFilter } from '../../features/applications/components/ApplicationUI';
+import AccountHeader from '../../components/AccountHeader';
+import { formatDate, jobUrl, stageLabels } from '../../features/applications/applicationPresentation';
+import { ErrorMessage, Pagination, Resource, StageBadge } from '../../features/applications/components/ApplicationUI';
 import ApplicationTimeline from '../../features/applications/components/ApplicationTimeline';
 import WithdrawButton from '../../features/applications/components/WithdrawButton';
 import { useApiResource, useBookmarkPage } from '../../features/applications/useApiResource';
@@ -12,19 +14,35 @@ export default function JobSeekerDashboard() {
   const pager = useBookmarkPage();
   const { bookmark } = pager;
   const resource = useApiResource(useCallback(() => applicationApi.mine({ bookmark, limit: 20, ...(stage ? { stage } : {}) }), [bookmark, stage]));
-  return <Page title="Hồ sơ ứng tuyển của tôi" subtitle="Theo dõi tiến trình và lịch sử xử lý từng vị trí."
-    action={<Link to="/jobs" className="text-sm font-semibold text-indigo-700">Tìm việc làm</Link>}>
-    <StageFilter value={stage} onChange={value => { setStage(value); pager.reset(); }} />
-    <Resource resource={resource} empty={!resource.data?.items.length} emptyMessage="Chưa có hồ sơ ứng tuyển phù hợp.">
-      <div className="space-y-5">{resource.data?.items.map(application => <article key={application._id} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-wrap justify-between gap-3"><div><Link className="text-lg font-semibold text-indigo-800" to={jobUrl(application.job_id)}>{application.job?.title || 'Tin tuyển dụng không còn khả dụng'}</Link>
-          <p className="mt-1 text-sm text-slate-500">Nộp lúc {formatDate(application.applied_at)}</p></div><StageBadge stage={application.current_stage} /></div>
-        <ApplicationTimeline application={application} />
-        <details><summary className="cursor-pointer text-sm text-indigo-700">CV và thư giới thiệu đã nộp</summary>
-          <p className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-4 text-sm">{application.submission?.resume_text || 'Hồ sơ lịch sử chưa có CV văn bản.'}</p>
-          {application.submission?.cover_letter && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{application.submission.cover_letter}</p>}
-        </details><WithdrawButton application={application} onChanged={resource.reload} />
-      </article>)}</div>
-    </Resource><Pagination pager={pager} data={resource.data} loading={resource.loading} />
-  </Page>;
+  const stats = useApiResource(useCallback(() => applicationApi.stats(), []));
+  const account = useApiResource(useCallback(() => applicationApi.context(), []));
+  const items = resource.data?.items || [];
+  const byStage = stats.data?.by_stage || {};
+  const count = stages => stages.reduce((total, value) => total + (byStage[value] || 0), 0);
+  const changed = () => Promise.all([resource.reload(), stats.reload()]);
+  return <main className="min-h-screen bg-slate-50"><div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <AccountHeader title="Hồ sơ ứng tuyển của tôi" profile={account.data?.candidate} email={account.data?.email} action={<><Link to="/profile" className="btn-secondary text-xs">Cập nhật CV / Profile</Link><Link to="/jobs" className="btn-primary text-xs">Tìm việc mới →</Link></>} />
+    <ErrorMessage error={account.error} retry={account.reload} />
+    <section aria-label="Thống kê toàn bộ hồ sơ của tôi"><div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">{[
+      ['Tổng đơn ứng tuyển', stats.data?.total_applications, FileText, 'text-blue-600 bg-blue-50'],
+      ['Đang xử lý', count(['APPLIED', 'SCREENING', 'INTERVIEW', 'OFFER']), Hourglass, 'text-amber-600 bg-amber-50'],
+      ['Đã tuyển', count(['HIRED']), CircleCheck, 'text-emerald-600 bg-emerald-50'],
+      ['Đã kết thúc', count(['REJECTED', 'WITHDRAWN']), CircleX, 'text-rose-600 bg-rose-50'],
+    ].map(([label, value, Icon, color]) => <div className="card p-4 sm:p-5 flex flex-wrap items-center gap-4" key={label}><span className={`p-3 rounded-xl ${color}`}><Icon className="h-6 w-6" aria-hidden="true" /></span><div><p className="text-2xl font-extrabold text-slate-900">{stats.loading || stats.error ? '—' : value}</p><p className="text-xs text-slate-500 mt-1">{label}</p></div></div>)}</div><ErrorMessage error={stats.error} retry={stats.reload} /></section>
+    <div className="grid lg:grid-cols-4 gap-6">
+      <aside className="lg:col-span-1"><div className="card p-4 lg:sticky lg:top-24"><h2 className="text-xs uppercase font-bold text-slate-400 px-3 mb-4 mt-2">Trạng thái ứng tuyển</h2><div className="space-y-2">
+        {[['', 'Tất cả đơn nộp'], ...Object.entries(stageLabels)].map(([value, label]) => <button type="button" key={value} aria-pressed={stage === value} onClick={() => { setStage(value); pager.reset(); }} className={`w-full flex justify-between gap-2 text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${stage === value ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}><span>{label}</span><span className={`px-2 rounded-full ${stage === value ? 'bg-white/20' : 'bg-slate-100'}`}>{stats.loading || stats.error ? '—' : value ? byStage[value] || 0 : stats.data?.total_applications}</span></button>)}
+      </div></div></aside>
+      <section className="lg:col-span-3 min-w-0 space-y-4"><div className="card px-5 py-3 flex flex-wrap justify-between gap-2 text-xs text-slate-500"><h2>Danh sách đơn ứng tuyển ({items.length} trên trang)</h2><span>Lọc theo trạng thái · Trang {pager.page}</span></div>
+        <Resource resource={resource} empty={!items.length} emptyMessage="Chưa có hồ sơ ứng tuyển phù hợp.">
+          <div className="space-y-4">{items.map(application => <article key={application._id} className="card card-hover p-5 sm:p-6 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-4 flex-1 min-w-0"><span className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-sm font-extrabold flex items-center justify-center shrink-0" aria-hidden="true">{(application.job?.company_name || 'IT').slice(0, 3).toUpperCase()}</span><div className="min-w-0"><p className="text-xs text-slate-500 mb-1">{application.job?.company_name || application.job?.industry}</p><Link to={jobUrl(application.job_id)}><h3 className="text-lg font-extrabold text-slate-900 hover:text-blue-600">{application.job?.title || 'Tin tuyển dụng không còn khả dụng'}</h3></Link></div></div><StageBadge stage={application.current_stage} /></div>
+            {!!application.job?.required_skills?.length && <div className="flex flex-wrap gap-2">{application.job.required_skills.map(skill => <span key={skill} className="badge-tag">{skill}</span>)}</div>}
+            <details><summary className="cursor-pointer text-xs font-semibold text-blue-600">Xem chi tiết, CV và lịch sử</summary><div className="pt-4 space-y-4"><ApplicationTimeline application={application} /><h4 className="text-sm font-bold">CV đã nộp</h4><p className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm">{application.submission?.resume_text || 'Hồ sơ lịch sử chưa có CV văn bản.'}</p>{application.submission?.cover_letter && <p className="whitespace-pre-wrap text-sm text-slate-600">{application.submission.cover_letter}</p>}</div></details>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100"><span className="text-xs text-slate-400">Đã nộp vào ngày: <strong className="text-slate-600">{formatDate(application.applied_at)}</strong></span><div className="flex flex-wrap items-center gap-3"><Link className="text-blue-600 text-xs font-semibold" to={jobUrl(application.job_id)}>Xem việc làm →</Link><WithdrawButton application={application} onChanged={changed} /></div></div>
+          </article>)}</div>
+        </Resource><Pagination pager={pager} data={resource.data} loading={resource.loading} />
+      </section>
+    </div>
+  </div></main>;
 }

@@ -1,4 +1,5 @@
 import client from './axiosClient';
+import { apiErrorMessage } from './apiError';
 
 const idPath = id => encodeURIComponent(id);
 async function unwrap(request) {
@@ -8,12 +9,13 @@ async function unwrap(request) {
     return response.data.data;
   } catch (error) {
     const body = error.response?.data;
-    throw Object.assign(new Error(body?.message || error.message || 'Không thể kết nối máy chủ.'), {
+    throw Object.assign(new Error(body?.message || apiErrorMessage(error)), {
       status: error.response?.status, code: body?.error?.code, details: body?.error?.details || [],
     });
   }
 }
 export const jobApi = {
+  context: () => unwrap(client.get('/recruiter/context')),
   list: params => unwrap(client.get('/recruiter/jobs', { params })),
   stats: () => unwrap(client.get('/recruiter/stats')),
   detail: id => unwrap(client.get(`/recruiter/jobs/${idPath(id)}`)),
@@ -24,6 +26,7 @@ export const jobApi = {
   publicDetail: id => unwrap(client.get(`/jobs/${idPath(id)}`)),
 };
 export const applicationApi = {
+  stats: () => unwrap(client.get('/applications/stats')),
   context: () => unwrap(client.get('/applications/context')),
   apply: payload => unwrap(client.post('/applications', payload)),
   mine: params => unwrap(client.get('/applications/my-applications', { params })),

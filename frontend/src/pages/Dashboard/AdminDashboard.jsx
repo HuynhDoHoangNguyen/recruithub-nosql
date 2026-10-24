@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../../services/api";
+import { ErrorMessage } from '../../features/applications/components/ApplicationUI';
+import { apiErrorMessage } from '../../api/apiError';
 import {
 	FaUsers,
 	FaBriefcase,
@@ -23,9 +25,12 @@ const AdminDashboard = () => {
 	const [selectedUserId, setSelectedUserId] = useState(null);
 	const [selectedJobId, setSelectedJobId] = useState(null);
 	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState(null);
+	const [refresh, setRefresh] = useState(0);
 
 	useEffect(() => {
 		const fetchDashboard = async () => {
+			setLoading(true); setError(null);
 			try {
 				const [statsRes, usersRes, jobsRes] = await Promise.all([
 					api.get("/admin/stats"),
@@ -36,14 +41,14 @@ const AdminDashboard = () => {
 				setUsers(usersRes.data);
 				setJobs(jobsRes.data);
 			} catch (err) {
-				console.error("❌ Failed to load dashboard:", err);
+				setError({ message: err.response?.status === 404 ? 'Dịch vụ quản trị chưa được tích hợp. Vui lòng thử lại sau.' : apiErrorMessage(err) });
 			} finally {
 				setLoading(false);
 			}
 		};
 
 		fetchDashboard();
-	}, []);
+	}, [refresh]);
 
 	const handleDeleteUser = async (id) => {
 		if (!window.confirm("Delete this user?")) return;
@@ -75,17 +80,17 @@ const AdminDashboard = () => {
 		}
 	};
 
-	if (loading) return <p className="text-center mt-10 text-blue-600 text-lg">Loading dashboard...</p>;
-
 	return (
 		<div className="p-6 space-y-10 max-w-screen-xl mx-auto">
 			<h1 className="text-3xl font-bold text-blue-800 mb-6">Admin Dashboard</h1>
+			{loading && <p role="status" className="text-blue-600"><span className="loading-spinner mr-3" />Đang tải dữ liệu…</p>}
+			<ErrorMessage error={error} retry={() => setRefresh(value => value + 1)} />
 
 			{/* Stats Section */}
 			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-				<StatCard icon={FaUsers} label="Total Users" count={stats.totalUsers} />
-				<StatCard icon={FaBriefcase} label="Total Jobs" count={stats.totalJobs} />
-				<StatCard icon={FaFileAlt} label="Applications" count={stats.totalApplications} />
+				<StatCard icon={FaUsers} label="Total Users" count={loading || error ? '—' : stats.totalUsers} />
+				<StatCard icon={FaBriefcase} label="Total Jobs" count={loading || error ? '—' : stats.totalJobs} />
+				<StatCard icon={FaFileAlt} label="Applications" count={loading || error ? '—' : stats.totalApplications} />
 			</div>
 
 			{/* Users Table */}

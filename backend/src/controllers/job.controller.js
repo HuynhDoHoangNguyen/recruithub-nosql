@@ -3,6 +3,7 @@ export function jobController(service) {
     res.status(status).json({ success: true, data: await action(req), message });
   };
   return {
+    context: send(req => service.context(req.user)),
     list: send(req => service.list(req.user, req.validated.query)),
     stats: send(req => service.stats(req.user)),
     detail: send(req => service.detail(req.user, req.params.id)),
