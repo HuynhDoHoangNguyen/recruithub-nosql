@@ -18,7 +18,10 @@ test('new writes reject unavailable classification while the stored-document sch
 test('Job create/edit/publish/close validates schema and real recruiter scope', async t => {
   const f = await startFixture(t);
   assert.equal((await f.request('POST', '/jobs', { ...jobInput, recruiter_id: 'recruiter:two' }, 'recruiter')).status, 400);
+  assert.equal((await f.request('POST', '/jobs', { ...jobInput, company_id: f.otherCompany._id }, 'recruiter')).status, 400);
+  assert.equal((await f.request('POST', '/jobs', { ...jobInput, department_id: f.otherDepartment._id }, 'recruiter')).status, 400);
   assert.equal((await f.request('POST', '/jobs', jobInput, 'candidate')).status, 403);
+  assert.equal((await f.request('POST', '/jobs', jobInput, 'admin')).status, 403);
   const created = await f.request('POST', '/jobs', { ...jobInput, status: 'DRAFT' }, 'recruiter');
   assert.equal(created.status, 201);
   let job = created.body.data;
@@ -34,6 +37,42 @@ test('Job create/edit/publish/close validates schema and real recruiter scope', 
   assert.equal((await f.request('PATCH', `/jobs/${job._id}/status`, { status: 'OPEN', expected_rev: closed.body.data._rev }, 'recruiter')).status, 409);
   const list = await f.request('GET', '/recruiter/jobs?status=CLOSED', undefined, 'recruiter');
   assert.deepEqual(list.body.data.items.map(item => item._id), [job._id]);
+});
+
+test('Recruiter organization scope is enforced for cross-company Job and Application access', async t => {
+  const f = await startFixture(t);
+  const originalJob = structuredClone(await f.repo.get(f.job._id));
+  const deniedCreate = await f.request('POST', '/jobs', jobInput, 'otherRecruiter');
+  assert.equal(deniedCreate.status, 201);
+  assert.equal(deniedCreate.body.data.company_id, f.otherCompany._id);
+  assert.equal(deniedCreate.body.data.department_id, f.otherDepartment._id);
+
+  const application = (await apply(f)).body.data;
+  const jobRev = (await f.repo.get(f.job._id))._rev;
+  const appRev = (await f.repo.get(application._id))._rev;
+  const denied = [
+    await f.request('PATCH', `/jobs/${f.job._id}`, { title: 'Không được sửa', expected_rev: jobRev }, 'otherRecruiter'),
+    await f.request('PATCH', `/jobs/${f.job._id}/status`, { status: 'CLOSED', expected_rev: jobRev }, 'otherRecruiter'),
+    await f.request('GET', `/jobs/${f.job._id}/applicants`, undefined, 'otherRecruiter'),
+    await f.request('GET', `/applications/${application._id}`, undefined, 'otherRecruiter'),
+    await f.request('PATCH', `/applications/${application._id}/stage`, mutation(application, { to_stage: 'SCREENING' }), 'otherRecruiter'),
+  ];
+  assert.deepEqual(denied.map(response => response.status), [403, 403, 403, 403, 403]);
+  assert.deepEqual(await f.repo.get(f.job._id), { ...originalJob, _rev: jobRev });
+  assert.equal((await f.repo.get(application._id))._rev, appRev);
+});
+
+test('Locked Recruiter and Recruiter with incomplete organization references cannot use Job management', async t => {
+  const f = await startFixture(t);
+  f.repo.docs.get(f.users.recruiter._id).account_status = 'LOCKED';
+  assert.equal((await f.request('GET', '/recruiter/jobs', undefined, 'recruiter')).status, 401);
+
+  f.repo.docs.get(f.users.recruiter._id).account_status = 'ACTIVE';
+  f.repo.docs.delete(f.recruiter.department_id);
+  const writesBefore = f.repo.writes.length;
+  const denied = await f.request('POST', '/jobs', jobInput, 'recruiter');
+  assert.notEqual(denied.status, 201);
+  assert.equal(f.repo.writes.length, writesBefore);
 });
 
 test('Job normalization rejects alias collisions, overlaps, conditional requirements and bad deadlines', async t => {

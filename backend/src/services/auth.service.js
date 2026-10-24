@@ -1,7 +1,16 @@
 import argon2 from 'argon2';
 import { PROVENANCE_CLASSIFICATIONS, USER_ACCOUNT_STATUSES, USER_ROLES } from '../constants/document.constants.js';
 import { candidateDocumentSchema } from '../schemas/candidate.schema.js';
+import { userDocumentSchema } from '../schemas/user.schema.js';
+import { companyDocumentSchema } from '../schemas/company.schema.js';
+import { departmentDocumentSchema } from '../schemas/department.schema.js';
+import { recruiterDocumentSchema, validateRecruiterOrganizationScope } from '../schemas/recruiter.schema.js';
 import { candidateIdFromUserId, userIdFromEmail, normalizeEmail } from '../utils/id.utils.js';
+import {
+  companyIdFromSelfRegistration, departmentIdFromSelfRegistration, departmentKeyFromName,
+  normalizeCompanyDisplayName, normalizeCompanyName, normalizeDepartmentDisplayName,
+  recruiterIdFromSelfRegistration,
+} from '../utils/recruiter-registration-id.utils.js';
 import { toSafeUserDto } from './user.dto.js';
 import { issueAccessToken, verifyAccessToken } from './jwt-access-token.js';
 
@@ -15,16 +24,17 @@ export const PASSWORD_HASH_OPTIONS = Object.freeze({
 });
 
 export class AuthServiceError extends Error {
-  constructor(status, code, message) {
+  constructor(status, code, message, details = null) {
     super(message);
     this.name = 'AuthServiceError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
 export class AuthService {
-  constructor({ userRepository, candidateRepository, jwtSecret, now = () => Date.now() }) {
+  constructor({ userRepository, candidateRepository, companyRepository, departmentRepository, recruiterRepository, jwtSecret, now = () => Date.now() }) {
     if (!userRepository || !candidateRepository) {
       throw new TypeError('AuthService requires User and Candidate repositories.');
     }
@@ -37,6 +47,9 @@ export class AuthService {
     }
     this.users = userRepository;
     this.candidates = candidateRepository;
+    this.companies = companyRepository;
+    this.departments = departmentRepository;
+    this.recruiters = recruiterRepository;
     this.jwtSecret = jwtSecret;
     this.now = now;
   }
@@ -144,6 +157,119 @@ export class AuthService {
     return { user: toSafeUserDto(activeUser) };
   }
 
+  /**
+   * Public Recruiter registration. Writes Company → Department → Recruiter →
+   * ACTIVE User so an account cannot authenticate before all required references
+   * exist. There is deliberately no automatic retry or compensating delete.
+   */
+  async registerRecruiter(input) {
+    if (!this.companies || !this.departments || !this.recruiters) {
+      throw new AuthServiceError(503, 'RECRUITER_REGISTRATION_UNAVAILABLE', 'Recruiter registration storage is not configured.');
+    }
+
+    const email = input.email.trim();
+    const emailNormalized = normalizeEmail(email);
+    const userId = userIdFromEmail(emailNormalized);
+    if (await this.#getExistingUser(emailNormalized)) {
+      throw new AuthServiceError(409, 'EMAIL_ALREADY_REGISTERED', 'An account with this email already exists.');
+    }
+
+    const companyName = normalizeCompanyDisplayName(input.company.name);
+    const normalizedCompanyName = normalizeCompanyName(companyName);
+    const industry = input.company.industry.normalize('NFKC').trim().replace(/\s+/gu, ' ');
+    const departmentName = normalizeDepartmentDisplayName(input.department.name);
+    const departmentKey = departmentKeyFromName(departmentName);
+    const companyId = companyIdFromSelfRegistration(companyName);
+    const departmentId = departmentIdFromSelfRegistration(companyId, departmentKey);
+    const recruiterId = recruiterIdFromSelfRegistration(userId, companyId, departmentId);
+
+    const companyCollision = await this.companies.findNameCollision(normalizedCompanyName, normalizeCompanyName);
+    if (companyCollision) {
+      throw new AuthServiceError(409, 'COMPANY_ALREADY_EXISTS', 'A company with a matching normalized name already exists. Contact an administrator if this is an error.');
+    }
+
+    const timestamp = new Date(this.now()).toISOString();
+    const passwordHash = await argon2.hash(input.password, PASSWORD_HASH_OPTIONS);
+    const userDocument = {
+      _id: userId, type: 'user', email, email_normalized: emailNormalized,
+      password_hash: passwordHash, role: USER_ROLES.RECRUITER,
+      account_status: USER_ACCOUNT_STATUSES.ACTIVE,
+      created_at: timestamp, updated_at: timestamp,
+    };
+    const companyDocument = {
+      _id: companyId, type: 'company', name: companyName, industry,
+      ...(input.company.website ? { website: input.company.website.trim() } : {}),
+      ...(input.company.address ? { address: input.company.address.trim() } : {}),
+      created_at: timestamp, updated_at: timestamp,
+      provenance: { classification: PROVENANCE_CLASSIFICATIONS.MIXED, field_origins: {
+        name: 'recruiter_self_registration', industry: 'recruiter_self_registration',
+        ...(input.company.website ? { website: 'recruiter_self_registration' } : {}),
+        ...(input.company.address ? { address: 'recruiter_self_registration' } : {}),
+      } },
+    };
+    const departmentDocument = {
+      _id: departmentId, type: 'department', company_id: companyId,
+      name: departmentName, key: departmentKey, created_at: timestamp, updated_at: timestamp,
+      provenance: { classification: PROVENANCE_CLASSIFICATIONS.MIXED, field_origins: {
+        name: 'recruiter_self_registration', key: 'normalized', company_id: 'derived',
+      } },
+    };
+    const recruiterDocument = {
+      _id: recruiterId, type: 'recruiter', user_id: userId, company_id: companyId,
+      department_id: departmentId, created_at: timestamp, updated_at: timestamp,
+      provenance: { classification: PROVENANCE_CLASSIFICATIONS.MIXED, field_origins: {
+        user_id: 'derived', company_id: 'derived', department_id: 'derived',
+      } },
+    };
+
+    const documents = [
+      [this.companies, companyDocument, companyDocumentSchema],
+      [this.departments, departmentDocument, departmentDocumentSchema],
+      [this.recruiters, recruiterDocument, recruiterDocumentSchema],
+      [this.users, userDocument, userDocumentSchema],
+    ];
+    for (const [, document, schema] of documents) {
+      const parsed = schema.safeParse(document);
+      if (!parsed.success) {
+        throw new AuthServiceError(500, 'REGISTRATION_CONFIGURATION_ERROR', 'Recruiter registration data does not satisfy the current document contract.');
+      }
+    }
+    const scope = validateRecruiterOrganizationScope({
+      recruiter: recruiterDocument, company: companyDocument, department: departmentDocument, user: userDocument,
+    });
+    if (!scope.valid) {
+      throw new AuthServiceError(500, 'REGISTRATION_CONFIGURATION_ERROR', 'Recruiter registration references are inconsistent.');
+    }
+
+    const attemptedIds = [];
+    for (const [repository, document] of documents) {
+      attemptedIds.push(document._id);
+      try {
+        await repository.create(document);
+      } catch (error) {
+        // The Company create may race another request with the same normalized
+        // name. It is a duplicate; never attach the caller to the existing doc.
+        if (document.type === 'company' && error?.code === 'CONFLICT') {
+          throw new AuthServiceError(409, 'COMPANY_ALREADY_EXISTS', 'A company with a matching normalized name already exists.');
+        }
+        throw new AuthServiceError(error?.code === 'CONFLICT' ? 409 : 503, 'REGISTRATION_INCOMPLETE',
+          'Registration did not finish. Do not retry automatically; contact an operator with the reference below.',
+          { registration_ref: userId, possibly_created_document_ids: attemptedIds });
+      }
+    }
+
+    // Read the persisted graph back before reporting success. Login and the TV2
+    // recruiter scope perform the same completeness check on later requests.
+    try {
+      await this.#assertRecruiterReady(userDocument);
+    } catch {
+      throw new AuthServiceError(503, 'REGISTRATION_INCOMPLETE',
+        'Documents were created but the Recruiter relationship could not be verified. Contact an operator; do not retry automatically.',
+        { registration_ref: userId, possibly_created_document_ids: documents.map(([, document]) => document._id) });
+    }
+    return { user: toSafeUserDto(userDocument) };
+  }
+
   async login({ email, password }) {
     let user;
     try {
@@ -165,6 +291,8 @@ export class AuthService {
     if (!verified) {
       throw new AuthServiceError(401, 'AUTHENTICATION_FAILED', 'Email or password is incorrect.');
     }
+
+    await this.#assertRecruiterReady(user);
 
     const accessToken = issueAccessToken({
       sub: user._id,
@@ -195,6 +323,8 @@ export class AuthService {
       throw new AuthServiceError(401, 'AUTHENTICATION_FAILED', 'A valid access token is required.');
     }
 
+    await this.#assertRecruiterReady(user);
+
     return {
       user: toSafeUserDto(user),
       principal: { sub: user._id, role: user.role },
@@ -206,6 +336,30 @@ export class AuthService {
       return await this.users.getByEmail(normalizeEmail(email));
     } catch (error) {
       if (error?.code === 'NOT_FOUND') return null;
+      throw error;
+    }
+  }
+
+  async #assertRecruiterReady(user) {
+    if (user.role !== USER_ROLES.RECRUITER) return;
+    if (!this.recruiters || !this.companies || !this.departments) {
+      throw new AuthServiceError(503, 'RECRUITER_PROFILE_UNAVAILABLE', 'Recruiter profile storage is unavailable.');
+    }
+    try {
+      const result = await this.recruiters.findByUserId(user._id);
+      if (result.docs?.length !== 1) throw new Error('Recruiter profile is missing or ambiguous.');
+      const recruiter = result.docs[0];
+      const [company, department] = await Promise.all([
+        this.companies.getById(recruiter.company_id), this.departments.getById(recruiter.department_id),
+      ]);
+      if (!validateRecruiterOrganizationScope({ recruiter, company, department, user }).valid) {
+        throw new Error('Recruiter organization references are inconsistent.');
+      }
+    } catch (error) {
+      if (error instanceof AuthServiceError) throw error;
+      if (['NOT_FOUND', 'CONFLICT', 'DOCUMENT_VALIDATION_FAILED'].includes(error?.code) || error?.message?.includes('Recruiter profile') || error?.message?.includes('Recruiter organization')) {
+        throw new AuthServiceError(403, 'RECRUITER_PROFILE_INCOMPLETE', 'Recruiter profile is incomplete or inconsistent. Contact an operator.');
+      }
       throw error;
     }
   }

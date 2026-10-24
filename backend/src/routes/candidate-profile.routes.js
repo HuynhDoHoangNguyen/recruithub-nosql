@@ -7,9 +7,12 @@ import { successResponse } from '../utils/api-response.js';
 import { sendApiError } from '../utils/send-api-error.js';
 
 function createDefaultServices() {
-  const { users, candidates } = createAuthRepositories();
+  const repositories = createAuthRepositories();
+  const { users, candidates } = repositories;
   return {
-    auth: new AuthService({ userRepository: users, candidateRepository: candidates, jwtSecret: process.env.JWT_ACCESS_SECRET }),
+    auth: new AuthService({ userRepository: users, candidateRepository: candidates,
+      companyRepository: repositories.companies, departmentRepository: repositories.departments,
+      recruiterRepository: repositories.recruiters, jwtSecret: process.env.JWT_ACCESS_SECRET }),
     profile: new CandidateProfileService({ candidateRepository: candidates }),
   };
 }

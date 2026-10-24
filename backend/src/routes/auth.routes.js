@@ -3,23 +3,26 @@ import { createAuthRepositories } from '../config/auth-database.config.js';
 export { getAuthDatabaseConfig } from '../config/auth-database.config.js';
 import { CouchDbError, toApiError } from '../services/couchdb.errors.js';
 import { AuthService, AuthServiceError } from '../services/auth.service.js';
-import { candidateRegistrationRequestSchema, loginRequestSchema } from '../schemas/auth-request.schema.js';
+import { candidateRegistrationRequestSchema, loginRequestSchema, recruiterRegistrationRequestSchema } from '../schemas/auth-request.schema.js';
 import { createAuthenticate } from '../middleware/authenticate.js';
 import { validateBody } from '../middleware/validate-body.js';
 import { errorResponse, successResponse } from '../utils/api-response.js';
 
 function createDefaultAuthService() {
-  const { users, candidates } = createAuthRepositories();
+  const repositories = createAuthRepositories();
   return new AuthService({
-    userRepository: users,
-    candidateRepository: candidates,
+    userRepository: repositories.users,
+    candidateRepository: repositories.candidates,
+    companyRepository: repositories.companies,
+    departmentRepository: repositories.departments,
+    recruiterRepository: repositories.recruiters,
     jwtSecret: process.env.JWT_ACCESS_SECRET,
   });
 }
 
 function sendAuthError(res, error) {
   if (error instanceof AuthServiceError) {
-    return res.status(error.status).json(errorResponse(error.code, error.message, null));
+    return res.status(error.status).json(errorResponse(error.code, error.message, error.details));
   }
   if (error instanceof CouchDbError) {
     const mapped = toApiError(error);
@@ -35,7 +38,10 @@ function sendAuthError(res, error) {
 }
 
 /** Route factory supports fake services for isolated tests. */
-export function createAuthRouter({ serviceFactory = createDefaultAuthService } = {}) {
+export function createAuthRouter({
+  serviceFactory = createDefaultAuthService,
+  recruiterRegistrationEnabled = process.env.PUBLIC_RECRUITER_REGISTRATION_ENABLED === 'true',
+} = {}) {
   if (typeof serviceFactory !== 'function') throw new TypeError('serviceFactory must be a function.');
   const router = Router();
   let service;
@@ -48,6 +54,20 @@ export function createAuthRouter({ serviceFactory = createDefaultAuthService } =
     try {
       const result = await serviceProvider().register(req.validatedBody);
       return res.status(201).json(successResponse(result, 'Candidate account created. Sign in to continue.'));
+    } catch (error) {
+      return sendAuthError(res, error);
+    }
+  });
+
+  router.post('/register/recruiter', (req, res, next) => {
+    if (!recruiterRegistrationEnabled) {
+      return res.status(404).json(errorResponse('RECRUITER_REGISTRATION_DISABLED', 'Recruiter registration is not enabled.', null));
+    }
+    return next();
+  }, validateBody(recruiterRegistrationRequestSchema), async (req, res) => {
+    try {
+      const result = await serviceProvider().registerRecruiter(req.validatedBody);
+      return res.status(201).json(successResponse(result, 'Recruiter account created. Sign in to continue.'));
     } catch (error) {
       return sendAuthError(res, error);
     }

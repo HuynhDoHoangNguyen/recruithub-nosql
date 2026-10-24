@@ -8,6 +8,16 @@
 
 TV1 owns User identity, Candidate registration and authentication. This stage reuses the existing React application, Express `/api/v1` namespace, User/Candidate repositories, DATA-02A schemas and shared CouchDB client. Job/Application APIs remain TV2-owned; Interview/Scoring/Audit remain TV3-owned.
 
+### Recruiter registration proposal (not active)
+
+TV1 proposes adding public Recruiter registration where the applicant declares a **new** Company and a Department belonging to it. No public Admin registration, existing-Company attachment, Company verification/approval workflow, onboarding document, or additional account status is proposed for the MVP. DR-003/DR-019 and TV2 Job ownership have not been approved for this change. A separate `/auth/register/recruiter` endpoint and Register option are implemented behind explicit disabled-by-default flags (`PUBLIC_RECRUITER_REGISTRATION_ENABLED` and `VITE_RECRUITER_REGISTRATION_ENABLED`). Keep both disabled until approvals and the recovery runbook are recorded. The existing `/auth/register` Candidate contract remains unchanged.
+
+Before activation, the group must approve the Auth contract and TV2 must confirm Company/Department/Job ownership and recruiter scope. The current documents have no in-progress marker or idempotency record. Because CouchDB writes across User, Company, Department and Recruiter are not transactional, a partial write cannot safely be resumed automatically. The implemented coordinator stops at the first write error, returns `REGISTRATION_INCOMPLETE` with a non-secret reference and possible document IDs, and performs no retry or compensating delete. Operator reconciliation is required before a new attempt.
+
+Auth denies Recruiter token issuance and rejects Recruiter access at `/auth/me` until it verifies the complete Recruiter, Company and Department references. TV2 Job/Application services independently check ACTIVE role and Recruiter organization scope before protected operations. The Company duplicate check uses NFKC, trim/collapsed whitespace and case-folded names; a match rejects registration and never attaches to the existing document. It scans Company IDs because the current schema has no normalized-name field/index, so this MVP check is linear in the number of Company documents.
+
+The Job schema's ownership references are `recruiter_id`, `company_id`, and `department_id`. Current TV2 code derives these from the authenticated Recruiter on create, rejects client-supplied ownership references, and checks all three on owned Job/Application operations. Current Job routes grant no Admin override. These are observed implementation rules, not TV2 contract approval; confirm them with TV2 before enabling the Recruiter signup flags.
+
 ## Implemented API
 
 All domain responses use the current provisional envelope `{success:true,data,message}` or `{success:false,error:{code,message,details}}`.

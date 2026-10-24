@@ -79,6 +79,48 @@ test('register → login → me uses the existing router contract and safe user 
   assert.deepEqual((await me.json()).data.user, safeUser);
 });
 
+test('Recruiter registration endpoint stays disabled by default and validates a strict DTO when enabled', async (t) => {
+  const disabledApp = express();
+  disabledApp.use(express.json());
+  disabledApp.use('/api/v1/auth', createAuthRouter({ serviceFactory: () => { throw new Error('must not initialize storage'); }, recruiterRegistrationEnabled: false }));
+  const disabledServer = disabledApp.listen(0);
+  await new Promise(resolve => disabledServer.once('listening', resolve));
+  t.after(() => disabledServer.close());
+  const body = { email: 'r@example.test', password: 'StrongPass1', company: { name: 'New Company', industry: 'Technology' }, department: { name: 'People' } };
+  const disabled = await fetch(`http://127.0.0.1:${disabledServer.address().port}/api/v1/auth/register/recruiter`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+  assert.equal(disabled.status, 404);
+  assert.equal((await disabled.json()).error.code, 'RECRUITER_REGISTRATION_DISABLED');
+
+  let received;
+  const enabledApp = express();
+  enabledApp.use(express.json());
+  enabledApp.use('/api/v1/auth', createAuthRouter({
+    recruiterRegistrationEnabled: true,
+    serviceFactory: () => ({ async registerRecruiter(input) { received = input; return { user: safeUser }; } }),
+  }));
+  const enabledServer = enabledApp.listen(0);
+  await new Promise(resolve => enabledServer.once('listening', resolve));
+  t.after(() => enabledServer.close());
+  const enabled = await fetch(`http://127.0.0.1:${enabledServer.address().port}/api/v1/auth/register/recruiter`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, role: 'ADMIN' }),
+  });
+  assert.equal(enabled.status, 400);
+  assert.equal((await enabled.json()).error.code, 'VALIDATION_ERROR');
+  const unsupportedWebsite = await fetch(`http://127.0.0.1:${enabledServer.address().port}/api/v1/auth/register/recruiter`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...body, company: { ...body.company, website: 'ftp://company.example' } }),
+  });
+  assert.equal(unsupportedWebsite.status, 400);
+  const valid = await fetch(`http://127.0.0.1:${enabledServer.address().port}/api/v1/auth/register/recruiter`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+  assert.equal(valid.status, 201);
+  assert.equal(received.role, undefined);
+  assert.equal(received.email, body.email);
+});
+
 test('basic RBAC checks server principal role', async (t) => {
   const app = express();
   app.get('/admin-only', (req, res, next) => {

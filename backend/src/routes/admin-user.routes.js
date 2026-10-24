@@ -11,9 +11,12 @@ const statusBodySchema = z.object({ account_status: z.enum(['ACTIVE', 'LOCKED'])
 const idSchema = z.string().regex(/^user:[a-f0-9]{64}$/);
 
 function createDefaultServices() {
-  const { users, candidates } = createAuthRepositories();
+  const repositories = createAuthRepositories();
+  const { users, candidates } = repositories;
   return {
-    auth: new AuthService({ userRepository: users, candidateRepository: candidates, jwtSecret: process.env.JWT_ACCESS_SECRET }),
+    auth: new AuthService({ userRepository: users, candidateRepository: candidates,
+      companyRepository: repositories.companies, departmentRepository: repositories.departments,
+      recruiterRepository: repositories.recruiters, jwtSecret: process.env.JWT_ACCESS_SECRET }),
     admin: new AdminUserService({ userRepository: users, candidateRepository: candidates }),
   };
 }

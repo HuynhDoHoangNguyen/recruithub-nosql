@@ -26,6 +26,26 @@ export const candidateRegistrationRequestSchema = z.object({
   years_experience: z.number().int().min(0).max(80),
 }).strict();
 
+export const recruiterRegistrationRequestSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(6).max(128)
+    .refine((value) => /[A-Z]/.test(value) && /\d/.test(value), {
+      message: 'Password must include an uppercase letter and a number.',
+    }),
+  company: z.object({
+    name: z.string().trim().min(1).max(200),
+    industry: z.string().trim().min(1).max(120),
+    website: z.string().trim().url().max(2048).refine((value) => {
+      const protocol = new URL(value).protocol;
+      return protocol === 'http:' || protocol === 'https:';
+    }, { message: 'Website must use HTTP or HTTPS.' }).optional(),
+    address: z.string().trim().min(1).max(500).optional(),
+  }).strict(),
+  department: z.object({
+    name: z.string().trim().min(1).max(120),
+  }).strict(),
+}).strict();
+
 export function validateAuthRequest(schema, input) {
   return schema.safeParse(input);
 }

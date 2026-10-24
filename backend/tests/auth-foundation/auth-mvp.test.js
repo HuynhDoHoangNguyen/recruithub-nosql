@@ -116,6 +116,21 @@ test('registration rejects duplicate users and does not permit client role/statu
   ));
 });
 
+test('concurrent registration for one canonical email creates one account and returns a stable conflict', async () => {
+  const { service, documents } = createInMemoryService();
+  const outcomes = await Promise.allSettled([
+    service.register(registration),
+    service.register({ ...registration, email: ` ${registration.email.toUpperCase()} ` }),
+  ]);
+
+  assert.equal(outcomes.filter((outcome) => outcome.status === 'fulfilled').length, 1);
+  const rejected = outcomes.find((outcome) => outcome.status === 'rejected');
+  assert.equal(rejected.reason.status, 409);
+  assert.equal(rejected.reason.code, 'EMAIL_ALREADY_REGISTERED');
+  assert.equal([...documents.values()].filter((document) => document.type === 'user').length, 1);
+  assert.equal([...documents.values()].filter((document) => document.type === 'candidate').length, 1);
+});
+
 test('login, token authentication, invalid signatures, and expired tokens are enforced', async () => {
   let now = Date.parse('2026-10-23T12:00:00.000Z');
   const { service } = createInMemoryService({ now: () => now });

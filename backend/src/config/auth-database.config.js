@@ -2,6 +2,7 @@ import { getDatabaseConfig } from './database.config.js';
 import { createCouchDbClient } from '../services/couchdb.client.js';
 import { UserRepository } from '../repositories/user.repository.js';
 import { CandidateRepository } from '../repositories/candidate.repository.js';
+import { CompanyRepository, DepartmentRepository, RecruiterRepository } from '../repositories/organization.repository.js';
 
 export function getAuthDatabaseConfig(environment = process.env) {
   const database = environment.AUTH_COUCHDB_DATABASE;
@@ -23,5 +24,8 @@ export function createAuthRepositories({ environment = process.env, clientFactor
   return {
     users: new UserRepository({ client }),
     candidates: new CandidateRepository({ client }),
+    companies: new CompanyRepository({ client }),
+    departments: new DepartmentRepository({ client }),
+    recruiters: new RecruiterRepository({ client }),
   };
 }

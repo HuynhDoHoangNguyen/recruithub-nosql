@@ -61,9 +61,12 @@ export function createFixture() {
     recruiter: user('recruiter-one', 'RECRUITER'), otherRecruiter: user('recruiter-two', 'RECRUITER'), admin: user('admin-test', 'ADMIN') };
   const company = { _id: 'company:test', type: 'company', name: 'Công ty kiểm thử', industry: 'SaaS', created_at: baseTime, updated_at: baseTime, provenance };
   const department = { _id: 'department:test', type: 'department', company_id: company._id, name: 'Kỹ thuật', key: 'engineering', created_at: baseTime, updated_at: baseTime, provenance };
+  const otherCompany = { ...company, _id: 'company:other', name: 'Công ty khác' };
+  const otherDepartment = { ...department, _id: 'department:other', company_id: otherCompany._id, name: 'Tuyển dụng' };
   const recruiter = { _id: 'recruiter:one', type: 'recruiter', user_id: users.recruiter._id, company_id: company._id,
     department_id: department._id, created_at: baseTime, updated_at: baseTime, provenance };
-  const otherRecruiter = { ...recruiter, _id: 'recruiter:two', user_id: users.otherRecruiter._id };
+  const otherRecruiter = { ...recruiter, _id: 'recruiter:two', user_id: users.otherRecruiter._id,
+    company_id: otherCompany._id, department_id: otherDepartment._id };
   const candidate = { _id: 'candidate:one', type: 'candidate', user_id: users.candidate._id,
     profile: { role: 'Backend Engineer', seniority: 'MID', industry: 'SaaS', years_experience: 2, experience_months: 24 },
     skills: [{ name: 'JavaScript', normalized: 'javascript' }], education: [], experience: [], projects: [],
@@ -73,10 +76,11 @@ export function createFixture() {
   const job = { ...structuredClone(jobInput), required_skills: ['javascript', 'couchdb'], optional_skills: ['docker'],
     _id: 'job:one', type: 'job', recruiter_id: recruiter._id, company_id: company._id, department_id: department._id,
     created_at: baseTime, updated_at: baseTime, published_at: baseTime, provenance };
-  const otherJob = { ...job, _id: 'job:two', recruiter_id: otherRecruiter._id };
-  const repo = new MemoryRepository([...Object.values(users), company, department, recruiter, otherRecruiter, candidate, otherCandidate, job, otherJob]);
+  const otherJob = { ...job, _id: 'job:two', recruiter_id: otherRecruiter._id,
+    company_id: otherCompany._id, department_id: otherDepartment._id };
+  const repo = new MemoryRepository([...Object.values(users), company, department, otherCompany, otherDepartment, recruiter, otherRecruiter, candidate, otherCandidate, job, otherJob]);
   const clock = { time: Date.parse(baseTime) };
-  return { repo, users, candidate, recruiter, job, otherJob, now: () => new Date(clock.time), clock };
+  return { repo, users, candidate, recruiter, otherRecruiter, company, department, otherCompany, otherDepartment, job, otherJob, now: () => new Date(clock.time), clock };
 }
 
 export function signToken(env, userDoc, overrides = {}, headerOverrides = {}, nowMs = Date.now()) {
