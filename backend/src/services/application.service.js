@@ -141,12 +141,18 @@ export class ApplicationService {
     };
     const document = { ...application, current_stage: toStage, updated_at: timestamp, stage_history: [...application.stage_history, event] };
     if (!validateStageHistory(document.stage_history, document.applied_at, document.current_stage, timestamp).valid) throw new ApiError(409, 'INVALID_HISTORY', 'Lịch sử hồ sơ không hợp lệ.');
-    const validated = validateWrite(applicationDocumentSchema, document);
+    const validated = validateWrite(applicationDocumentSchema, document, {
+      allowLegacyUnavailable: application.provenance?.classification === 'unavailable',
+    });
     // Resolve response references before committing; a successful write must not
     // be followed by the first business validation of Candidate/User references.
     const response = await this.dto(validated, user.role);
     let saved;
-    try { saved = await this.repo.put(validated); }
+    try {
+      saved = await this.repo.put(validated, {
+        allowLegacyUnavailable: application.provenance?.classification === 'unavailable',
+      });
+    }
     catch (error) {
       if (error.status === 409) await this.authorize(user, id); // Re-read scope; never overwrite the winning history.
       throw error;

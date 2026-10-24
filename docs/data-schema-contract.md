@@ -38,6 +38,7 @@ No item marked `REJECTED_MVP` is an implementation option. Exactly nine business
 | 10 | Project uses PROJ-A required-technology coverage. | `APPROVED_MVP` |
 | 11 | Demo scoring inputs may be synthetic with provenance; absent source-only inputs remain unavailable. | `APPROVED_MVP` |
 | 12 | A missing component produces `INCOMPLETE` analysis without total, recommendation or ranking eligibility. | `APPROVED_MVP` |
+| 13 | Candidate IDs use `candidate:cms:<resume_id>` for imported CMS records and `candidate:<sha256(user_id)>` for self-registration; existing IDs are immutable. Self-registration provenance is `mixed`, with `candidate_self_registration` for submitted values and `derived` for deterministic calculations. Missing optional fields are omitted; required arrays remain `[]` with `data_availability`. | `APPROVED_MVP — project-owner delegated decision, Phase B4.2B (2026-10-24)` |
 
 Additional locked decisions:
 
@@ -94,6 +95,8 @@ Approved provenance shape:
 ```
 
 Only applicable keys are present. Provenance must not contain passwords, secrets or sensitive personal information.
+
+For backward compatibility, validation of stored historical documents may accept the legacy document classification `unavailable`. New document writes must use one of the five standard classifications shown above. Updating a historical document must preserve its `unavailable` classification unless an explicit, approved provenance change is part of that operation; updates must not silently relabel history.
 
 ### 3.3. Availability states
 
@@ -157,7 +160,7 @@ A Candidate is valid with a partial profile when its identity/reference and pres
 
 | Field | Required | Contract | DATA-01 origin |
 |---|---:|---|---|
-| `_id` | Yes | `candidate:cms:<resume_id>` for dataset records | `normalized` |
+| `_id` | Yes | `candidate:cms:<resume_id>` for imported CMS records; `candidate:<sha256(user_id)>` for self-registration | `normalized` / deterministic self-registration ID |
 | `type` | Yes | Constant `candidate` | `derived` |
 | `user_id` | Yes | Existing Candidate-role User | `synthetic` reference |
 | `profile.role` | Source import | Non-empty string | `source` |
@@ -177,6 +180,8 @@ A Candidate is valid with a partial profile when its identity/reference and pres
 | `provenance` | Yes | Common provenance contract | `mixed` |
 
 Candidate and Recruiter do not store canonical email. School, employer, project, dates and personal identity details absent from the source must not be fabricated.
+
+For self-registration, the Candidate document classification is `mixed`: submitted profile fields use field origin `candidate_self_registration`, and `profile.experience_months` uses `derived`. Missing optional fields are omitted. Required collection fields without supplied entries are stored as empty arrays and their `data_availability` values explain the missing or partial evidence. `unavailable` describes data availability; it is not used as this document's provenance classification. This convention does not re-key or relabel existing Candidate documents.
 
 ## 6. Organization and recruiter contracts
 

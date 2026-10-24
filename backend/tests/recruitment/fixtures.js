@@ -61,9 +61,12 @@ export function createFixture() {
     recruiter: user('recruiter-one', 'RECRUITER'), otherRecruiter: user('recruiter-two', 'RECRUITER'), admin: user('admin-test', 'ADMIN') };
   const company = { _id: 'company:test', type: 'company', name: 'Công ty kiểm thử', industry: 'SaaS', created_at: baseTime, updated_at: baseTime, provenance };
   const department = { _id: 'department:test', type: 'department', company_id: company._id, name: 'Kỹ thuật', key: 'engineering', created_at: baseTime, updated_at: baseTime, provenance };
+  const otherCompany = { ...company, _id: 'company:other', name: 'Công ty khác' };
+  const otherDepartment = { ...department, _id: 'department:other', company_id: otherCompany._id, name: 'Tuyển dụng' };
   const recruiter = { _id: 'recruiter:one', type: 'recruiter', user_id: users.recruiter._id, company_id: company._id,
     department_id: department._id, created_at: baseTime, updated_at: baseTime, provenance };
-  const otherRecruiter = { ...recruiter, _id: 'recruiter:two', user_id: users.otherRecruiter._id };
+  const otherRecruiter = { ...recruiter, _id: 'recruiter:two', user_id: users.otherRecruiter._id,
+    company_id: otherCompany._id, department_id: otherDepartment._id };
   const candidate = { _id: 'candidate:one', type: 'candidate', user_id: users.candidate._id,
     profile: { role: 'Backend Engineer', seniority: 'MID', industry: 'SaaS', years_experience: 2, experience_months: 24 },
     skills: [{ name: 'JavaScript', normalized: 'javascript' }], education: [], experience: [], projects: [],
@@ -73,26 +76,29 @@ export function createFixture() {
   const job = { ...structuredClone(jobInput), required_skills: ['javascript', 'couchdb'], optional_skills: ['docker'],
     _id: 'job:one', type: 'job', recruiter_id: recruiter._id, company_id: company._id, department_id: department._id,
     created_at: baseTime, updated_at: baseTime, published_at: baseTime, provenance };
-  const otherJob = { ...job, _id: 'job:two', recruiter_id: otherRecruiter._id };
-  const repo = new MemoryRepository([...Object.values(users), company, department, recruiter, otherRecruiter, candidate, otherCandidate, job, otherJob]);
+  const otherJob = { ...job, _id: 'job:two', recruiter_id: otherRecruiter._id,
+    company_id: otherCompany._id, department_id: otherDepartment._id };
+  const repo = new MemoryRepository([...Object.values(users), company, department, otherCompany, otherDepartment, recruiter, otherRecruiter, candidate, otherCandidate, job, otherJob]);
   const clock = { time: Date.parse(baseTime) };
-  return { repo, users, candidate, recruiter, job, otherJob, now: () => new Date(clock.time), clock };
+  return { repo, users, candidate, recruiter, otherRecruiter, company, department, otherCompany, otherDepartment, job, otherJob, now: () => new Date(clock.time), clock };
 }
 
-export function signToken(env, userDoc, overrides = {}, headerOverrides = {}) {
+export function signToken(env, userDoc, overrides = {}, headerOverrides = {}, nowMs = Date.now()) {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT', ...headerOverrides })).toString('base64url');
-  const claims = Buffer.from(JSON.stringify({ sub: userDoc._id, role: userDoc.role, exp: Math.floor(Date.now() / 1000) + 3600, ...overrides })).toString('base64url');
-  return `${header}.${claims}.${createHmac('sha256', env.JWT_SECRET).update(`${header}.${claims}`).digest('base64url')}`;
+  const issuedAt = Math.floor(nowMs / 1000);
+  const claims = Buffer.from(JSON.stringify({ sub: userDoc._id, role: userDoc.role, iss: 'recruithub-api', aud: 'recruithub-client',
+    iat: issuedAt, exp: issuedAt + 900, jti: randomBytes(16).toString('hex'), ...overrides })).toString('base64url');
+  return `${header}.${claims}.${createHmac('sha256', env.JWT_ACCESS_SECRET).update(`${header}.${claims}`).digest('base64url')}`;
 }
 export async function startFixture(t, options = {}) {
   const fixture = createFixture();
-  const jwtEnv = { JWT_SECRET: randomBytes(48).toString('base64url'), JWT_ALGORITHM: 'HS256', ...options.jwtEnv };
+  const jwtEnv = { JWT_ACCESS_SECRET: randomBytes(48).toString('base64url'), ...options.jwtEnv };
   const app = createApp({ ...options, repository: fixture.repo, now: fixture.now, jwtEnv });
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   async function request(method, path, payload, who = 'candidate', tokenOverride) {
-    const token = tokenOverride ?? (who ? signToken(jwtEnv, fixture.users[who]) : null);
+    const token = tokenOverride ?? (who ? signToken(jwtEnv, fixture.users[who], {}, {}, fixture.now()) : null);
     const response = await fetch(`http://127.0.0.1:${server.address().port}/api/v1${path}`, { method,
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json' },
       ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });

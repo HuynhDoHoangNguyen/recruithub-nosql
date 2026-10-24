@@ -3,10 +3,16 @@ import { jobDocumentSchema } from '../schemas/job.schema.js';
 import { ApiError } from '../middleware/job-application.middleware.js';
 import { descendingSort, ownedJob, parseStored, publicJobDto, recruiterScope, requireDocument, runtimeProvenance } from './job-application-scope.service.js';
 
-export function validateWrite(schema, value) {
+export function validateWrite(schema, value, { allowLegacyUnavailable = false } = {}) {
   const result = schema.safeParse(value);
   if (!result.success) throw new ApiError(400, 'VALIDATION_ERROR', 'Dữ liệu không hợp lệ.',
     result.error.issues.map(issue => ({ field: issue.path.join('.'), message: issue.message })));
+  const isLegacyUpdate = allowLegacyUnavailable && typeof value._rev === 'string' && value._rev.length > 0;
+  if (value.provenance?.classification === 'unavailable' && !isLegacyUpdate) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'New documents cannot use unavailable provenance classification.', [
+      { field: 'provenance.classification', message: 'Use source, normalized, derived, synthetic, or mixed.' },
+    ]);
+  }
   return result.data;
 }
 
@@ -46,11 +52,17 @@ export class JobService {
     const { expected_rev, ...changes } = payload;
     const document = { ...job, ...changes, updated_at: new Date(Math.max(this.now().getTime(), Date.parse(job.updated_at) + 1)).toISOString(),
       ...(job.status === 'DRAFT' && changes.status === 'OPEN' ? { published_at: this.now().toISOString() } : {}),
-      provenance: { ...job.provenance, classification: 'mixed', transform_version: 'job-application-v1',
+      provenance: { ...job.provenance,
+        classification: job.provenance?.classification === 'unavailable' ? 'unavailable' : 'mixed',
+        transform_version: 'job-application-v1',
         field_origins: { ...job.provenance.field_origins, ...runtimeProvenance(Object.keys(changes)).field_origins } },
     };
     this.checkOpen(document);
-    try { return await this.repo.put(validateWrite(jobDocumentSchema, document)); }
+    try {
+      return await this.repo.put(validateWrite(jobDocumentSchema, document, {
+        allowLegacyUnavailable: job.provenance?.classification === 'unavailable',
+      }), { allowLegacyUnavailable: job.provenance?.classification === 'unavailable' });
+    }
     catch (error) {
       if (error.status === 409) await ownedJob(this.repo, user, id);
       throw error;

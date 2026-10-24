@@ -31,6 +31,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -284,7 +285,8 @@ test('DATA-03.2: Foundation Acceptance & Verification Tests', async (t) => {
   });
 
   await t.test('Negative: Input manifest checksum mismatch triggers failure', () => {
-    const scratchManifestPath = path.resolve(REPO_ROOT, 'data/scratch_bad_manifest.json');
+    const scratchDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'recruithub-bad-manifest-'));
+    const scratchManifestPath = path.join(scratchDirectory, 'manifest.json');
     const etlManifest = JSON.parse(fs.readFileSync(ETL_POINTER_PATH, 'utf8'));
 
     // Corrupt candidate sha256 in manifest
@@ -298,14 +300,16 @@ test('DATA-03.2: Foundation Acceptance & Verification Tests', async (t) => {
         },
       },
     };
-    fs.writeFileSync(scratchManifestPath, JSON.stringify(corruptedManifest), 'utf8');
+    try {
+      fs.writeFileSync(scratchManifestPath, JSON.stringify(corruptedManifest), 'utf8');
 
-    assert.throws(
-      () => verifyInputReleaseIntegrity(scratchManifestPath),
-      /Input candidates\.jsonl SHA-256 mismatch/
-    );
-
-    fs.rmSync(scratchManifestPath, { force: true });
+      assert.throws(
+        () => verifyInputReleaseIntegrity(scratchManifestPath),
+        /Input candidates\.jsonl SHA-256 mismatch/
+      );
+    } finally {
+      fs.rmSync(scratchDirectory, { recursive: true, force: true });
+    }
   });
 
   await t.test('Negative: Unapproved Job industry triggers allocation failure', () => {

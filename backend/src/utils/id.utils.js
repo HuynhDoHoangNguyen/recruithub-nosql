@@ -53,6 +53,23 @@ export function userIdFromEmail(email) {
 }
 
 /**
+ * Computes the deterministic Candidate ID for a self-registered canonical User.
+ * This namespace is distinct from the imported CMS Candidate namespace.
+ * ID = candidate:<sha256(user_id)>
+ *
+ * @param {string} userId - Canonical User document ID
+ * @returns {string} Candidate document _id
+ */
+export function candidateIdFromUserId(userId) {
+  if (typeof userId !== 'string' || !/^user:[a-f0-9]{64}$/.test(userId)) {
+    throw new TypeError('User ID must be a canonical user:<sha256> ID');
+  }
+
+  const digest = createHash('sha256').update(userId, 'utf8').digest('hex');
+  return `candidate:${digest}`;
+}
+
+/**
  * Generates or validates candidate ID from source resume ID.
  * Returns candidate:cms:<resume_id>
  * 

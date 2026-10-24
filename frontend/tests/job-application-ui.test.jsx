@@ -12,13 +12,13 @@ import { jobPayload, fromJob, jobErrorsFromApi, validateJobForm } from '../src/f
 import { deadlineIsOpen } from '../src/features/applications/applicationPresentation';
 import { Resource } from '../src/features/applications/components/ApplicationUI';
 import AppRoutes from '../src/routes/AppRoutes';
-import { setAccessToken } from '../src/utils/authHelper';
+import { removeAccessToken, setAccessToken } from '../src/utils/authHelper';
 
 vi.mock('../src/api/jobApplicationApi', () => ({
   jobApi: { list: vi.fn(), stats: vi.fn(), detail: vi.fn(), create: vi.fn(), edit: vi.fn(), status: vi.fn(), publicList: vi.fn(), publicDetail: vi.fn() },
   applicationApi: { context: vi.fn(), apply: vi.fn(), mine: vi.fn(), detail: vi.fn(), applicants: vi.fn(), withdraw: vi.fn(), transition: vi.fn() },
 }));
-vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'CANDIDATE' } }) }));
+vi.mock('../src/context/useAuth', () => ({ useAuth: () => ({ user: window.__verifiedTestUser || null, loading: false, logout: vi.fn() }) }));
 vi.mock('react-toastify', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const job = { _id: 'job:cms:J_000001', _rev: '1-fixture', title: 'Kỹ sư Backend', seniority: 'MID', industry: 'SaaS', description: 'Phát triển API',
   status: 'OPEN', deadline: '2026-11-30T23:59:00Z', responsibilities: [], required_skills: ['javascript'], optional_skills: [],
@@ -29,7 +29,7 @@ const application = { _id: 'application:pair:test', _rev: '1-fixture', current_s
   submission: { resume_text: 'CV đã lưu', cover_letter: 'Thư giới thiệu đã lưu' },
   stage_history: [{ from_stage: null, to_stage: 'APPLIED', timestamp: '2026-10-22T12:00:00Z', actor_role: 'CANDIDATE' }] };
 
-beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); applicationApi.context.mockResolvedValue({ candidate, email: application.email }); });
+beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); removeAccessToken(); window.__verifiedTestUser = null; applicationApi.context.mockResolvedValue({ candidate, email: application.email }); });
 
 describe('deadline precision when editing jobs', () => {
   const precise = { ...job, deadline: '2026-11-30T23:59:59.123Z' };
@@ -157,9 +157,9 @@ it('data states render loading, empty and retryable error explicitly', () => {
   rerender(<Resource resource={{ loading: false }}>Success</Resource>); expect(screen.getByText('Success')).toBeTruthy();
 });
 
-const tokenFor = role => `e30.${btoa(JSON.stringify({ role, exp: Math.floor(Date.now() / 1000) + 3600 }))}.test`;
+const verifiedUserFor = role => { window.__verifiedTestUser = { id: 'user:test', role, account_status: 'ACTIVE' }; };
 it('active router mounts recruiter edit and applicants for canonical roles', async () => {
-  setAccessToken(tokenFor('RECRUITER')); jobApi.detail.mockResolvedValue(job);
+  verifiedUserFor('RECRUITER'); setAccessToken('test-token'); jobApi.detail.mockResolvedValue(job);
   const { unmount } = render(<MemoryRouter initialEntries={['/recruiter/jobs/job%3Acms%3AJ_000001/edit']}><AppRoutes /></MemoryRouter>);
   expect(await screen.findByDisplayValue(job.title)).toBeTruthy(); expect(jobApi.detail).toHaveBeenCalledWith(job._id); unmount();
   applicationApi.applicants.mockResolvedValue({ job, items: [application], has_more: false });
@@ -168,7 +168,7 @@ it('active router mounts recruiter edit and applicants for canonical roles', asy
 });
 
 it('candidate tracker reloads persisted stage and CV after remount', async () => {
-  setAccessToken(tokenFor('CANDIDATE'));
+  verifiedUserFor('CANDIDATE'); setAccessToken('test-token');
   applicationApi.mine.mockResolvedValue({ items: [{ ...application, current_stage: 'WITHDRAWN' }], has_more: false });
   const mount = () => render(<MemoryRouter initialEntries={['/user/dashboard']}><AppRoutes /></MemoryRouter>);
   const first = mount(); await screen.findByText('CV đã lưu'); expect(screen.queryByRole('button', { name: 'Rút đơn ứng tuyển' })).toBeNull(); first.unmount();

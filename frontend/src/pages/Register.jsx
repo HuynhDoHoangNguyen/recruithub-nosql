@@ -1,347 +1,197 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { Building2, Check, Eye, EyeOff, UserRound } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { validateCandidateRegistration } from '../utils/candidateRegistration';
+import RecruiterRegistrationFields from '../components/auth/RecruiterRegistrationFields';
+import AuthLayout from '../components/auth/AuthLayout';
+import SuggestionSelectField from '../components/auth/SuggestionSelectField';
+import { recruiterRegistrationInput, validateRecruiterRegistration } from '../utils/recruiterRegistration';
+
+const OTHER_PREFIX = '__other__:';
+const roleSuggestions = ['Phát triển phần mềm', 'Frontend Developer', 'Backend Developer', 'Full-stack Developer', 'Data Analyst', 'Data Engineer', 'QA / Tester', 'UI/UX Designer', 'Product Manager', 'DevOps Engineer', 'Nhân sự / Tuyển dụng', 'Marketing', 'Kinh doanh'];
+const industrySuggestions = ['Công nghệ', 'Công nghệ thông tin', 'Tài chính / Ngân hàng', 'Thương mại điện tử', 'Giáo dục', 'Y tế', 'Sản xuất', 'Logistics', 'Tư vấn', 'Truyền thông', 'Viễn thông'];
+
+const submittedSuggestion = (value) => (value.startsWith(OTHER_PREFIX) ? value.slice(OTHER_PREFIX.length).trim() : value.trim());
+
+const initialForm = {
+  full_name: '', email: '', password: '', confirm_password: '',
+  candidate_role: '', industry: '', seniority: 'JUNIOR', years_experience: '0',
+};
 
 const Register = () => {
-	const navigate = useNavigate();
-	const { login } = useAuth();
-	const [form, setForm] = useState({
-		name: '',
-		email: '',
-		password: '',
-		role: 'job-seeker',
-	});
-	const [error, setError] = useState('');
-	const [loading, setLoading] = useState(false);
-	const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
+  const submitting = useRef(false);
+  const [form, setForm] = useState(initialForm);
+  const [selectedRole, setSelectedRole] = useState('CANDIDATE');
+  const [recruiterForm, setRecruiterForm] = useState({ email: '', password: '', confirm_password: '', company_id: '', department_id: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const recruiterSignupEnabled = import.meta.env.VITE_RECRUITER_REGISTRATION_ENABLED === 'true';
 
-	const handleChange = (e) => {
-		setForm({ ...form, [e.target.name]: e.target.value });
-	};
+  const handleChange = (event) => {
+    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+    setError('');
+  };
+  const passwordStrength = [form.password.length >= 6, /[A-Z]/.test(form.password), /\d/.test(form.password), /[!@#$%^&*(),.?":{}|<>]/.test(form.password)].filter(Boolean).length;
 
-	const isStrongPassword = (password) => {
-		return (
-			password.length >= 6 && /[A-Z]/.test(password) && /\d/.test(password)
-		);
-	};
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting.current) return;
+    setError('');
+    const isRecruiter = selectedRole === 'RECRUITER';
+    if (isRecruiter && !recruiterSignupEnabled) {
+      setError('Đăng ký Recruiter hiện chưa được bật.');
+      return;
+    }
+    const candidateForm = {
+      ...form,
+      candidate_role: submittedSuggestion(form.candidate_role),
+      industry: submittedSuggestion(form.industry),
+    };
+    const validationError = isRecruiter ? validateRecruiterRegistration(recruiterForm) : validateCandidateRegistration(candidateForm);
+    if (validationError) { setError(validationError); return; }
+    submitting.current = true;
+    setLoading(true);
+    try {
+      if (isRecruiter) {
+        await api.post('/v1/auth/register/recruiter', recruiterRegistrationInput(recruiterForm));
+      } else {
+        await api.post('/v1/auth/register', {
+          email: form.email.trim(),
+          password: form.password,
+          full_name: form.full_name.trim(),
+          candidate_role: candidateForm.candidate_role,
+          industry: candidateForm.industry,
+          seniority: form.seniority,
+          years_experience: Number(form.years_experience),
+        });
+      }
+      navigate('/login', { replace: true, state: { registered: true } });
+    } catch (requestError) {
+      const code = requestError.response?.data?.error?.code;
+      const registrationReference = requestError.response?.data?.error?.details?.registration_ref;
+      const messages = {
+        EMAIL_ALREADY_REGISTERED: 'Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.',
+        COMPANY_ALREADY_EXISTS: 'Tên công ty đã tồn tại hoặc trùng sau chuẩn hóa. Không thể tự nhận quyền với công ty đó.',
+        ORGANIZATION_NOT_SUPPORTED: 'Công ty hoặc phòng ban không còn khả dụng. Hãy tìm và chọn lại.',
+        COMPANY_NOT_FOUND: 'Công ty không còn khả dụng. Hãy tìm và chọn lại.',
+        DEPARTMENT_ALREADY_EXISTS: 'Phòng ban đã tồn tại trong công ty này.',
+        REGISTRATION_INCOMPLETE: `Đăng ký chưa hoàn tất. Không gửi lại; liên hệ quản trị viên và cung cấp mã tham chiếu${registrationReference ? ` ${registrationReference}` : ''}.`,
+        RECRUITER_REGISTRATION_DISABLED: 'Đăng ký Recruiter hiện chưa được bật.',
+        VALIDATION_ERROR: 'Thông tin chưa hợp lệ. Hãy kiểm tra lại các trường.',
+        AUTH_CONFIGURATION_ERROR: 'Dịch vụ đăng ký chưa được cấu hình. Vui lòng báo quản trị viên.',
+      };
+      setError(messages[code] || (requestError.response ? 'Đăng ký thất bại. Vui lòng kiểm tra thông tin và thử lại.' : 'Không thể kết nối máy chủ. Vui lòng thử lại.'));
+    } finally {
+      submitting.current = false;
+      setLoading(false);
+    }
+  };
 
-	const getPasswordStrength = (password) => {
-		let strength = 0;
-		if (password.length >= 6) strength++;
-		if (/[A-Z]/.test(password)) strength++;
-		if (/\d/.test(password)) strength++;
-		if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) strength++;
-		return strength;
-	};
+  const chooseRole = (role) => {
+    setSelectedRole(role);
+    setError('');
+  };
 
-	const handleSubmit = async (e) => {
-		e.preventDefault();
-		setError('');
+  return (
+    <AuthLayout width="wide" title="Tạo tài khoản RecruiHub" description="Tham gia để tìm kiếm cơ hội hoặc kết nối nhân tài.">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <fieldset>
+          <legend className="mb-3 text-sm font-semibold text-slate-800">Bạn muốn đăng ký với vai trò nào?</legend>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className={`relative flex min-h-[82px] cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors focus-within:ring-4 focus-within:ring-blue-100 ${selectedRole === 'CANDIDATE' ? 'border-blue-600 bg-blue-50/70' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+              <input className="peer sr-only" type="radio" name="registration-role" value="CANDIDATE" checked={selectedRole === 'CANDIDATE'} onChange={() => chooseRole('CANDIDATE')} aria-label="Ứng viên" />
+              <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${selectedRole === 'CANDIDATE' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}><UserRound className="h-5 w-5" aria-hidden="true" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-900">Ứng viên</span>
+                <span className="mt-1 block text-sm leading-5 text-slate-600">Tìm cơ hội nghề nghiệp phù hợp với bạn.</span>
+              </span>
+              {selectedRole === 'CANDIDATE' && <Check className="h-5 w-5 shrink-0 text-blue-700" aria-label="Đang chọn" />}
+            </label>
+            <label className={`relative flex min-h-[82px] items-start gap-3 rounded-xl border p-3.5 transition-colors ${recruiterSignupEnabled ? 'cursor-pointer focus-within:ring-4 focus-within:ring-blue-100' : 'cursor-not-allowed bg-slate-50 opacity-75'} ${selectedRole === 'RECRUITER' ? 'border-blue-600 bg-blue-50/70' : 'border-slate-200 bg-white'}`}>
+              <input className="peer sr-only" type="radio" name="registration-role" value="RECRUITER" checked={selectedRole === 'RECRUITER'} onChange={() => chooseRole('RECRUITER')} disabled={!recruiterSignupEnabled} aria-label="Nhà tuyển dụng" aria-describedby={!recruiterSignupEnabled ? 'recruiter-registration-disabled' : undefined} />
+              <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${selectedRole === 'RECRUITER' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}><Building2 className="h-5 w-5" aria-hidden="true" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-900">Nhà tuyển dụng</span>
+                <span className="mt-1 block text-sm leading-5 text-slate-600">Đăng tin và quản lý quy trình tuyển dụng.</span>
+                {!recruiterSignupEnabled && <span id="recruiter-registration-disabled" className="mt-2 inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">Đăng ký hiện chưa được bật</span>}
+              </span>
+              {selectedRole === 'RECRUITER' && <Check className="h-5 w-5 shrink-0 text-blue-700" aria-label="Đang chọn" />}
+            </label>
+          </div>
+        </fieldset>
 
-		if (!isStrongPassword(form.password)) {
-			setError(
-				'Password must be at least 6 characters, include a capital letter and a number.'
-			);
-			return;
-		}
+        {error && <div role="alert" className="message-error" aria-live="assertive">{error}</div>}
 
-		try {
-			setLoading(true);
-			const res = await api.post('/auth/register', form);
-			const accessToken = res.data?.accessToken;
-			if (accessToken) {
-				login(accessToken);
-				navigate('/');
-				return;
-			}
+        {selectedRole === 'RECRUITER' ? (
+          <RecruiterRegistrationFields value={recruiterForm} onChange={setRecruiterForm} disabled={loading} />
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 pt-1">
+              <h2 className="shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Thông tin tài khoản</h2>
+              <span className="h-px flex-1 bg-slate-100" aria-hidden="true" />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="full_name" className="form-label">Họ và tên</label>
+                <input id="full_name" name="full_name" type="text" autoComplete="name" required maxLength={160} value={form.full_name} onChange={handleChange} className="input-field h-12" placeholder="Nguyễn Văn An" />
+              </div>
+              <div>
+                <label htmlFor="email" className="form-label">Địa chỉ email</label>
+                <input id="email" name="email" type="email" autoComplete="email" required maxLength={254} value={form.email} onChange={handleChange} className="input-field h-12" placeholder="ban@example.com" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="password" className="form-label">Mật khẩu</label>
+                <div className="relative">
+                  <input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required minLength={6} maxLength={128} value={form.password} onChange={handleChange} className="input-field h-12 pr-12" aria-describedby="password-hint" />
+                  <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600" aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>{showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}</button>
+                </div>
+                <p id="password-hint" className="mt-2 text-xs leading-5 text-slate-500">Ít nhất 6 ký tự, có chữ in hoa và chữ số.</p>
+                {form.password && <div className="mt-2 flex gap-1" aria-label={`Độ mạnh mật khẩu: ${passwordStrength} trên 4`} role="img">{[1, 2, 3, 4].map((level) => <span key={level} className={`h-1 flex-1 rounded ${level <= passwordStrength ? (passwordStrength <= 2 ? 'bg-red-500' : passwordStrength === 3 ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-200'}`} />)}</div>}
+              </div>
+              <div>
+                <label htmlFor="confirm_password" className="form-label">Xác nhận mật khẩu</label>
+                <div className="relative">
+                  <input id="confirm_password" name="confirm_password" type={showConfirmation ? 'text' : 'password'} autoComplete="new-password" required maxLength={128} value={form.confirm_password} onChange={handleChange} className="input-field h-12 pr-12" />
+                  <button type="button" onClick={() => setShowConfirmation((value) => !value)} className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600" aria-label={showConfirmation ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}>{showConfirmation ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}</button>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <h2 className="shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Hồ sơ nghề nghiệp</h2>
+              <span className="h-px flex-1 bg-slate-100" aria-hidden="true" />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <SuggestionSelectField id="candidate_role" name="candidate_role" label="Vị trí mong muốn" value={form.candidate_role} onChange={handleChange} options={roleSuggestions} placeholder="Chọn vị trí" otherPlaceholder="Nhập vị trí mong muốn" />
+              <SuggestionSelectField id="industry" name="industry" label="Ngành nghề quan tâm" value={form.industry} onChange={handleChange} options={industrySuggestions} placeholder="Chọn ngành nghề" otherPlaceholder="Nhập ngành nghề quan tâm" />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="seniority" className="form-label">Cấp độ kinh nghiệm</label>
+                <select id="seniority" name="seniority" value={form.seniority} onChange={handleChange} className="input-field h-12">
+                  <option value="JUNIOR">Junior</option><option value="MID">Trung cấp</option><option value="SENIOR">Senior</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="years_experience" className="form-label">Số năm kinh nghiệm</label>
+                <input id="years_experience" name="years_experience" type="number" min="0" max="80" step="1" required value={form.years_experience} onChange={handleChange} className="input-field h-12" />
+              </div>
+            </div>
+          </div>
+        )}
 
-			// Fallback: if backend didn't return accessToken for some reason
-			setError('Registration succeeded but no access token returned. Please log in.');
-			navigate('/login');
-		} catch (err) {
-			setError(err.response?.data?.message || err.response?.data?.error || 'Registration failed');
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const passwordStrength = getPasswordStrength(form.password);
-
-	return (
-		<div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-			<div className="max-w-md w-full space-y-8">
-				{/* Header */}
-				<div className="text-center">
-					<Link to="/" className="inline-flex items-center mb-8">
-						<div className="h-12 w-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg">
-							<span className="text-white font-bold text-xl">J</span>
-						</div>
-						<span className="ml-3 text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-							JobPortal
-						</span>
-					</Link>
-					<h2 className="text-4xl font-bold text-gray-900 mb-2">
-						Create your account
-					</h2>
-					<p className="text-gray-600">
-						Join thousands of professionals finding their dream jobs
-					</p>
-				</div>
-
-				{/* Form */}
-				<div className="card p-8">
-					{error && (
-						<div className="message-error mb-6">
-							{error}
-						</div>
-					)}
-					
-					<form onSubmit={handleSubmit} className="space-y-6">
-						<div>
-							<label htmlFor="name" className="form-label">
-								Full Name
-							</label>
-							<div className="relative">
-								<input
-									name="name"
-									id="name"
-									type="text"
-									placeholder="Enter your full name"
-									value={form.name}
-									onChange={handleChange}
-									required
-									className="input-field pl-10"
-								/>
-								<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-									<svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-									</svg>
-								</div>
-							</div>
-						</div>
-
-						<div>
-							<label htmlFor="email" className="form-label">
-								Email address
-							</label>
-							<div className="relative">
-								<input
-									type="email"
-									name="email"
-									id="email"
-									placeholder="Enter your email"
-									value={form.email}
-									onChange={handleChange}
-									required
-									className="input-field pl-10"
-								/>
-								<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-									<svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-									</svg>
-								</div>
-							</div>
-						</div>
-
-						<div>
-							<label htmlFor="password" className="form-label">
-								Password
-							</label>
-							<div className="relative">
-								<input
-									type={showPassword ? 'text' : 'password'}
-									name="password"
-									id="password"
-									placeholder="Create a strong password"
-									value={form.password}
-									onChange={handleChange}
-									required
-									className="input-field pl-10 pr-10"
-								/>
-								<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-									<svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-									</svg>
-								</div>
-								<button
-									type="button"
-									className="absolute inset-y-0 right-0 pr-3 flex items-center"
-									onClick={() => setShowPassword(!showPassword)}
-								>
-									{showPassword ? (
-										<svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-										</svg>
-									) : (
-										<svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-										</svg>
-									)}
-								</button>
-							</div>
-							
-							{/* Password Strength Indicator */}
-							{form.password && (
-								<div className="mt-2">
-									<div className="flex space-x-1">
-										{[1, 2, 3, 4].map((level) => (
-											<div
-												key={level}
-												className={`h-1 flex-1 rounded ${
-													level <= passwordStrength
-														? passwordStrength <= 2
-															? 'bg-red-500'
-															: passwordStrength === 3
-															? 'bg-yellow-500'
-															: 'bg-green-500'
-														: 'bg-gray-200'
-												}`}
-											/>
-										))}
-									</div>
-									<p className="text-xs text-gray-500 mt-1">
-										{passwordStrength <= 2 && 'Weak password'}
-										{passwordStrength === 3 && 'Good password'}
-										{passwordStrength === 4 && 'Strong password'}
-									</p>
-								</div>
-							)}
-						</div>
-
-						<div>
-							<label htmlFor="role" className="form-label">
-								I am a
-							</label>
-							<div className="grid grid-cols-2 gap-3">
-								<label className={`relative flex cursor-pointer rounded-lg p-4 border-2 ${
-									form.role === 'job-seeker' 
-										? 'border-blue-500 bg-blue-50' 
-										: 'border-gray-200 bg-white hover:border-gray-300'
-								} transition-all`}>
-									<input
-										type="radio"
-										name="role"
-										value="job-seeker"
-										checked={form.role === 'job-seeker'}
-										onChange={handleChange}
-										className="sr-only"
-									/>
-									<div className="flex items-center">
-										<div className="text-2xl mr-3">👤</div>
-										<div>
-											<div className="font-medium text-gray-900">Job Seeker</div>
-											<div className="text-sm text-gray-500">Looking for opportunities</div>
-										</div>
-									</div>
-								</label>
-
-								<label className={`relative flex cursor-pointer rounded-lg p-4 border-2 ${
-									form.role === 'recruiter' 
-										? 'border-blue-500 bg-blue-50' 
-										: 'border-gray-200 bg-white hover:border-gray-300'
-								} transition-all`}>
-									<input
-										type="radio"
-										name="role"
-										value="recruiter"
-										checked={form.role === 'recruiter'}
-										onChange={handleChange}
-										className="sr-only"
-									/>
-									<div className="flex items-center">
-										<div className="text-2xl mr-3">🏢</div>
-										<div>
-											<div className="font-medium text-gray-900">Recruiter</div>
-											<div className="text-sm text-gray-500">Hiring talent</div>
-										</div>
-									</div>
-								</label>
-							</div>
-						</div>
-
-						<div className="flex items-center">
-							<input
-								id="terms"
-								name="terms"
-								type="checkbox"
-								required
-								className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-							/>
-							<label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
-								I agree to the{' '}
-								<a href="#" className="text-blue-600 hover:text-blue-500">
-									Terms of Service
-								</a>{' '}
-								and{' '}
-								<a href="#" className="text-blue-600 hover:text-blue-500">
-									Privacy Policy
-								</a>
-							</label>
-						</div>
-
-						<button
-							type="submit"
-							disabled={loading}
-							className={`w-full btn-primary ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-						>
-							{loading ? (
-								<div className="flex items-center justify-center">
-									<div className="loading-spinner mr-2"></div>
-									Creating account...
-								</div>
-							) : (
-								'Create account'
-							)}
-						</button>
-					</form>
-
-					<div className="mt-6">
-						<div className="relative">
-							<div className="absolute inset-0 flex items-center">
-								<div className="w-full border-t border-gray-300" />
-							</div>
-							<div className="relative flex justify-center text-sm">
-								<span className="px-2 bg-white text-gray-500">Or continue with</span>
-							</div>
-						</div>
-
-						<div className="mt-6 grid grid-cols-2 gap-3">
-							<button className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-								<svg className="w-5 h-5" viewBox="0 0 24 24">
-									<path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-									<path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-									<path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-									<path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-								</svg>
-								<span className="ml-2">Google</span>
-							</button>
-
-							<button className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-								<svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-									<path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
-								</svg>
-								<span className="ml-2">Twitter</span>
-							</button>
-						</div>
-					</div>
-
-					<div className="text-center mt-6">
-						<p className="text-gray-600">
-							Already have an account?{' '}
-							<Link
-								to="/login"
-								className="font-medium text-blue-600 hover:text-blue-500"
-							>
-								Sign in
-							</Link>
-						</p>
-					</div>
-				</div>
-			</div>
-		</div>
-	);
+        <button type="submit" disabled={loading} className="btn-primary h-12 w-full rounded-[10px] bg-blue-700 shadow-none transition-colors hover:bg-blue-800 hover:shadow-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100">
+          {loading ? <span role="status" className="inline-flex items-center gap-2"><span className="loading-spinner" aria-hidden="true" />Đang tạo tài khoản…</span> : `Tạo tài khoản ${selectedRole === 'RECRUITER' ? 'Recruiter' : 'Candidate'}`}
+        </button>
+      </form>
+      <p className="mt-6 text-center text-sm text-slate-600">Đã có tài khoản? <Link to="/login" className="font-semibold text-blue-700 hover:text-blue-800 focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Đăng nhập</Link></p>
+    </AuthLayout>
+  );
 };
 
 export default Register;

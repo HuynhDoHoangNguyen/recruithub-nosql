@@ -1,4 +1,3 @@
-import { loadCouchDbConfig } from '../../../scripts/database/couchdb-client.js';
 import { ApiError } from '../middleware/job-application.middleware.js';
 
 const documentPath = id => id.startsWith('_design/')
@@ -24,7 +23,11 @@ export const recruitmentDesign = {
 };
 
 export class JobApplicationRepository {
-  constructor(config = loadCouchDbConfig(), request = fetch) {
+  constructor(config, request = fetch) {
+    if (!config || !config.url || !config.database) {
+      const error = new ApiError(503, 'AUTH_DATABASE_CONFIGURATION_ERROR', 'Job/Application persistence requires an explicit isolated database configuration.');
+      throw error;
+    }
     this.config = config;
     this.request = request;
   }
@@ -32,7 +35,7 @@ export class JobApplicationRepository {
     let response;
     try {
       response = await this.request(`${this.config.url}/${encodeURIComponent(this.config.database)}/${path}`, {
-        method, headers: { Authorization: this.config.authHeader, 'Content-Type': 'application/json' },
+        method, headers: { ...(this.config.authHeader ? { Authorization: this.config.authHeader } : {}), 'Content-Type': 'application/json' },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(10000),
       });
     } catch { throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'Chưa kết nối được cơ sở dữ liệu.'); }
@@ -42,7 +45,11 @@ export class JobApplicationRepository {
     return response.json();
   }
   get(id) { return this.http(documentPath(id)); }
-  async put(document) {
+  async put(document, { allowLegacyUnavailable = false } = {}) {
+    const isLegacyUpdate = allowLegacyUnavailable && typeof document?._rev === 'string' && document._rev.length > 0;
+    if (document?.provenance?.classification === 'unavailable' && !isLegacyUpdate) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'New documents cannot use unavailable provenance classification.');
+    }
     const result = await this.http(documentPath(document._id), 'PUT', document);
     if (!result?.ok) throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'Không thể lưu dữ liệu.');
     return { ...document, _rev: result.rev };
@@ -52,7 +59,18 @@ export class JobApplicationRepository {
       ...(bookmark ? { bookmark } : {}), ...(index ? { use_index: index } : {}), ...(sort ? { sort } : {}),
     });
     if (!result) throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'Database chưa được thiết lập.');
-    return { items: result.docs, bookmark: result.bookmark, has_more: result.docs.length === limit };
+    if (result.docs.length < limit) return { items: result.docs, bookmark: result.bookmark, has_more: false };
+    if (typeof result.bookmark !== 'string' || !result.bookmark) {
+      throw new ApiError(503, 'PAGINATION_CURSOR_UNAVAILABLE', 'CouchDB did not return a pagination cursor.');
+    }
+    // A full page does not prove another page exists. Probe from the primary
+    // query's bookmark and keep that original bookmark for the caller.
+    const next = await this.http('_find', 'POST', {
+      selector, limit: 1, bookmark: result.bookmark,
+      ...(index ? { use_index: index } : {}), ...(sort ? { sort } : {}),
+    });
+    if (!next) throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'Database is not initialized.');
+    return { items: result.docs, bookmark: result.bookmark, has_more: next.docs.length > 0 };
   }
   async profile(type, userId) {
     const result = await this.find({ type, user_id: userId }, { limit: 2, index: 'profile_user' });

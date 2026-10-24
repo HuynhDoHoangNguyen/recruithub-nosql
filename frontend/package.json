@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run && node --test tests/auth/auth-helper.test.js tests/public-jobs/public-jobs.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

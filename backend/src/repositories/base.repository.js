@@ -1,4 +1,5 @@
 import { ZodError } from 'zod';
+import { newDocumentProvenanceSchema } from '../schemas/common.schema.js';
 
 export class RepositoryValidationError extends Error {
   constructor(issues) {
@@ -28,8 +29,16 @@ export class BaseRepository {
     return this.client.find(query);
   }
 
+  async listByIdPrefix(prefix, options = {}) {
+    if (typeof this.client.listDocumentsByIdPrefix !== 'function') {
+      throw new TypeError('The configured client does not support ID-prefix scans.');
+    }
+    return this.client.listDocumentsByIdPrefix(prefix, options);
+  }
+
   async create(document) {
     this.validate(document);
+    this.validateNewProvenance(document);
     return this.client.createDocument(document);
   }
 
@@ -50,6 +59,15 @@ export class BaseRepository {
   validate(document) {
     if (!this.schema) return;
     const result = this.schema.safeParse(document);
+    if (!result.success) {
+      const issues = result.error instanceof ZodError ? result.error.issues : [];
+      throw new RepositoryValidationError(issues);
+    }
+  }
+
+  validateNewProvenance(document) {
+    if (document?.provenance === undefined) return;
+    const result = newDocumentProvenanceSchema.safeParse(document.provenance);
     if (!result.success) {
       const issues = result.error instanceof ZodError ? result.error.issues : [];
       throw new RepositoryValidationError(issues);
