@@ -34,7 +34,7 @@ function createConfiguredRepository(environment) {
     }
     return repository;
   };
-  return Object.fromEntries(['get', 'put', 'find', 'profile', 'allInterviews', 'view', 'stats', 'initialize']
+  return Object.fromEntries(['get', 'put', 'find', 'scanPublicJobs', 'profile', 'allInterviews', 'view', 'stats', 'initialize']
     .map(method => [method, (...args) => getRepository()[method](...args)]));
 }
 

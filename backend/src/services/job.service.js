@@ -1,7 +1,36 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { jobDocumentSchema } from '../schemas/job.schema.js';
 import { ApiError } from '../middleware/job-application.middleware.js';
 import { descendingSort, ownedJob, parseStored, publicJobDto, recruiterScope, requireDocument, runtimeProvenance } from './job-application-scope.service.js';
+import { normalizeSkill } from '../utils/normalization.utils.js';
+
+const publicFilterKey = query => createHash('sha256').update(JSON.stringify({
+  q: query.q.toLocaleLowerCase(), industry: query.industry.toLocaleLowerCase(), seniority: query.seniority || '', skills: query.skills,
+})).digest('hex');
+const encodePublicCursor = (id, filterKey) => Buffer.from(JSON.stringify({ version: 1, id, filterKey })).toString('base64url');
+
+function decodePublicCursor(bookmark, filterKey) {
+  if (!bookmark) return undefined;
+  try {
+    const cursor = JSON.parse(Buffer.from(bookmark, 'base64url').toString('utf8'));
+    if (cursor.version !== 1 || cursor.filterKey !== filterKey || typeof cursor.id !== 'string' || !/^job:[a-z0-9:_-]+$/i.test(cursor.id)) throw new Error();
+    return cursor.id;
+  } catch {
+    throw new ApiError(400, 'INVALID_BOOKMARK', 'Con trỏ trang không hợp lệ hoặc không khớp bộ lọc.');
+  }
+}
+
+function matchesPublicFilters(job, query) {
+  if (job.status !== 'OPEN') return false;
+  if (query.industry && job.industry.toLocaleLowerCase() !== query.industry.toLocaleLowerCase()) return false;
+  if (query.seniority && job.seniority !== query.seniority) return false;
+  const skills = [...(job.required_skills || []), ...(job.optional_skills || [])].map(normalizeSkill);
+  if (query.skills.some(skill => !skills.includes(skill))) return false;
+  const term = query.q.toLocaleLowerCase();
+  if (!term) return true;
+  return [job.title, job.industry, job.description, ...(job.responsibilities || []), ...skills]
+    .some(value => value.toLocaleLowerCase().includes(term));
+}
 
 export function validateWrite(schema, value, { allowLegacyUnavailable = false } = {}) {
   const result = schema.safeParse(value);
@@ -69,9 +98,28 @@ export class JobService {
     }
   }
   async publicList(query) {
-    const page = await this.repo.find({ type: 'job', status: 'OPEN', published_at: { $gte: '' } },
-      { ...query, index: 'public_jobs', sort: descendingSort(['type', 'status', 'published_at']) });
-    return { ...page, items: page.items.map(publicJobDto) };
+    if (typeof this.repo.scanPublicJobs !== 'function') throw new ApiError(503, 'PUBLIC_SEARCH_UNAVAILABLE', 'Kho việc làm chưa hỗ trợ tìm kiếm theo hợp đồng.');
+    const filterKey = publicFilterKey(query);
+    let afterId = decodePublicCursor(query.bookmark, filterKey);
+    const items = [];
+    let exhausted = false;
+    while (items.length <= query.limit && !exhausted) {
+      const batch = await this.repo.scanPublicJobs({ afterId, limit: 100 });
+      if (!batch.length) { exhausted = true; break; }
+      for (const job of batch) {
+        afterId = job._id;
+        if (matchesPublicFilters(job, query)) items.push(job);
+        if (items.length > query.limit) break;
+      }
+      if (batch.length < 100 || items.length > query.limit) exhausted = batch.length < 100;
+    }
+    const hasMore = items.length > query.limit;
+    const pageItems = items.slice(0, query.limit);
+    return {
+      items: pageItems.map(publicJobDto),
+      has_more: hasMore,
+      ...(hasMore && pageItems.length ? { bookmark: encodePublicCursor(pageItems.at(-1)._id, filterKey) } : {}),
+    };
   }
   async publicDetail(id) {
     const job = parseStored(jobDocumentSchema, await requireDocument(this.repo, id, 'job'));

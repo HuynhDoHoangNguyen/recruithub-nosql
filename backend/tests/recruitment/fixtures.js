@@ -47,6 +47,12 @@ export class MemoryRepository {
     const offset = Number(bookmark || 0);
     return { items: structuredClone(values.slice(offset, offset + limit)), bookmark: String(offset + limit), has_more: offset + limit < values.length };
   }
+  async scanPublicJobs({ afterId, limit = 100 } = {}) {
+    const jobs = [...this.docs.values()].filter(doc => doc._id.startsWith('job:') && doc.type === 'job')
+      .sort((left, right) => left._id.localeCompare(right._id));
+    const offset = afterId ? jobs.findIndex(job => job._id === afterId) + 1 : 0;
+    return structuredClone(jobs.slice(offset, offset + limit));
+  }
   async allInterviews(id) { return structuredClone([...this.docs.values()].filter(doc => doc.type === 'interview' && doc.application_id === id)); }
   async stats(id) {
     const jobs = [...this.docs.values()].filter(doc => doc.type === 'job' && doc.recruiter_id === id);

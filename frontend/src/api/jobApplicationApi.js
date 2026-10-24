@@ -7,6 +7,7 @@ async function unwrap(request) {
     if (!response.data.success) throw new Error(response.data.message || 'Không thể tải dữ liệu.');
     return response.data.data;
   } catch (error) {
+    if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') throw error;
     const body = error.response?.data;
     throw Object.assign(new Error(body?.error?.message || error.message || 'Không thể kết nối máy chủ.'), {
       status: error.response?.status, code: body?.error?.code, details: body?.error?.details || [],
@@ -20,7 +21,7 @@ export const jobApi = {
   create: payload => unwrap(client.post('/v1/jobs', payload)),
   edit: (id, payload) => unwrap(client.patch(`/v1/jobs/${idPath(id)}`, payload)),
   status: (id, status, expected_rev) => unwrap(client.patch(`/v1/jobs/${idPath(id)}/status`, { status, expected_rev })),
-  publicList: params => unwrap(client.get('/v1/jobs', { params })),
+  publicList: (params, { signal } = {}) => unwrap(client.get('/v1/jobs', { params, signal })),
   publicDetail: id => unwrap(client.get(`/v1/jobs/${idPath(id)}`)),
 };
 export const applicationApi = {

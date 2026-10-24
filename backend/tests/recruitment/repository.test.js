@@ -40,6 +40,23 @@ test('Repository sends bounded Mango query, index, descending sort, bookmark and
   assert.deepEqual(JSON.parse(requests[2].body), { selector, limit: 1, bookmark: 'next', use_index: 'candidate_applications_stage', sort });
 });
 
+test('Public job scan uses the built-in _all_docs job ID range in bounded read-only pages', async () => {
+  let requestedUrl;
+  const repo = new JobApplicationRepository(config, async (url, init) => {
+    requestedUrl = new URL(url);
+    assert.equal(init.method, 'GET');
+    return json({ rows: [{ id: 'job:cms:J_000001', doc: { _id: 'job:cms:J_000001', type: 'job' } }] });
+  });
+  const jobs = await repo.scanPublicJobs({ afterId: 'job:cms:J_000000', limit: 100 });
+  assert.equal(requestedUrl.pathname.endsWith('/_all_docs'), true);
+  assert.equal(requestedUrl.searchParams.get('include_docs'), 'true');
+  assert.equal(requestedUrl.searchParams.get('startkey'), JSON.stringify('job:cms:J_000000'));
+  assert.equal(requestedUrl.searchParams.get('endkey'), JSON.stringify('job:\ufff0'));
+  assert.equal(requestedUrl.searchParams.get('skip'), '1');
+  assert.equal(requestedUrl.searchParams.get('limit'), '100');
+  assert.deepEqual(jobs.map(job => job._id), ['job:cms:J_000001']);
+});
+
 test('Repository reports has_more truthfully for empty, partial, exact-final, and continuing pages', async t => {
   async function pageFor(count, limit) {
     const docs = Array.from({ length: count }, (_, i) => ({ _id: `job:${i + 1}` }));
