@@ -32,18 +32,8 @@ export const recruiterRegistrationRequestSchema = z.object({
     .refine((value) => /[A-Z]/.test(value) && /\d/.test(value), {
       message: 'Password must include an uppercase letter and a number.',
     }),
-  company: z.object({
-    name: z.string().trim().min(1).max(200),
-    industry: z.string().trim().min(1).max(120),
-    website: z.string().trim().url().max(2048).refine((value) => {
-      const protocol = new URL(value).protocol;
-      return protocol === 'http:' || protocol === 'https:';
-    }, { message: 'Website must use HTTP or HTTPS.' }).optional(),
-    address: z.string().trim().min(1).max(500).optional(),
-  }).strict(),
-  department: z.object({
-    name: z.string().trim().min(1).max(120),
-  }).strict(),
+  company_id: z.string().regex(/^company:[a-z0-9_:-]+$/),
+  department_id: z.string().regex(/^department:[a-z0-9_:-]+$/),
 }).strict();
 
 export function validateAuthRequest(schema, input) {

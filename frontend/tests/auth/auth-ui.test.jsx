@@ -9,8 +9,10 @@ import api from '../../src/services/api';
 import { validateCandidateRegistration } from '../../src/utils/candidateRegistration';
 
 const authState = vi.hoisted(() => ({ user: null, login: vi.fn(), refreshMe: vi.fn() }));
+const organizationApi = vi.hoisted(() => ({ searchCompanies: vi.fn(), getCompanyDepartments: vi.fn() }));
 vi.mock('../../src/services/api', () => ({ default: { post: vi.fn(), get: vi.fn(), patch: vi.fn() } }));
 vi.mock('../../src/context/useAuth', () => ({ useAuth: () => authState }));
+vi.mock('../../src/services/organizationApi', () => organizationApi);
 
 function renderLogin(initialEntry = '/login') {
   return render(<MemoryRouter initialEntries={[initialEntry]}><Routes>
@@ -45,8 +47,8 @@ async function fillRegistration(user, { password = 'StrongPass1', confirmation =
   await user.type(screen.getByLabelText('Địa chỉ email'), 'an@example.com');
   await user.type(screen.getByLabelText('Mật khẩu', { selector: '#password' }), password);
   await user.type(screen.getByLabelText('Xác nhận mật khẩu'), confirmation);
-  await user.type(screen.getByLabelText('Vị trí mong muốn'), 'Backend Developer');
-  await user.type(screen.getByLabelText('Ngành nghề quan tâm'), 'Công nghệ');
+  await user.selectOptions(screen.getByLabelText('Vị trí mong muốn'), 'Backend Developer');
+  await user.selectOptions(screen.getByLabelText('Ngành nghề quan tâm'), 'Công nghệ');
 }
 
 beforeEach(() => {
@@ -55,6 +57,11 @@ beforeEach(() => {
   authState.refreshMe.mockResolvedValue(null);
 });
 afterEach(() => vi.unstubAllEnvs());
+beforeEach(() => {
+  vi.stubEnv('VITE_RECRUITER_REGISTRATION_ENABLED', 'false');
+  organizationApi.searchCompanies.mockResolvedValue([{ id: 'company:acme', name: 'Acme Technology', industry: 'Technology' }]);
+  organizationApi.getCompanyDepartments.mockResolvedValue([{ id: 'department:engineering', name: 'Engineering' }]);
+});
 
 describe('Login UI', () => {
   it.each([
@@ -98,7 +105,6 @@ describe('Login UI', () => {
   it('does not show nonfunctional remember, password recovery, or social login controls', () => {
     renderLogin();
     expect(screen.queryByText(/remember me|forgot your password|google|twitter/i)).toBeNull();
-    expect(screen.getByText(/quên mật khẩu chưa được hỗ trợ/i)).toBeTruthy();
   });
 });
 
@@ -148,6 +154,21 @@ describe('Candidate registration UI', () => {
     });
   });
 
+  it('submits custom text when Khác is selected for a suggestion field', async () => {
+    const user = userEvent.setup();
+    api.post.mockResolvedValue({ data: { success: true } });
+    renderRegister();
+    await fillRegistration(user);
+    await user.selectOptions(screen.getByLabelText('Vị trí mong muốn'), '__other__');
+    await user.clear(screen.getByLabelText('Nhập vị trí mong muốn khác'));
+    await user.type(screen.getByLabelText('Nhập vị trí mong muốn khác'), 'Thiết kế sản phẩm');
+    await user.click(screen.getByRole('button', { name: 'Tạo tài khoản Candidate' }));
+    await screen.findByText('Sign in page');
+    expect(api.post).toHaveBeenCalledWith('/v1/auth/register', expect.objectContaining({
+      candidate_role: 'Thiết kế sản phẩm', industry: 'Công nghệ',
+    }));
+  });
+
   it('blocks double submission while the registration request is pending', async () => {
     const user = userEvent.setup();
     let resolveRequest;
@@ -168,31 +189,32 @@ describe('Candidate registration UI', () => {
     expect(screen.queryByText(/google|twitter|điều khoản|chính sách bảo mật/i)).toBeNull();
   });
 
-  it('keeps the active registration UI Candidate-only while Recruiter contracts are pending', () => {
+  it('shows both role cards and keeps Recruiter visibly disabled while its feature flag is off', () => {
+    vi.stubEnv('VITE_RECRUITER_REGISTRATION_ENABLED', 'false');
     renderRegister();
-    expect(screen.getByRole('heading', { name: 'Tạo tài khoản Candidate' })).toBeTruthy();
-    expect(screen.queryByText(/Recruiter|Nhà tuyển dụng|Công ty mới/i)).toBeNull();
-    expect(screen.queryByLabelText(/vai trò|role|Admin/i)).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Tạo tài khoản RecruiHub' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Ứng viên' }).checked).toBe(true);
+    expect(screen.getByRole('radio', { name: 'Nhà tuyển dụng' }).disabled).toBe(true);
+    expect(screen.getByText('Đăng ký hiện chưa được bật')).toBeTruthy();
+    expect(screen.queryByLabelText('Tìm công ty')).toBeNull();
   });
 
-  it('connects the Recruiter form to its separate API only when the explicit UI flag is enabled', async () => {
+  it('shows the Recruiter form and submits only selected IDs when the explicit UI flag is enabled', async () => {
     vi.stubEnv('VITE_RECRUITER_REGISTRATION_ENABLED', 'true');
     const user = userEvent.setup();
     api.post.mockResolvedValue({ data: { success: true } });
     renderRegister();
-    await user.selectOptions(screen.getByLabelText('Loại tài khoản'), 'RECRUITER');
+    await user.click(screen.getByRole('radio', { name: 'Nhà tuyển dụng' }));
     await user.type(screen.getByLabelText('Email'), 'r@example.com');
     await user.type(screen.getByLabelText('Mật khẩu', { selector: '#recruiter-password' }), 'StrongPass1');
-    await user.type(screen.getByLabelText('Xác nhận mật khẩu'), 'StrongPass1');
-    await user.type(screen.getByLabelText('Tên công ty mới'), ' Công ty Ánh Dương ');
-    await user.type(screen.getByLabelText('Lĩnh vực hoạt động'), ' Công nghệ ');
-    await user.type(screen.getByLabelText('Phòng ban'), 'Nhân sự');
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu', { selector: '#recruiter-confirm-password' }), 'StrongPass1');
+    await user.type(screen.getByLabelText('Tìm công ty'), 'Acme');
+    await user.click(await screen.findByRole('option', { name: /Acme Technology.*Technology/i }));
+    await user.selectOptions(await screen.findByLabelText('Phòng ban'), 'department:engineering');
     await user.click(screen.getByRole('button', { name: 'Tạo tài khoản Recruiter' }));
     expect(await screen.findByText('Sign in page')).toBeTruthy();
     expect(api.post).toHaveBeenCalledWith('/v1/auth/register/recruiter', {
-      email: 'r@example.com', password: 'StrongPass1',
-      company: { name: 'Công ty Ánh Dương', industry: 'Công nghệ' },
-      department: { name: 'Nhân sự' },
+      email: 'r@example.com', password: 'StrongPass1', company_id: 'company:acme', department_id: 'department:engineering',
     });
   });
 });

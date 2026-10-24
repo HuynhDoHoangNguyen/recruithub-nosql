@@ -1,9 +1,17 @@
 import axios from 'axios';
 import { getAccessToken } from '../utils/authHelper';
 
-// The base is the /api root. Versioned service modules add /v1 themselves.
+const DEFAULT_API_ROOT = 'http://127.0.0.1:5000/api';
+
+/** Keep the Axios base at /api because API modules append /v1 themselves. */
+export function normalizeApiBaseUrl(value) {
+  const configured = typeof value === 'string' && value.trim() ? value.trim() : DEFAULT_API_ROOT;
+  const withoutVersionSuffix = configured.replace(/\/+$/, '').replace(/(?:\/v1)+$/i, '');
+  return /\/api$/i.test(withoutVersionSuffix) ? withoutVersionSuffix : `${withoutVersionSuffix}/api`;
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5002/api',
+  baseURL: normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL),
   timeout: 10000,
 });
 

@@ -7,14 +7,16 @@ import { candidateRegistrationRequestSchema, loginRequestSchema, recruiterRegist
 import { createAuthenticate } from '../middleware/authenticate.js';
 import { validateBody } from '../middleware/validate-body.js';
 import { errorResponse, successResponse } from '../utils/api-response.js';
+import { createOrganizationDirectoryRepositories } from '../services/organization-lookup.service.js';
 
 function createDefaultAuthService() {
   const repositories = createAuthRepositories();
+  const organizations = createOrganizationDirectoryRepositories();
   return new AuthService({
     userRepository: repositories.users,
     candidateRepository: repositories.candidates,
-    companyRepository: repositories.companies,
-    departmentRepository: repositories.departments,
+    companyRepository: organizations.companies,
+    departmentRepository: organizations.departments,
     recruiterRepository: repositories.recruiters,
     jwtSecret: process.env.JWT_ACCESS_SECRET,
   });

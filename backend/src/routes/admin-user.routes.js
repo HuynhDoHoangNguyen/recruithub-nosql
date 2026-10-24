@@ -6,16 +6,18 @@ import { AuthService } from '../services/auth.service.js';
 import { AdminUserService } from '../services/admin-user.service.js';
 import { errorResponse, successResponse } from '../utils/api-response.js';
 import { sendApiError } from '../utils/send-api-error.js';
+import { createOrganizationDirectoryRepositories } from '../services/organization-lookup.service.js';
 
 const statusBodySchema = z.object({ account_status: z.enum(['ACTIVE', 'LOCKED']) }).strict();
 const idSchema = z.string().regex(/^user:[a-f0-9]{64}$/);
 
 function createDefaultServices() {
   const repositories = createAuthRepositories();
+  const organizations = createOrganizationDirectoryRepositories();
   const { users, candidates } = repositories;
   return {
     auth: new AuthService({ userRepository: users, candidateRepository: candidates,
-      companyRepository: repositories.companies, departmentRepository: repositories.departments,
+      companyRepository: organizations.companies, departmentRepository: organizations.departments,
       recruiterRepository: repositories.recruiters, jwtSecret: process.env.JWT_ACCESS_SECRET }),
     admin: new AdminUserService({ userRepository: users, candidateRepository: candidates }),
   };

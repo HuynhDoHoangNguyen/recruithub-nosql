@@ -5,13 +5,15 @@ import { createAuthenticate, requireRole } from '../middleware/authenticate.js';
 import { CandidateProfileService } from '../services/candidate-profile.service.js';
 import { successResponse } from '../utils/api-response.js';
 import { sendApiError } from '../utils/send-api-error.js';
+import { createOrganizationDirectoryRepositories } from '../services/organization-lookup.service.js';
 
 function createDefaultServices() {
   const repositories = createAuthRepositories();
+  const organizations = createOrganizationDirectoryRepositories();
   const { users, candidates } = repositories;
   return {
     auth: new AuthService({ userRepository: users, candidateRepository: candidates,
-      companyRepository: repositories.companies, departmentRepository: repositories.departments,
+      companyRepository: organizations.companies, departmentRepository: organizations.departments,
       recruiterRepository: repositories.recruiters, jwtSecret: process.env.JWT_ACCESS_SECRET }),
     profile: new CandidateProfileService({ candidateRepository: candidates }),
   };

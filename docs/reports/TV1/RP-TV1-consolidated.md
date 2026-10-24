@@ -1,6 +1,6 @@
 # Báo cáo tổng hợp TV1 — Toàn bộ hồ sơ giai đoạn
 
-Ngày cập nhật: 2026-10-24. Tài liệu này gom nguyên văn 16 báo cáo TV1 trước đây để lưu một bản duy nhất. Các trạng thái trong phụ lục là trạng thái lịch sử tại thời điểm từng báo cáo; trạng thái tích hợp hiện tại là merge commit `260cf4a` trên `feature/identity-candidate-portal`. Nhánh `dev` hiện vẫn ở parent `91f8346`. Full backend suite chưa PASS; các subset test không thay thế kết quả full suite.
+Ngày cập nhật: 2026-10-24. Tài liệu này gom nguyên văn 16 báo cáo TV1 trước đây và bổ sung các báo cáo Phase C.1C, Auth UI/Recruiter Registration ở cuối. Các trạng thái trong phụ lục là trạng thái lịch sử tại thời điểm từng báo cáo; trạng thái tích hợp hiện tại là merge commit `260cf4a` trên `feature/identity-candidate-portal`. Nhánh `dev` hiện vẫn ở parent `91f8346`. Full backend suite chưa PASS; các subset test không thay thế kết quả full suite.
 
 Báo cáo TV1 + TV2 và hướng dẫn kiểm thử được chuyển sang [báo cáo tổng hợp TV2](../TV2/RP-TV2-consolidated.md#rp-tv1-tv2-merge-test-guide). Contract hiện hành: [TV1 Auth contract](../../shared/TV1_AUTH_MODULE_CONTRACT.md), [CouchDB Foundation guide](../../shared/COUCHDB_FOUNDATION_GUIDE.md).
 
@@ -22,6 +22,8 @@ Báo cáo TV1 + TV2 và hướng dẫn kiểm thử được chuyển sang [báo
 14. [RP-TV1-stage-04b-auth-mvp-integration.md](#rp-tv1-stage-04b-auth-mvp-integration)
 15. [RP-TV1-technical-decision-freeze.md](#rp-tv1-technical-decision-freeze)
 16. [RP-TV1-technical-decision-register.md](#rp-tv1-technical-decision-register)
+17. [RP-TV1-phase-c1c-recruiter-ownership-integration.md](#rp-tv1-phase-c1c-recruiter-ownership-integration)
+18. [RP-TV1-auth-recruiter-registration-login-ui.md](#rp-tv1-auth-recruiter-registration-login-ui)
 
 
 <a id="rp-tv1-couchdb-client-repository"></a>
@@ -2351,5 +2353,66 @@ No other files were intentionally edited for this stage. Existing unrelated chan
 TV1 ghi nhận quy tắc trên là đề xuất tích hợp dựa theo source TV2 hiện tại, không đại diện cho TV2 approval. Báo cáo TV2 hiện có nội dung cấm public Recruiter signup; cần TV2 và nhóm Auth xác nhận hoặc sửa hợp đồng trước khi đổi DR-003/DR-019 sang trạng thái được duyệt. Cũng cần xác nhận quy ước ID/provenance, chính sách Company duplicate và chấp thuận runbook xử lý partial registration. Không bật hai feature flags trước khi các quyết định này được ghi nhận.
 
 **Trạng thái Phase C.1C: PARTIAL — kiểm thử tích hợp theo source hiện tại đạt; public Recruiter registration chưa được phép kích hoạt vì phê duyệt Auth/TV2 còn pending.** Git branch giữ nguyên `feature/identity-candidate-portal`; không stage/commit/push. Working tree còn các thay đổi trước đó của TV1 và tài liệu khác, cần review riêng trước khi commit.
+
+---
+
+<a id="rp-tv1-auth-recruiter-registration-login-ui"></a>
+
+## RecruiHub NoSQL — TV1 Auth & Recruiter Registration UI/UX
+
+_Source: RP-TV1-auth-recruiter-registration-login-ui.md. Báo cáo gốc được lưu riêng; phần dưới tóm lược vòng đời chức năng và kết quả kiểm tra._
+
+**Ngày:** 2026-10-24
+**Phạm vi:** UI đăng ký/đăng nhập, lựa chọn Candidate/Recruiter và tổng quan đường đi tới khu vực Recruiter/Job.
+**Trạng thái:** UI Auth hoàn tất; Recruiter signup được kiểm tra qua API trên DB demo; Job management còn vướng cách phân chia database.
+
+### Tổng quan nhanh
+
+UI Login/Register được làm mới theo bố cục Auth trong `docs/Job-Application-Portal-Frontend`, nhưng giữ React routes, AuthContext, API client và nghiệp vụ RecruiHub. Register hiển thị hai role cards. Recruiter card luôn có mặt; khi `VITE_RECRUITER_REGISTRATION_ENABLED` tắt, card bị khóa và nêu trạng thái. Khi bật, form cho phép tìm Company có sẵn, chọn Department của Company đó và gửi đăng ký.
+
+Không thêm Company, Department hoặc Job trong form đăng ký. Job được tạo sau khi đăng nhập trong khu vực Recruiter.
+
+### Vòng đời đăng ký, đăng nhập và Job
+
+1. **Chọn vai trò:** Candidate tiếp tục dùng các trường, validation và API Candidate hiện có. Recruiter chỉ chọn được khi feature flag UI bật.
+2. **Đăng ký Recruiter:** nhập email/mật khẩu; tìm Company từ hai ký tự; chọn Company và Department được tải theo Company. Khi đổi Company, Department cũ bị xóa. Nếu không có Company/Department, form báo chưa hỗ trợ và không gửi.
+3. **Kiểm tra và tạo documents:** frontend gửi `email`, `password`, `company_id`, `department_id`. Backend xác minh lại Company/Department và quan hệ của chúng; tạo User role `RECRUITER` cùng Recruiter document, rồi mới kích hoạt User. Company/Department không bị ghi.
+4. **Lỗi ghi một phần:** User và Recruiter là hai writes riêng, không phải transaction. Nếu có lỗi, API trả `REGISTRATION_INCOMPLETE` kèm mã tham chiếu; không tự retry hoặc xóa bù.
+5. **Đăng nhập:** backend xác thực User và trạng thái hiện hành, kiểm tra Recruiter relationship khi áp dụng, phát access token và DTO an toàn. Frontend giữ token trong memory, xác minh bằng `/auth/me` rồi điều hướng theo role từ server.
+6. **Đi tới Recruiter/Job:** Recruiter được điều hướng vào Recruiter dashboard. Job được tạo sau signup; TV2 Job API lấy scope Recruiter/Company/Department từ dữ liệu phía server, không tin các reference do form Job gửi lên.
+
+### Thay đổi UI
+
+- Dùng chung Auth layout cho Login/Register: logo, heading/subtitle, card và giới hạn chiều rộng.
+- Hai role cards có selected/focus/disabled states, icon và nội dung mô tả; radio inputs hỗ trợ bàn phím.
+- Chuẩn hóa input, focus ring, nút submit và error/loading states.
+- Thêm nút hiện/ẩn mật khẩu cho Login, Candidate Register và Recruiter Register.
+- Company autocomplete có loading/results/empty/error; chọn gợi ý bằng Arrow Up/Down, Enter hoặc chuột. Department chỉ mở sau khi chọn Company và tải xong.
+- Không thay AuthContext, JWT lifecycle, API contract, route protection, role redirect hoặc Candidate payload.
+
+### Kiểm thử và kết quả
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Frontend Vitest | **PASS 55/55** |
+| Frontend Node tests | **PASS 4/4** |
+| Frontend production build | **PASS** |
+| Frontend lint | **PASS**, 0 lỗi; 2 cảnh báo React import cũ tại `App.jsx` và `Landing.jsx` |
+| `git diff --check` | **PASS**, chỉ cảnh báo chuẩn LF→CRLF |
+| Browser visual/responsive review | Chưa xác minh do môi trường không có browser khả dụng |
+
+API flow Recruiter đăng ký → duplicate registration → đăng nhập → `/auth/me` đã được chạy trên `recruithub_auth_demo`. Đăng ký thành công, email trùng trả 409, đăng nhập và `/auth/me` xác nhận role `RECRUITER`. Department không thuộc Company đã chọn bị từ chối 400 `ORGANIZATION_NOT_SUPPORTED` trước khi ghi.
+
+Các writes E2E chỉ dùng database demo cô lập: số document tăng từ 41 lên 43. `recruitment_db` giữ nguyên 25.750 documents. Thông tin đăng nhập test không được lưu trong report.
+
+### Điểm tích hợp Job còn mở
+
+Company/Department lookup đọc từ `COUCHDB_DATABASE`; User/Recruiter ghi vào `AUTH_COUCHDB_DATABASE`. TV2 Job/Application scope hiện đọc Recruiter, Company và Department từ cùng database. Do đó `GET /api/v1/recruiter/jobs` với Recruiter mới trả 404 `NOT_FOUND`: Company/Department được chọn không nằm trong auth database. Chưa thể xem toàn bộ vòng đời Job sau signup là tích hợp thành công.
+
+TV1/TV2 cần thống nhất cách Job/Application đọc Company/Department từ directory database hoặc chọn cấu hình database tích hợp phù hợp. Không copy/ghi tổ chức vào `recruitment_db` để né khác biệt. Feature flags mặc định vẫn `false`; lượt E2E dùng cờ bật theo process riêng.
+
+### Báo cáo gốc và files chính
+
+Báo cáo đầy đủ: [RP-TV1-auth-recruiter-registration-login-ui.md](RP-TV1-auth-recruiter-registration-login-ui.md). Files UI chính: `frontend/src/components/auth/AuthLayout.jsx`, `frontend/src/pages/Login.jsx`, `frontend/src/pages/Register.jsx`, `frontend/src/components/auth/RecruiterRegistrationFields.jsx`, `frontend/src/utils/recruiterRegistration.js` và hai test file Auth liên quan.
 
 ---
