@@ -6,5 +6,5 @@ export function apiErrorMessage(error) {
   if (error.response.data?.error?.code === 'NOT_FOUND' && /\/auth\//.test(error.config?.url || '')) {
     return 'Dịch vụ tài khoản chưa được tích hợp. Hiện chưa thể đăng nhập hoặc đăng ký.';
   }
-  return error.response.data?.message || 'Không thể xử lý yêu cầu. Vui lòng thử lại.';
+  return error.response.data?.error?.message || error.response.data?.message || 'Không thể xử lý yêu cầu. Vui lòng thử lại.';
 }

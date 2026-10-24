@@ -1,4 +1,4 @@
-﻿import { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, BriefcaseBusiness, Users, CalendarDays, CircleCheck } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -26,7 +26,7 @@ export default function RecruiterDashboard() {
   }
   const values = stats.data;
   return <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-slate-50 min-h-screen relative space-y-6">
-    <AccountHeader title="Quản lý tuyển dụng" organization={organization.data} action={<Link to="/recruiter/jobs/create" className="btn-primary inline-flex items-center"><Plus className="w-4 h-4 mr-2" />Tạo tin tuyển dụng</Link>} />
+    <AccountHeader id="organization" title="Quản lý tuyển dụng" organization={organization.data} action={<Link to="/recruiter/jobs/create" className="btn-primary inline-flex items-center"><Plus className="w-4 h-4 mr-2" />Tạo tin tuyển dụng</Link>} />
     <ErrorMessage error={organization.error} retry={organization.reload} />
     <Resource resource={stats}><div className="grid grid-cols-2 lg:grid-cols-4 gap-6">{[
       ['Tin đang tuyển', values?.jobs.OPEN || 0, BriefcaseBusiness], ['Tổng hồ sơ', values?.total_applications || 0, Users],

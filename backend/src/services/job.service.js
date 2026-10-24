@@ -115,9 +115,19 @@ export class JobService {
     // Preserve the accepted newest-first listing, including historical jobs
     // without published_at. Filtered searches retain dev's literal search/cursor.
     if (!query.q && !query.industry && !query.seniority && !query.skills.length) {
+      const filterKey = publicFilterKey(query);
+      let bookmark;
+      if (query.bookmark) {
+        try {
+          const cursor = JSON.parse(Buffer.from(query.bookmark, 'base64url').toString('utf8'));
+          if (cursor.version !== 1 || cursor.filterKey !== filterKey || typeof cursor.bookmark !== 'string' || !cursor.bookmark) throw new Error();
+          bookmark = cursor.bookmark;
+        } catch { throw new ApiError(400, 'INVALID_BOOKMARK', 'Con trỏ trang không hợp lệ hoặc không khớp bộ lọc.'); }
+      }
       const page = await this.repo.find({ type: 'job', status: 'OPEN', created_at: { $gte: '' }, _id: { $gte: '' } },
-        { ...query, index: 'public_jobs_created_v2', sort: descendingSort(['type', 'status', 'created_at', '_id']) });
-      return { ...page, items: await enrich(page.items) };
+        { ...query, bookmark, index: 'public_jobs_created_v2', sort: descendingSort(['type', 'status', 'created_at', '_id']) });
+      return { ...page, bookmark: page.has_more ? Buffer.from(JSON.stringify({ version: 1, bookmark: page.bookmark, filterKey })).toString('base64url') : undefined,
+        items: await enrich(page.items) };
     }
     if (typeof this.repo.scanPublicJobs !== 'function') throw new ApiError(503, 'PUBLIC_SEARCH_UNAVAILABLE', 'Kho việc làm chưa hỗ trợ tìm kiếm theo hợp đồng.');
     const filterKey = publicFilterKey(query);

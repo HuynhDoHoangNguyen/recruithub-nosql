@@ -3,7 +3,7 @@ import { filterSortAndPageJobs, findOpenJob, normalizeJob } from './publicJobsMo
 import { jobApi } from '../api/jobApplicationApi';
 
 // Fixtures are explicit development-only behavior. Live mode calls TV2's public API.
-const developmentFixturesEnabled = import.meta.env.DEV && import.meta.env.VITE_PUBLIC_JOBS_MODE !== 'api';
+const developmentFixturesEnabled = import.meta.env.DEV && import.meta.env.VITE_PUBLIC_JOBS_MODE === 'fixtures';
 export const isPublicJobsMockMode = developmentFixturesEnabled;
 
 export async function listPublicJobs({ search = '', skills = '', industry = '', seniority = '', sort = 'newest', page = 1, pageSize = 12, bookmark, signal } = {}) {

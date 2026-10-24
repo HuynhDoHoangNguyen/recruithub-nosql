@@ -1,5 +1,9 @@
 # RecruiHub NoSQL
 
+> Đã sửa Public Jobs sau merge: [nguyên nhân, bản sửa và dữ liệu live](docs/public-jobs-after-merge-fix.md). GET public đọc lại recruitment_db, trả đủ 200 OPEN; không cần import. Auth và thao tác private vẫn dùng cấu hình riêng. Các ghi nhận Jobs 503 bên dưới là lịch sử trước bản sửa này.
+
+> Sau merge dev 25/10/2026: [báo cáo giữ UI hiện tại, tích hợp Auth/Public Search và trạng thái kiểm thử](docs/merge-dev-review-2026-10-25.md). HEAD `875986a`; runtime hiện cần cấu hình `AUTH_COUCHDB_DATABASE` riêng theo guard mới của dev. Các kết quả Jobs live trong báo cáo trước thuộc bản trước merge.
+
 > Bàn giao TV2 mới nhất 25/10/2026: [đúng phiên bản JobPortal IT, menu/UC, dữ liệu live và kết quả test](docs/recruitment-it-template-handoff.md). Frontend 28/28 PASS; full backend 266/288 PASS, 22 lỗi dataset/ETL. Private chưa nghiệm thu với Identity thật. Các số liệu test khác bên dưới là thông tin lịch sử.
 
 ## 1. Giới thiệu tổng quan

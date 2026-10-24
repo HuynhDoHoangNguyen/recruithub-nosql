@@ -10,7 +10,7 @@ import { apiErrorMessage } from '../src/api/apiError';
 import { formatDate } from '../src/features/applications/applicationPresentation';
 
 const session = vi.hoisted(() => ({ user: null, login: vi.fn(), logout: vi.fn(), loading: false }));
-vi.mock('../src/context/AuthContext', () => ({ useAuth: () => session }));
+vi.mock('../src/context/useAuth', () => ({ useAuth: () => session }));
 vi.mock('../src/api/jobApplicationApi', () => ({
   jobApi: { context: vi.fn(), list: vi.fn(), stats: vi.fn(), detail: vi.fn(), create: vi.fn(), edit: vi.fn(), status: vi.fn(), publicList: vi.fn(), publicDetail: vi.fn() },
   applicationApi: { stats: vi.fn(), context: vi.fn(), apply: vi.fn(), mine: vi.fn(), detail: vi.fn(), applicants: vi.fn(), withdraw: vi.fn(), transition: vi.fn() },
@@ -54,21 +54,20 @@ it('preserves Jobs filter layout, Navbar and retry when the API fails', async ()
   expect(screen.getByRole('heading', { name: /Bộ Lọc Nâng Cao/ })).toBeTruthy();
   expect(screen.getByRole('navigation', { name: 'Điều hướng chính' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
-  await screen.findByText('Chưa có tin tuyển dụng phù hợp trên trang này.');
+  await screen.findByText('Chưa tìm thấy việc làm phù hợp');
   expect(jobApi.publicList).toHaveBeenCalledTimes(2);
 });
 
-it('retains protected destination and makes missing Identity explicit without successful login', async () => {
+it('retains protected destination and reports rejected Identity login without claiming success', async () => {
   mount('/recruiter/jobs/create');
-  await screen.findByRole('heading', { name: 'Welcome back' });
+  await screen.findByRole('heading', { name: 'Chào mừng bạn trở lại' });
   expect(screen.getByTestId('protected-destination').textContent).toBe('/recruiter/jobs/create');
-  api.post.mockRejectedValue({ config: { url: '/auth/login' }, response: { status: 404, data: { error: { code: 'NOT_FOUND' } } } });
-  fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'test@example.invalid' } });
-  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-password' } });
-  fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form'));
-  await screen.findByText('Dịch vụ tài khoản chưa được tích hợp. Hiện chưa thể đăng nhập hoặc đăng ký.');
+  api.post.mockRejectedValue({ response: { status: 401, data: { error: { code: 'AUTHENTICATION_FAILED' } } } });
+  fireEvent.change(screen.getByLabelText('Địa chỉ email'), { target: { value: 'test@example.invalid' } });
+  fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'test-password' } });
+  fireEvent.submit(screen.getByRole('button', { name: 'Đăng nhập' }).closest('form'));
+  await screen.findByText('Email hoặc mật khẩu không đúng, hoặc tài khoản chưa được kích hoạt.');
   expect(session.login).not.toHaveBeenCalled();
-  expect(screen.getByRole('button', { name: 'Google' }).disabled).toBe(true);
 });
 
 it('recruiter can navigate create, edit, publish, close and applicants using persisted API responses', async () => {

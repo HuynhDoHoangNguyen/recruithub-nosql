@@ -10,6 +10,7 @@ import { createApplicationRoutes } from './routes/application.routes.js';
 import databaseHealthRoutes from './routes/database-health.routes.js';
 import apiV1Routes from './routes/api-v1.routes.js';
 import { getAuthDatabaseConfig } from './config/auth-database.config.js';
+import { getDatabaseConfig } from './config/database.config.js';
 
 function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://localhost:5173') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
@@ -22,11 +23,11 @@ function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://l
   return origins;
 }
 
-function createConfiguredRepository(environment) {
+function createConfiguredRepository(environment, { readOnly = false } = {}) {
   let repository;
   const getRepository = () => {
     if (!repository) {
-      const config = getAuthDatabaseConfig(environment);
+      const config = readOnly ? getDatabaseConfig(environment) : getAuthDatabaseConfig(environment);
       const authHeader = config.username && config.password
         ? `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}`
         : undefined;
@@ -34,17 +35,23 @@ function createConfiguredRepository(environment) {
     }
     return repository;
   };
-  return Object.fromEntries(['get', 'put', 'find', 'scanPublicJobs', 'profile', 'allInterviews', 'view', 'stats', 'initialize']
+  // The public catalog can read the existing dataset without granting any
+  // mutation or identity capability on that database.
+  const methods = readOnly ? ['get', 'find', 'scanPublicJobs']
+    : ['get', 'put', 'find', 'scanPublicJobs', 'profile', 'allInterviews', 'view', 'stats', 'candidateStats', 'initialize'];
+  return Object.fromEntries(methods
     .map(method => [method, (...args) => getRepository()[method](...args)]));
 }
 
-export function createApp({ repository: suppliedRepository, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
+export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
   const app = express();
   const origins = configuredFrontendOrigins(jwtEnv.FRONTEND_URL);
   const repository = suppliedRepository || createConfiguredRepository(jwtEnv);
+  const publicRepository = suppliedPublicRepository || suppliedRepository || createConfiguredRepository(jwtEnv, { readOnly: true });
   const dependencies = {
     authenticate: authenticate || createJwtAuthentication(repository, jwtEnv, () => now ? new Date(now()).getTime() : Date.now()),
     jobs: new JobService(repository, now),
+    publicJobs: new JobService(publicRepository, now),
     applications: new ApplicationService(repository, { now, analyzeApplication }),
   };
 

@@ -1,5 +1,9 @@
 # React + Vite
 
+> [Đã sửa Public Jobs sau merge](../docs/public-jobs-after-merge-fix.md): GET public đã đọc lại dataset thật mà không cần Auth database. Nếu tab giữ lỗi cũ, bấm Thử lại hoặc reload; không import lại dữ liệu.
+
+> Sau merge dev: [xem mốc tích hợp hiện tại](../docs/merge-dev-review-2026-10-25.md). Auth dùng User đã được server xác minh và token memory-only; reload cần đăng nhập lại. API client dùng root `/api`, service nối `/v1`; `VITE_PUBLIC_JOBS_MODE=fixtures` chỉ dành cho opt-in development, mặc định gọi API thật. Jobs có thể trả 503 cho đến khi cấu hình database riêng theo contract dev.
+
 ## Chạy RecruiHub Frontend
 
 Frontend thật nằm trong thư mục này. `docs/Job-Application-Portal-Frontend/` là template chỉ đọc.

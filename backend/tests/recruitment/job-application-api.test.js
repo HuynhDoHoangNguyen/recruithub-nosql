@@ -76,18 +76,22 @@ test('Public Job search is literal, OPEN-only, filterable, and uses stable curso
   const literalSpecial = await f.request('GET', '/jobs?q=%2E%2A');
   assert.equal(literalSpecial.status, 200); assert.deepEqual(literalSpecial.body.data.items, []);
   const empty = await f.request('GET', '/jobs');
-  assert.equal(empty.status, 200); assert.deepEqual(empty.body.data.items.map(job => job._id), ['job:one', 'job:two']);
+  assert.equal(empty.status, 200); assert.deepEqual(empty.body.data.items.map(job => job._id), ['job:two', 'job:one']);
   const bySkill = await f.request('GET', '/jobs?skills=JavaScript');
   assert.deepEqual(bySkill.body.data.items.map(job => job._id), ['job:one']);
   const combined = await f.request('GET', '/jobs?industry=FinTech&seniority=JUNIOR&skills=SQL');
   assert.deepEqual(combined.body.data.items.map(job => job._id), ['job:two']);
 
   const first = await f.request('GET', '/jobs?limit=1');
-  assert.equal(first.body.data.items[0]._id, 'job:one'); assert.equal(first.body.data.has_more, true);
+  assert.equal(first.body.data.items[0]._id, 'job:two'); assert.equal(first.body.data.has_more, true);
   const next = await f.request('GET', `/jobs?limit=1&bookmark=${encodeURIComponent(first.body.data.bookmark)}`);
-  assert.equal(next.body.data.items[0]._id, 'job:two'); assert.equal(next.body.data.has_more, false);
+  assert.equal(next.body.data.items[0]._id, 'job:one'); assert.equal(next.body.data.has_more, false);
   const mismatchedCursor = await f.request('GET', `/jobs?industry=FinTech&limit=1&bookmark=${encodeURIComponent(first.body.data.bookmark)}`);
   assert.equal(mismatchedCursor.status, 400); assert.equal(mismatchedCursor.body.error.code, 'INVALID_BOOKMARK');
+  const filteredPage = await f.request('GET', '/jobs?skills=JavaScript&limit=1');
+  assert.equal(filteredPage.status, 200);
+  const invalidUnfiltered = await f.request('GET', `/jobs?bookmark=${encodeURIComponent('not-a-valid-cursor')}`);
+  assert.equal(invalidUnfiltered.status, 400); assert.equal(invalidUnfiltered.body.error.code, 'INVALID_BOOKMARK');
   for (const path of ['/jobs?salary_min=1', '/jobs?location=Hanoi', '/jobs?seniority=LEAD', '/jobs?limit=500']) {
     const invalid = await f.request('GET', path);
     assert.equal(invalid.status, 400);

@@ -1,0 +1,28 @@
+{
+  "checkedAt": "2026-10-24T18:36:28.132Z",
+  "origin": "http://localhost:5173",
+  "mocked": false,
+  "database": "recruitment_db",
+  "businessDocuments": 25750,
+  "docCount": 25761,
+  "jobs": 2500,
+  "statuses": {
+    "DRAFT": 2300,
+    "OPEN": 200
+  },
+  "openWithoutPublishedAt": 200,
+  "pages": [
+    50,
+    50,
+    50,
+    50
+  ],
+  "browserErrors": [],
+  "uniqueOpenJobs": 200,
+  "landingReadback": true,
+  "listReadback": true,
+  "detailReadback": true,
+  "filteredSearch": true,
+  "responsive": true,
+  "databaseUnchanged": true
+}
