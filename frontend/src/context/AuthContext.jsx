@@ -1,56 +1,51 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { jwtDecode } from 'jwt-decode';
-import {
-  getAccessToken,
-  setAccessToken,
-  removeAccessToken,
-  logout as clearSession,
-} from '../utils/authHelper';
-
-const AuthContext = createContext();
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import api from '../services/api';
+import { getAccessToken, removeAccessToken, setAccessToken } from '../utils/authHelper';
+import AuthContext from './auth-context';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // ✅ Add loading state
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const token = getAccessToken();
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        setUser(decoded);
-      } catch (err) {
-        console.error('Invalid access token', err);
-        removeAccessToken();
-        setUser(null);
-      }
-    }
-    setLoading(false); // ✅ Always set loading to false after check
+  const login = useCallback((token, authenticatedUser) => {
+    setAccessToken(token);
+    setUser(authenticatedUser);
   }, []);
 
-  const login = (accessToken) => {
-    setAccessToken(accessToken);
-    try {
-      const decoded = jwtDecode(accessToken);
-      setUser(decoded);
-    } catch (err) {
-      console.error('Failed to decode access token during login', err);
+  const logout = useCallback(() => {
+    removeAccessToken();
+    setUser(null);
+  }, []);
+
+  const refreshMe = useCallback(async () => {
+    if (!getAccessToken()) {
+      logout();
+      return null;
     }
-  };
+    setLoading(true);
+    try {
+      const response = await api.get('/v1/auth/me');
+      const currentUser = response.data?.data?.user;
+      if (!currentUser) throw new Error('Invalid authentication response.');
+      setUser(currentUser);
+      return currentUser;
+    } catch (error) {
+      if (error.response?.status === 401) logout();
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [logout]);
 
-  const logout = async () => {
-    await clearSession(); // call backend to clear cookie
-    removeAccessToken();  // just to be sure
-    setUser(null);        // instantly update state
-    window.location.href = "/login"; // force redirect
-  };
+  useEffect(() => {
+    const onUnauthorized = () => logout();
+    window.addEventListener('auth:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
+  }, [logout]);
 
+  const value = useMemo(() => ({ user, login, logout, refreshMe, loading }), [
+    user, login, logout, refreshMe, loading,
+  ]);
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-export const useAuth = () => useContext(AuthContext);

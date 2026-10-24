@@ -5,6 +5,25 @@ import { JobApplicationRepository, recruitmentIndexes } from '../../src/reposito
 const config = { url: 'http://couch.test:5984', database: 'isolated_test_db', authHeader: 'Basic test-only' };
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status });
 
+test('Repository refuses implicit CouchDB database configuration', () => {
+  assert.throws(() => new JobApplicationRepository(), error => error.code === 'AUTH_DATABASE_CONFIGURATION_ERROR');
+});
+
+test('Repository blocks new writes with unavailable classification but allows explicit legacy updates', async () => {
+  const requests = [];
+  const repo = new JobApplicationRepository(config, async (url, init) => {
+    requests.push({ url, ...init });
+    return json({ ok: true, rev: '2-legacy' });
+  });
+  const legacy = { _id: 'job:legacy', _rev: '1-legacy', provenance: { classification: 'unavailable' } };
+
+  await assert.rejects(repo.put(legacy), error => error.code === 'VALIDATION_ERROR');
+  assert.equal(requests.length, 0);
+  await repo.put(legacy, { allowLegacyUnavailable: true });
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].method, 'PUT');
+});
+
 test('Repository sends bounded Mango query, index, descending sort, bookmark and encoded document IDs', async () => {
   const requests = [];
   const repo = new JobApplicationRepository(config, async (url, init) => {
@@ -18,6 +37,79 @@ test('Repository sends bounded Mango query, index, descending sort, bookmark and
   const page = await repo.find(selector, { limit: 1, bookmark: 'previous', index: 'candidate_applications_stage', sort });
   assert.deepEqual(JSON.parse(requests[1].body), { selector, limit: 1, bookmark: 'previous', use_index: 'candidate_applications_stage', sort });
   assert.equal(page.bookmark, 'next'); assert.equal(page.has_more, true);
+  assert.deepEqual(JSON.parse(requests[2].body), { selector, limit: 1, bookmark: 'next', use_index: 'candidate_applications_stage', sort });
+});
+
+test('Public job scan uses the built-in _all_docs job ID range in bounded read-only pages', async () => {
+  let requestedUrl;
+  const repo = new JobApplicationRepository(config, async (url, init) => {
+    requestedUrl = new URL(url);
+    assert.equal(init.method, 'GET');
+    return json({ rows: [{ id: 'job:cms:J_000001', doc: { _id: 'job:cms:J_000001', type: 'job' } }] });
+  });
+  const jobs = await repo.scanPublicJobs({ afterId: 'job:cms:J_000000', limit: 100 });
+  assert.equal(requestedUrl.pathname.endsWith('/_all_docs'), true);
+  assert.equal(requestedUrl.searchParams.get('include_docs'), 'true');
+  assert.equal(requestedUrl.searchParams.get('startkey'), JSON.stringify('job:cms:J_000000'));
+  assert.equal(requestedUrl.searchParams.get('endkey'), JSON.stringify('job:\ufff0'));
+  assert.equal(requestedUrl.searchParams.get('skip'), '1');
+  assert.equal(requestedUrl.searchParams.get('limit'), '100');
+  assert.deepEqual(jobs.map(job => job._id), ['job:cms:J_000001']);
+});
+
+test('Repository reports has_more truthfully for empty, partial, exact-final, and continuing pages', async t => {
+  async function pageFor(count, limit) {
+    const docs = Array.from({ length: count }, (_, i) => ({ _id: `job:${i + 1}` }));
+    const requests = [];
+    const repo = new JobApplicationRepository(config, async (url, init) => {
+      const body = JSON.parse(init.body);
+      requests.push(body);
+      const offset = Number(body.bookmark || 0);
+      const items = docs.slice(offset, offset + body.limit);
+      return json({ docs: items, bookmark: String(offset + items.length) });
+    });
+    const page = await repo.find({ type: 'job' }, { limit });
+    return { page, requests };
+  }
+
+  for (const scenario of [
+    { name: '0 jobs', count: 0, limit: 1, hasMore: false },
+    { name: 'fewer than limit', count: 1, limit: 2, hasMore: false },
+    { name: 'exact limit at end', count: 1, limit: 1, hasMore: false },
+    { name: 'exact limit with next page', count: 2, limit: 1, hasMore: true },
+    { name: 'limit 2 at end', count: 2, limit: 2, hasMore: false },
+    { name: 'limit 2 with more rows', count: 3, limit: 2, hasMore: true },
+  ]) {
+    await t.test(scenario.name, async () => {
+      const { page, requests } = await pageFor(scenario.count, scenario.limit);
+      assert.equal(page.items.length, Math.min(scenario.count, scenario.limit));
+      assert.equal(page.has_more, scenario.hasMore);
+      assert.equal(requests.length, page.items.length === scenario.limit ? 2 : 1);
+      if (requests.length === 2) {
+        assert.equal(requests[1].limit, 1);
+        assert.equal(requests[1].bookmark, page.bookmark);
+      }
+    });
+  }
+});
+
+test('Repository bookmarks traverse multiple pages without duplicates or skipped documents', async () => {
+  const docs = Array.from({ length: 5 }, (_, i) => ({ _id: `job:${i + 1}` }));
+  const repo = new JobApplicationRepository(config, async (_url, init) => {
+    const body = JSON.parse(init.body);
+    const offset = Number(body.bookmark || 0);
+    const items = docs.slice(offset, offset + body.limit);
+    return json({ docs: items, bookmark: String(offset + items.length) });
+  });
+  const actual = [];
+  let bookmark;
+  do {
+    const page = await repo.find({ type: 'job' }, { limit: 2, ...(bookmark ? { bookmark } : {}) });
+    actual.push(...page.items.map(item => item._id));
+    bookmark = page.has_more ? page.bookmark : undefined;
+  } while (bookmark);
+  assert.deepEqual(actual, docs.map(doc => doc._id));
+  assert.equal(new Set(actual).size, docs.length);
 });
 
 test('Setup creates named index design docs and reduces scoped stats without loading candidate documents', async () => {

@@ -176,29 +176,32 @@ Chưa chạy setup trên recruitment_db do môi trường chưa sẵn sàng. Ch�
 
 **Scoring:** factory hỗ trợ `analyzeApplication(applicationId)` để nhóm ghép service thật. Hiện chưa truyền hook trong production. Hook thành công trả REQUESTED; lỗi trả PENDING_RETRY và vẫn 201/giữ Application. Chưa có queue/retry worker hoặc readback trạng thái phân tích; các trạng thái REQUESTED/PENDING_RETRY là kết quả tức thời của hook, không persist vào Application. UI ghi rõ chưa tích hợp; không tính điểm từ CV hoặc thay engine hiện có.
 
-## 6. Cấu hình và chạy trên PowerShell
+## 6. Runtime configuration and startup
 
-Từ root, tạo `.env` dựa trên `.env.example` **chỉ khi chưa có**, giữ credentials cá nhân. Cần COUCHDB_URL, COUCHDB_DATABASE, COUCHDB_USER, COUCHDB_PASSWORD; JWT_ALGORITHM=HS256, JWT_SECRET ngẫu nhiên ít nhất 32 ký tự; JWT_ISSUER/JWT_AUDIENCE phải khớp Identity nếu thiết lập. FRONTEND_URL mặc định http://localhost:5173. Không dùng giá trị placeholder làm cấu hình thật.
+The Auth and Job/Application APIs share one explicitly configured CouchDB database. Set `AUTH_COUCHDB_DATABASE` to an already prepared isolated integration database; the API refuses an unset value and refuses `recruitment_db`. It does not create databases. Configure `COUCHDB_URL`, `COUCHDB_USER`, and `COUCHDB_PASSWORD` for the CouchDB endpoint. Do not place secrets in source control.
+
+TV1 Auth is the sole identity contract. Set `JWT_ACCESS_SECRET` to the same strong secret used by Auth. Tokens use HS256 with the issuer, audience, subject, and 15-minute expiry defined by `TV1_AUTH_MODULE_CONTRACT.md`. Do not configure a second `JWT_SECRET` or `JWT_ALGORITHM` policy. Set `FRONTEND_URL` to the exact browser origin; wildcard CORS is not supported.
+
+From the repository root in PowerShell:
 
 ```powershell
 Set-Location backend
 npm ci
-# Chỉ chạy khi CouchDB/database hiện có đã sẵn sàng; không import lại snapshot:
-npm run db:job-application
 npm run dev
 ```
 
-Terminal khác từ root:
+In a second terminal:
 
 ```powershell
 Set-Location frontend
 npm ci
-# frontend/.env.local nếu cần: VITE_API_BASE_URL=http://localhost:5000/api/v1
+# Optional: VITE_API_BASE_URL=http://127.0.0.1:5002/api
 npm run dev
 ```
 
-Setup chỉ ghi indexes/design document, không tạo database hoặc sửa business documents. Không chạy ETL/import để sửa lỗi API.
+All frontend modules share one Axios instance with a `/api` base URL; the TV1 and TV2 service paths add `/v1`. Development Public Jobs use explicitly labeled fixtures by default. Set `VITE_PUBLIC_JOBS_MODE=api` to exercise TV2's public endpoint in development; production always uses the API and never falls back to fixtures. Apply is disabled for fixture jobs.
 
+`npm run db:job-application` creates Mango indexes and a design document. It is not part of application startup or tests. Run it only against an explicitly approved, prepared isolated database after separate approval for index/view creation; never run it against `recruitment_db`.
 ## 7. Kiểm thử và kết quả thực tế
 
 | Lệnh | Kết quả sau sửa ngày 23/10/2026 |

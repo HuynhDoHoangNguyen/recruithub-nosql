@@ -1,13 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { z } from 'zod';
 import { applicationDocumentSchema } from '../../src/schemas/application.schema.js';
+import { provenanceSchema } from '../../src/schemas/common.schema.js';
+import { validateWrite } from '../../src/services/job.service.js';
 import { applicationIdFromPair } from '../../src/utils/id.utils.js';
 import { advance, apply, interviewFor, jobInput, mutation, startFixture, submission } from './fixtures.js';
+
+test('new writes reject unavailable classification while the stored-document schema accepts it', () => {
+  const schema = z.object({ provenance: provenanceSchema });
+  const legacy = { _rev: '1-legacy', provenance: { classification: 'unavailable', field_origins: { old: 'legacy' } } };
+  assert.throws(() => validateWrite(schema, legacy), error => error.code === 'VALIDATION_ERROR');
+  assert.deepEqual(validateWrite(schema, legacy, { allowLegacyUnavailable: true }), { provenance: legacy.provenance });
+  assert.throws(() => validateWrite(schema, { provenance: { classification: 'mixed', field_origins: { profile: 42 } } }), error => error.code === 'VALIDATION_ERROR');
+});
 
 test('Job create/edit/publish/close validates schema and real recruiter scope', async t => {
   const f = await startFixture(t);
   assert.equal((await f.request('POST', '/jobs', { ...jobInput, recruiter_id: 'recruiter:two' }, 'recruiter')).status, 400);
+  assert.equal((await f.request('POST', '/jobs', { ...jobInput, company_id: f.otherCompany._id }, 'recruiter')).status, 400);
+  assert.equal((await f.request('POST', '/jobs', { ...jobInput, department_id: f.otherDepartment._id }, 'recruiter')).status, 400);
   assert.equal((await f.request('POST', '/jobs', jobInput, 'candidate')).status, 403);
+  assert.equal((await f.request('POST', '/jobs', jobInput, 'admin')).status, 403);
   const created = await f.request('POST', '/jobs', { ...jobInput, status: 'DRAFT' }, 'recruiter');
   assert.equal(created.status, 201);
   let job = created.body.data;
@@ -25,6 +39,75 @@ test('Job create/edit/publish/close validates schema and real recruiter scope', 
   assert.deepEqual(list.body.data.items.map(item => item._id), [job._id]);
 });
 
+test('Recruiter organization scope is enforced for cross-company Job and Application access', async t => {
+  const f = await startFixture(t);
+  const originalJob = structuredClone(await f.repo.get(f.job._id));
+  const deniedCreate = await f.request('POST', '/jobs', jobInput, 'otherRecruiter');
+  assert.equal(deniedCreate.status, 201);
+  assert.equal(deniedCreate.body.data.company_id, f.otherCompany._id);
+  assert.equal(deniedCreate.body.data.department_id, f.otherDepartment._id);
+
+  const application = (await apply(f)).body.data;
+  const jobRev = (await f.repo.get(f.job._id))._rev;
+  const appRev = (await f.repo.get(application._id))._rev;
+  const denied = [
+    await f.request('PATCH', `/jobs/${f.job._id}`, { title: 'Không được sửa', expected_rev: jobRev }, 'otherRecruiter'),
+    await f.request('PATCH', `/jobs/${f.job._id}/status`, { status: 'CLOSED', expected_rev: jobRev }, 'otherRecruiter'),
+    await f.request('GET', `/jobs/${f.job._id}/applicants`, undefined, 'otherRecruiter'),
+    await f.request('GET', `/applications/${application._id}`, undefined, 'otherRecruiter'),
+    await f.request('PATCH', `/applications/${application._id}/stage`, mutation(application, { to_stage: 'SCREENING' }), 'otherRecruiter'),
+  ];
+  assert.deepEqual(denied.map(response => response.status), [403, 403, 403, 403, 403]);
+  assert.deepEqual(await f.repo.get(f.job._id), { ...originalJob, _rev: jobRev });
+  assert.equal((await f.repo.get(application._id))._rev, appRev);
+});
+
+test('Public Job search is literal, OPEN-only, filterable, and uses stable cursor pagination', async t => {
+  const f = await startFixture(t);
+  const second = await f.repo.get(f.otherJob._id);
+  second.title = 'Data Analyst'; second.industry = 'FinTech'; second.seniority = 'JUNIOR';
+  second.required_skills = ['sql', 'python']; second.optional_skills = [];
+  await f.repo.put(second);
+  const draft = { ...structuredClone(f.job), _id: 'job:draft', status: 'DRAFT', published_at: undefined };
+  f.repo.docs.set(draft._id, { ...draft, _rev: '1-fixture' });
+
+  const oneTerm = await f.request('GET', '/jobs?q=Backend');
+  assert.equal(oneTerm.status, 200); assert.deepEqual(oneTerm.body.data.items.map(job => job._id), ['job:one']);
+  const literalSpecial = await f.request('GET', '/jobs?q=%2E%2A');
+  assert.equal(literalSpecial.status, 200); assert.deepEqual(literalSpecial.body.data.items, []);
+  const empty = await f.request('GET', '/jobs');
+  assert.equal(empty.status, 200); assert.deepEqual(empty.body.data.items.map(job => job._id), ['job:one', 'job:two']);
+  const bySkill = await f.request('GET', '/jobs?skills=JavaScript');
+  assert.deepEqual(bySkill.body.data.items.map(job => job._id), ['job:one']);
+  const combined = await f.request('GET', '/jobs?industry=FinTech&seniority=JUNIOR&skills=SQL');
+  assert.deepEqual(combined.body.data.items.map(job => job._id), ['job:two']);
+
+  const first = await f.request('GET', '/jobs?limit=1');
+  assert.equal(first.body.data.items[0]._id, 'job:one'); assert.equal(first.body.data.has_more, true);
+  const next = await f.request('GET', `/jobs?limit=1&bookmark=${encodeURIComponent(first.body.data.bookmark)}`);
+  assert.equal(next.body.data.items[0]._id, 'job:two'); assert.equal(next.body.data.has_more, false);
+  const mismatchedCursor = await f.request('GET', `/jobs?industry=FinTech&limit=1&bookmark=${encodeURIComponent(first.body.data.bookmark)}`);
+  assert.equal(mismatchedCursor.status, 400); assert.equal(mismatchedCursor.body.error.code, 'INVALID_BOOKMARK');
+  for (const path of ['/jobs?salary_min=1', '/jobs?location=Hanoi', '/jobs?seniority=LEAD', '/jobs?limit=500']) {
+    const invalid = await f.request('GET', path);
+    assert.equal(invalid.status, 400);
+  }
+  assert.equal(f.repo.writes.length, 1);
+});
+
+test('Locked Recruiter and Recruiter with incomplete organization references cannot use Job management', async t => {
+  const f = await startFixture(t);
+  f.repo.docs.get(f.users.recruiter._id).account_status = 'LOCKED';
+  assert.equal((await f.request('GET', '/recruiter/jobs', undefined, 'recruiter')).status, 401);
+
+  f.repo.docs.get(f.users.recruiter._id).account_status = 'ACTIVE';
+  f.repo.docs.delete(f.recruiter.department_id);
+  const writesBefore = f.repo.writes.length;
+  const denied = await f.request('POST', '/jobs', jobInput, 'recruiter');
+  assert.notEqual(denied.status, 201);
+  assert.equal(f.repo.writes.length, writesBefore);
+});
+
 test('Job normalization rejects alias collisions, overlaps, conditional requirements and bad deadlines', async t => {
   const f = await startFixture(t);
   for (const changes of [
@@ -35,6 +118,17 @@ test('Job normalization rejects alias collisions, overlaps, conditional requirem
   ]) assert.equal((await f.request('POST', '/jobs', { ...jobInput, ...changes }, 'recruiter')).status, 400);
   const created = await f.request('POST', '/jobs', { ...jobInput, required_skills: [' JS ', 'NodeJS'] }, 'recruiter');
   assert.equal(created.status, 201); assert.deepEqual(created.body.data.required_skills, ['javascript', 'node.js']);
+});
+
+test('Job updates preserve historical unavailable provenance while new writes reject it', async t => {
+  const f = await startFixture(t);
+  const job = f.repo.docs.get(f.job._id);
+  job.provenance = { classification: 'unavailable', field_origins: { legacy: 'historical' } };
+  const response = await f.request('PATCH', `/jobs/${job._id}`, { title: 'Updated title', expected_rev: job._rev }, 'recruiter');
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.provenance.classification, 'unavailable');
+  assert.equal(response.body.data.provenance.field_origins.legacy, 'historical');
+  assert.equal(response.body.data.provenance.field_origins.title, 'user_input');
 });
 
 test('Apply saves submitted text, deterministic identity and an atomic initial event; legacy remains compatible', async t => {
@@ -50,6 +144,18 @@ test('Apply saves submitted text, deterministic identity and an atomic initial e
   assert.ok(ignored); assert.equal(applicationDocumentSchema.safeParse(legacy).success, true);
   const read = await f.request('GET', `/applications/${app._id}`, undefined, 'recruiter');
   assert.deepEqual(read.body.data.submission, submission); assert.equal(read.body.data.email, f.users.candidate.email);
+});
+
+test('Application stage PATCH preserves legacy unavailable provenance', async t => {
+  const f = await startFixture(t);
+  const applied = await apply(f);
+  const app = f.repo.docs.get(applied.body.data._id);
+  app.provenance = { classification: 'unavailable', field_origins: { legacy: 'historical' } };
+
+  const transitioned = await advance(f, applied.body.data, 'SCREENING');
+  assert.equal(transitioned.status, 200);
+  assert.equal(app.provenance.classification, 'unavailable');
+  assert.equal(app.provenance.field_origins.legacy, 'historical');
 });
 
 test('Apply accepts inclusive UTC deadline and rejects a millisecond after it, DRAFT and CLOSED without writes', async t => {

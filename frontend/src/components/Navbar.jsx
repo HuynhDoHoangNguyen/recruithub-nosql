@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink as Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { normalizeRole } from '../features/applications/applicationPresentation';
 
 const Navbar = () => {
@@ -33,6 +33,8 @@ const Navbar = () => {
 	};
 
 	const isActive = (path) => location.pathname === path;
+	const profileRoute = user?.role === 'recruiter' ? '/recruiter/dashboard#organization' : '/profile';
+	const profileActive = user?.role === 'recruiter' ? isActive('/recruiter/dashboard') && location.hash === '#organization' : isActive('/profile');
 
 	const roleLabel = {
 		'admin': { text: 'Admin', color: 'bg-amber-100 text-amber-800 border-amber-300' },
@@ -98,9 +100,9 @@ const Navbar = () => {
 
 							{user && user.role !== 'admin' && (
 								<Link
-									to="/profile"
+									to={profileRoute} aria-current={profileActive ? 'page' : false}
 									className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition ${
-										isActive('/profile')
+										profileActive
 											? 'bg-blue-50 text-blue-700'
 											: 'text-slate-700 hover:text-blue-600 hover:bg-slate-50'
 									}`}
@@ -173,7 +175,7 @@ const Navbar = () => {
 
 										{user.role !== 'admin' && (
 											<Link
-												to="/profile"
+												to={profileRoute} aria-current={profileActive ? 'page' : false}
 												onClick={() => setUserDropdown(false)}
 												className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition"
 											>
@@ -267,7 +269,7 @@ const Navbar = () => {
 
 								{user.role !== 'admin' && (
 									<Link
-										to="/profile"
+										to={profileRoute} aria-current={profileActive ? 'page' : false}
 										onClick={() => setMenuOpen(false)}
 										className="block px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
 									>

@@ -43,6 +43,8 @@ Response helpers trong backend/src/utils/api-response.js là provisional. Chúng
 
 The backend entrypoint reads existing `backend/.env` first and then the repository-root `.env`. Values already present in the parent process are never replaced; if a key exists in both files, `backend/.env` wins. Files are read only and are not created or copied. The loader resolves paths from its own source location, so behavior does not depend on whether the process starts from the repository root or `backend/`.
 
+Auth and Job/Application runtime persistence share `AUTH_COUCHDB_DATABASE`, which must name an explicitly prepared isolated database. Those write-capable APIs reject an unset database and reject `recruitment_db`; they do not fall back to the generic `COUCHDB_DATABASE` default. The read-only database health diagnostic may still report the generic configured database.
+
 No credentials belong in source, this guide, terminal output or reports. Do not print environment objects or CouchDB client configuration.
 
 ## 5. Start CouchDB and Backend
@@ -191,7 +193,7 @@ TV3 owns interview lifecycle, round semantics, audit and scoring. The example do
 
 Run all backend tests from backend/: npm.cmd test.
 
-Foundation tests use fake Fetch responses for writes and do not modify CouchDB. Any live integration verification must be read-only against recruitment_db. Create/update/delete tests require a separately approved test database; do not create or drop one without approval.
+Foundation tests use fake Fetch responses for writes and do not modify CouchDB. Verification against `recruitment_db` must remain read-only. Live write integration checks may use only a separately approved, isolated test database; do not create or drop databases without approval.
 
 ## 16. Limits and open dependencies
 
@@ -221,3 +223,8 @@ TV2/TV3 integration checklist:
 - [ ] Keep authorization/ownership checks in the business service; the base repository does not enforce them.
 
 Known test limitation: `npm.cmd test` runs only `tests/data/*.test.js` and includes legacy data pipeline, release publication and CouchDB acceptance cases. That suite has previously failed on missing release inputs/checksum mismatches and failure-injection assertions. It also creates and removes shared scratch paths under `data/`, so rerun only after verifying those paths and any pointer/release side effects are safe. Foundation and runtime route tests are run explicitly with `node --test tests/foundation/*.test.js`.
+
+
+## Read-only ID-prefix scans (TV1 Stage 05?10)
+
+`CouchDbClient.listDocumentsByIdPrefix(prefix, { afterId, limit })` is a read-only GET wrapper for CouchDB built-in `_all_docs`. It requires a colon-terminated safe prefix, validates `afterId` belongs to that prefix, and caps pages at 1,000 rows (default 250). It returns `{docs,lastId,hasMore}`; reads include full documents and should be limited to trusted backend service use. `BaseRepository.listByIdPrefix` delegates to it; UserRepository and CandidateRepository pin the prefix to their own document types. This does not create Mango indexes or views. Full-range scans cost more than indexed queries and should be replaced only after a separately reviewed index/query proposal.

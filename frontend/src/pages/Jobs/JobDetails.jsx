@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { BriefcaseBusiness, Clock, GraduationCap } from 'lucide-react';
 import { applicationApi, jobApi } from '../../api/jobApplicationApi';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { deadlineIsOpen, degreeLabels, formatDate, jobStatusLabels, normalizeRole, seniorityLabels } from '../../features/applications/applicationPresentation';
 import { Button, Resource, StageBadge } from '../../features/applications/components/ApplicationUI';
 import ApplyModal from '../../features/applications/components/ApplyModal';

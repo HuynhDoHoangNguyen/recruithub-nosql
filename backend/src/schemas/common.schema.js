@@ -49,6 +49,12 @@ export const provenanceSchema = z
   })
   .strict();
 
+/** Provenance contract for newly created documents; unavailable is legacy-only. */
+export const newDocumentProvenanceSchema = provenanceSchema.refine(
+  (provenance) => provenance.classification !== PROVENANCE_CLASSIFICATIONS.UNAVAILABLE,
+  { message: 'New documents cannot use unavailable provenance classification.', path: ['classification'] },
+);
+
 /**
  * Availability state enumeration schema (DATA-02A Section 3.3).
  */

@@ -1,4 +1,3 @@
-import React from "react";
 import { Routes, Route } from "react-router-dom";
 import Landing from "../pages/Landing";
 import Login from "../pages/Login";
@@ -24,22 +23,22 @@ const AppRoutes = () => {
 			<Route path="/jobs/:id" element={<JobDetails />} />
 
 			{/* Protected Routes */}
-			<Route element={<ProtectedRoute allowedRoles={['job-seeker', 'recruiter']} />}>
+			<Route element={<ProtectedRoute allowedRoles={['CANDIDATE']} />}>
 				<Route path="/profile" element={<Profile />} />
 			</Route>
 
-			<Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+			<Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
 				<Route path="/admin/dashboard" element={<AdminDashboard />} />
 			</Route>
 
-			<Route element={<ProtectedRoute allowedRoles={['recruiter']} />}>
+			<Route element={<ProtectedRoute allowedRoles={['RECRUITER']} />}>
 				<Route path="/recruiter/dashboard" element={<RecruiterDashboard />} />
 				<Route path="/recruiter/jobs/create" element={<CreateJob />} />
 				<Route path="/recruiter/jobs/:id/edit" element={<CreateJob />} />
 				<Route path="/recruiter/jobs/:id/applicants" element={<JobApplicantsPage />} />
 			</Route>
 
-			<Route element={<ProtectedRoute allowedRoles={['job-seeker']} />}>
+			<Route element={<ProtectedRoute allowedRoles={['CANDIDATE']} />}>
 				<Route path="/user/dashboard" element={<JobSeekerDashboard />} />
 			</Route>
 		</Routes>

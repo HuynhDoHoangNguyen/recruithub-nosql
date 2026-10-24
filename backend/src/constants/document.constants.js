@@ -43,6 +43,7 @@ export const PROVENANCE_CLASSIFICATIONS = Object.freeze({
   DERIVED: 'derived',
   SYNTHETIC: 'synthetic',
   MIXED: 'mixed',
+  // Legacy-only document classification; new writes must use a standard class.
   UNAVAILABLE: 'unavailable',
 });
 
