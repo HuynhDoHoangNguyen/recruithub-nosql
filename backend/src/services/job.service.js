@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { jobDocumentSchema } from '../schemas/job.schema.js';
+import { companyDocumentSchema } from '../schemas/company.schema.js';
 import { ApiError } from '../middleware/job-application.middleware.js';
 import { descendingSort, ownedJob, parseStored, publicJobDto, recruiterScope, requireDocument, runtimeProvenance } from './job-application-scope.service.js';
 import { normalizeSkill } from '../utils/normalization.utils.js';
@@ -123,8 +124,36 @@ export class JobService {
   }
   async publicDetail(id) {
     const job = parseStored(jobDocumentSchema, await requireDocument(this.repo, id, 'job'));
-    if (job.status === 'DRAFT') throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy tin tuyển dụng công khai.');
-    const company = await requireDocument(this.repo, job.company_id, 'company');
-    return { ...publicJobDto(job), company_name: company.name };
+    if (job.status !== 'OPEN') throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy tin tuyển dụng công khai.');
+
+    let companyDocument = null;
+    try {
+      companyDocument = await this.repo.get(job.company_id);
+    } catch (error) {
+      if (error.code !== 'NOT_FOUND' && error.status !== 404) throw error;
+    }
+    const parsedCompany = companyDocument?._id === job.company_id && companyDocument?.type === 'company'
+      ? companyDocumentSchema.safeParse(companyDocument)
+      : null;
+    let website;
+    if (parsedCompany?.success && parsedCompany.data.website) {
+      try {
+        const parsedUrl = new URL(parsedCompany.data.website);
+        if (['http:', 'https:'].includes(parsedUrl.protocol)) website = parsedUrl.toString();
+      } catch { /* Omit malformed external links from the public DTO. */ }
+    }
+    const company = parsedCompany?.success
+      ? {
+        name: parsedCompany.data.name,
+        industry: parsedCompany.data.industry,
+        ...(website ? { website } : {}),
+      }
+      : null;
+
+    return {
+      ...publicJobDto(job),
+      company,
+      ...(company ? { company_name: company.name } : {}),
+    };
   }
 }
