@@ -9,9 +9,10 @@ import ApplicationAttempts from './ApplicationAttempts';
 import ApplicationTimeline from './ApplicationTimeline';
 import ViewAssetButton from '../../../components/uploads/ViewAssetButton';
 import PrivateAssetImage from '../../../components/uploads/PrivateAssetImage';
+import MatchScoreBadge from '../../scoring/components/MatchScoreBadge';
 const actionIcons = { SCREENING: Check, INTERVIEW: MessageSquare, OFFER: Send, HIRED: UserCheck, REJECTED: X };
 
-export default function ApplicantDetailModal({ id, initialTarget = '', onClose, onChanged }) {
+export default function ApplicantDetailModal({ id, initialTarget = '', onClose, onChanged, onOpenScore }) {
   const resource = useApiResource(useCallback(() => applicationApi.detail(id), [id]));
   const [target, setTarget] = useState(initialTarget);
   const [reason, setReason] = useState('');
@@ -53,7 +54,7 @@ export default function ApplicantDetailModal({ id, initialTarget = '', onClose, 
       <section className="space-y-3"><h3 className="mb-2 font-semibold">CV đã nộp</h3><ViewAssetButton asset={application.submission?.resume_file} />{application.submission?.resume_text && <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-gray-50 p-4 font-sans text-sm">{application.submission.resume_text}</pre>}{!application.submission?.resume_text && !application.submission?.resume_file && <p className="text-sm text-slate-400">Hồ sơ lịch sử chưa có CV đính kèm.</p>}</section>
       {application.submission?.cover_letter && <section><h3 className="mb-2 font-semibold">Thư giới thiệu</h3><p className="whitespace-pre-wrap text-sm text-gray-700">{application.submission.cover_letter}</p></section>}
       <ApplicationTimeline application={application} /><ApplicationAttempts application={application} />
-      <p className="text-sm text-gray-500">Điểm phù hợp: Chưa tích hợp dịch vụ phân tích.</p>
+      <div className="flex items-center gap-2"><span className="text-sm font-medium text-gray-700">Điểm phù hợp:</span><MatchScoreBadge status={application.analysis_status} fresh={application.analysis_fresh} totalScore={application.analysis_total_score} recommendation={application.analysis_recommendation} onOpen={onOpenScore ? () => onOpenScore(application._id) : undefined} /></div>
       {application.current_stage === 'INTERVIEW' && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{application.interview_status === 'SCHEDULING_REQUIRED' ? 'Cần lên lịch phỏng vấn. Liên hệ bộ phận phỏng vấn để tạo vòng đánh giá.' : 'Đã có biên bản phỏng vấn. Chỉ có thể gửi offer khi tất cả các vòng hoàn tất.'}</p>}
       {application.offer_blocker && <p className="text-sm text-amber-800">{application.offer_blocker}</p>}
       {!!application.allowed_transitions.length && <form onSubmit={submit} className="space-y-4 border-t border-gray-200 pt-5"><fieldset disabled={busy} className="space-y-4">

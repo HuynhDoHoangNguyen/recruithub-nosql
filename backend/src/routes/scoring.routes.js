@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { scoringController } from '../controllers/scoring.controller.js';
 import { requireRoles, validate } from '../middleware/job-application.middleware.js';
-import { computeScoringRequestSchema } from '../schemas/scoring-request.schema.js';
+import {
+  computeScoringRequestSchema,
+  getScoringAnalysisParamsSchema,
+  getScoringAnalysisQuerySchema,
+} from '../schemas/scoring-request.schema.js';
 
 export function createScoringRoutes({ authenticate, scoring }) {
   const router = Router();
@@ -13,6 +17,13 @@ export function createScoringRoutes({ authenticate, scoring }) {
     requireRoles('RECRUITER'),
     validate(computeScoringRequestSchema),
     controller.compute
+  );
+  router.get(
+    '/:applicationId',
+    requireRoles('RECRUITER'),
+    validate(getScoringAnalysisParamsSchema, 'params'),
+    validate(getScoringAnalysisQuerySchema, 'query'),
+    controller.getAnalysis
   );
 
   return router;

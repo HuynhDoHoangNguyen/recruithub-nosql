@@ -46,6 +46,7 @@ export class ResumeScoringService {
     this.analyzeApplication = this.analyzeApplication.bind(this);
     this.getAnalysisSummary = this.getAnalysisSummary.bind(this);
     this.analyzeApplicationForRecruiter = this.analyzeApplicationForRecruiter.bind(this);
+    this.getResumeAnalysisForRecruiter = this.getResumeAnalysisForRecruiter.bind(this);
   }
 
   /**
@@ -279,10 +280,17 @@ export class ResumeScoringService {
     }
 
     const fresh = isAnalysisFresh(existingAnalysis, inputs.candidate, inputs.job);
-    return {
+    const summary = {
       analysis_status: existingAnalysis.analysis_status,
       analysis_fresh: fresh,
     };
+
+    if (existingAnalysis.analysis_status === 'COMPLETE' && fresh) {
+      summary.analysis_total_score = existingAnalysis.total_score;
+      summary.analysis_recommendation = existingAnalysis.recommendation;
+    }
+
+    return summary;
   }
 
   /**
@@ -311,6 +319,112 @@ export class ResumeScoringService {
     await ownedJob(this.repo, user, application.job_id);
 
     return this.analyzeApplication(application._id);
+  }
+
+  /**
+   * Retrieves Resume Analysis DTO for an Application on behalf of an owner Recruiter.
+   *
+   * @param {Object} user - Authenticated user document
+   * @param {string} applicationId - Application ID
+   * @returns {Promise<Object>} Safe DTO for UC14
+   */
+  async getResumeAnalysisForRecruiter(user, applicationId) {
+    if (!applicationId || typeof applicationId !== 'string') {
+      throw new ApiError(400, 'INVALID_APPLICATION_ID', 'Mã hồ sơ ứng tuyển không hợp lệ.');
+    }
+
+    assertActiveRole(user, 'RECRUITER');
+
+    const applicationDoc = await requireDocument(this.repo, applicationId, 'application');
+    const application = parseStored(applicationDocumentSchema, applicationDoc);
+
+    const { job } = await ownedJob(this.repo, user, application.job_id);
+
+    const candidateDoc = await requireDocument(this.repo, application.candidate_id, 'candidate');
+    const candidate = parseStored(candidateDocumentSchema, candidateDoc);
+
+    if (application.candidate_id !== candidate._id || application.job_id !== job._id) {
+      throw new ApiError(409, 'REFERENCE_MISMATCH', 'Tham chiếu không khớp với hồ sơ ứng tuyển.');
+    }
+
+    const analysisId = `analysis:${application._id}`;
+    const existingAnalysis = await this.#loadAndValidateExistingAnalysis(analysisId, { application, candidate, job });
+
+    if (!existingAnalysis) {
+      return {
+        application_id: application._id,
+        analysis_status: 'NOT_ANALYZED',
+        analysis_fresh: false,
+        candidate: {
+          id: candidate._id,
+          full_name: candidate.profile?.full_name ?? '',
+        },
+        job: {
+          id: job._id,
+          title: job.title,
+        },
+        analysis: null,
+      };
+    }
+
+    const fresh = isAnalysisFresh(existingAnalysis, candidate, job);
+    const hasMetadata = Boolean(
+      existingAnalysis.component_details?.skill?.input_context !== undefined &&
+      existingAnalysis.component_details?.experience?.input_context !== undefined &&
+      existingAnalysis.component_details?.education?.input_context !== undefined &&
+      existingAnalysis.component_details?.project?.input_context !== undefined
+    );
+
+    let hasSyntheticEvidence = null;
+    if (hasMetadata) {
+      const projectEvidence = existingAnalysis.component_details?.project?.input_context?.candidate_project_evidence;
+      hasSyntheticEvidence = Array.isArray(projectEvidence)
+        ? projectEvidence.some(item => item?.is_synthetic === true)
+        : false;
+    }
+
+    const analysisDto = {
+      scores: {
+        skill: existingAnalysis.scores.skill,
+        experience: existingAnalysis.scores.experience,
+        education: existingAnalysis.scores.education,
+        project: existingAnalysis.scores.project,
+      },
+    };
+
+    if (existingAnalysis.analysis_status === 'COMPLETE') {
+      analysisDto.total_score = existingAnalysis.total_score;
+      analysisDto.recommendation = existingAnalysis.recommendation;
+    }
+
+    analysisDto.matched_skills = existingAnalysis.matched_skills || [];
+    analysisDto.missing_skills = existingAnalysis.missing_skills || [];
+    analysisDto.project = {
+      matched_technologies: existingAnalysis.component_details?.project?.matched_technologies || [],
+      missing_technologies: existingAnalysis.component_details?.project?.missing_technologies || [],
+    };
+    analysisDto.missing_inputs = existingAnalysis.missing_inputs || [];
+    analysisDto.algorithm_version = existingAnalysis.algorithm_version;
+    analysisDto.analyzed_at = existingAnalysis.analyzed_at;
+    analysisDto.evidence_metadata = {
+      available: hasMetadata,
+      has_synthetic_evidence: hasSyntheticEvidence,
+    };
+
+    return {
+      application_id: application._id,
+      analysis_status: existingAnalysis.analysis_status,
+      analysis_fresh: fresh,
+      candidate: {
+        id: candidate._id,
+        full_name: candidate.profile?.full_name ?? '',
+      },
+      job: {
+        id: job._id,
+        title: job.title,
+      },
+      analysis: analysisDto,
+    };
   }
 }
 

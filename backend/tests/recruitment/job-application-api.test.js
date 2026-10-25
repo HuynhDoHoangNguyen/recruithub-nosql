@@ -690,3 +690,156 @@ test('TV3-UC22-002 Vector 14: Không có match_score hoặc analysis_status tron
   assert.equal(storedApp.analysis_status, undefined);
   assert.equal(storedApp.analysis_fresh, undefined);
 });
+
+test('TV3-UC14 Vector 11: Applicant Recruiter DTO chỉ có score khi COMPLETE + fresh', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+
+  // Recruiter read detail
+  const resDetail = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'recruiter');
+  assert.equal(resDetail.status, 200);
+  assert.equal(resDetail.body.data.analysis_status, 'COMPLETE');
+  assert.equal(resDetail.body.data.analysis_fresh, true);
+  assert.equal(typeof resDetail.body.data.analysis_total_score, 'number');
+  assert.ok(resDetail.body.data.analysis_total_score > 0);
+  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(resDetail.body.data.analysis_recommendation));
+
+  // Recruiter read applicants list
+  const resList = await f.request('GET', `/jobs/${f.job._id}/applicants`, undefined, 'recruiter');
+  assert.equal(resList.status, 200);
+  const appInList = resList.body.data.items.find(item => item._id === applied.body.data._id);
+  assert.ok(appInList);
+  assert.equal(appInList.analysis_status, 'COMPLETE');
+  assert.equal(appInList.analysis_fresh, true);
+  assert.equal(typeof appInList.analysis_total_score, 'number');
+  assert.ok(appInList.analysis_total_score > 0);
+  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(appInList.analysis_recommendation));
+});
+
+test('TV3-UC14 Vector 12: Stale/INCOMPLETE/NOT_ANALYZED không có score summary', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+
+  // Case 1: NOT_ANALYZED
+  const fNotAnalyzed = await startFixture(t, { analyzeApplication: async () => null });
+  const appNotAnalyzed = (await apply(fNotAnalyzed)).body.data;
+  const resNotAnalyzed = await fNotAnalyzed.request('GET', `/applications/${appNotAnalyzed._id}`, undefined, 'recruiter');
+  assert.equal(resNotAnalyzed.status, 200);
+  assert.equal(resNotAnalyzed.body.data.analysis_status, 'NOT_ANALYZED');
+  assert.equal(resNotAnalyzed.body.data.analysis_fresh, false);
+  assert.equal(resNotAnalyzed.body.data.analysis_total_score, undefined);
+  assert.equal(resNotAnalyzed.body.data.analysis_recommendation, undefined);
+
+  // Case 2: INCOMPLETE
+  const fIncomplete = await startFixture(t);
+  fIncomplete.repo.docs.get(fIncomplete.job._id).requirements.education = { status: 'REQUIRED', minimum_degree: 'BACHELOR' };
+  const appIncomplete = (await apply(fIncomplete)).body.data;
+  const resIncomplete = await fIncomplete.request('GET', `/applications/${appIncomplete._id}`, undefined, 'recruiter');
+  assert.equal(resIncomplete.status, 200);
+  assert.equal(resIncomplete.body.data.analysis_status, 'INCOMPLETE');
+  assert.equal(resIncomplete.body.data.analysis_fresh, true);
+  assert.equal(resIncomplete.body.data.analysis_total_score, undefined);
+  assert.equal(resIncomplete.body.data.analysis_recommendation, undefined);
+
+  // Case 3: Stale
+  f.repo.docs.get(f.job._id).requirements.education = { status: 'NO_MINIMUM' };
+  f.repo.docs.set(completeCand._id, completeCand);
+  const appStale = (await apply(f)).body.data;
+  const updatedCandidate = structuredClone(completeCand);
+  updatedCandidate.skills.push({ name: 'TypeScript', normalized: 'typescript' });
+  updatedCandidate._rev = '2-fixture';
+  f.repo.docs.set(updatedCandidate._id, updatedCandidate);
+
+  const resStale = await f.request('GET', `/applications/${appStale._id}`, undefined, 'recruiter');
+  assert.equal(resStale.status, 200);
+  assert.equal(resStale.body.data.analysis_status, 'COMPLETE');
+  assert.equal(resStale.body.data.analysis_fresh, false);
+  assert.equal(resStale.body.data.analysis_total_score, undefined);
+  assert.equal(resStale.body.data.analysis_recommendation, undefined);
+});
+
+test('TV3-UC14 Vector 13: Candidate DTO tuyệt đối không lộ score hoặc recommendation', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+
+  // 1. Apply response
+  assert.equal(applied.body.data.analysis_total_score, undefined);
+  assert.equal(applied.body.data.analysis_recommendation, undefined);
+
+  // 2. Candidate read detail
+  const resDetail = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'candidate');
+  assert.equal(resDetail.status, 200);
+  assert.equal(resDetail.body.data.analysis_status, 'COMPLETE');
+  assert.equal(resDetail.body.data.analysis_fresh, true);
+  assert.equal(resDetail.body.data.analysis_total_score, undefined);
+  assert.equal(resDetail.body.data.analysis_recommendation, undefined);
+
+  // 3. Candidate read my-applications
+  const resMine = await f.request('GET', '/applications/my-applications', undefined, 'candidate');
+  assert.equal(resMine.status, 200);
+  const appInMine = resMine.body.data.items.find(item => item._id === applied.body.data._id);
+  assert.ok(appInMine);
+  assert.equal(appInMine.analysis_total_score, undefined);
+  assert.equal(appInMine.analysis_recommendation, undefined);
+});
+
+test('TV3-UC14 Vector 14: Giá trị decimal không bị làm tròn ở backend', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+
+  // Set an unrounded fractional score that matches weighted sum formula
+  const analysisId = `analysis:${applied.body.data._id}`;
+  const analysisDoc = f.repo.docs.get(analysisId);
+  analysisDoc.scores.skill = 100 / 3;
+  analysisDoc.scores.experience = 75;
+  analysisDoc.scores.education = 80;
+  analysisDoc.scores.project = 70;
+  const unroundedValue = 0.5 * (100 / 3) + 0.25 * 75 + 0.10 * 80 + 0.15 * 70;
+  analysisDoc.total_score = unroundedValue;
+  analysisDoc.recommendation = 'LOW';
+
+  // Check Recruiter DTO
+  const resDetail = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'recruiter');
+  assert.equal(resDetail.status, 200);
+  assert.equal(resDetail.body.data.analysis_total_score, unroundedValue, 'Decimal value must not be rounded');
+
+  // Check GET /resume-analysis/:id
+  const resAnalysis = await f.request('GET', `/resume-analysis/${applied.body.data._id}`, undefined, 'recruiter');
+  assert.equal(resAnalysis.status, 200);
+  assert.equal(resAnalysis.body.data.analysis.total_score, unroundedValue);
+  assert.equal(resAnalysis.body.data.analysis.scores.skill, 100 / 3);
+});
+
+test('TV3-UC14 Vector 15: Không persist mirrored score vào Application', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+
+  // Trigger Recruiter read which produces DTO with score summary
+  await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'recruiter');
+  await f.request('GET', `/jobs/${f.job._id}/applicants`, undefined, 'recruiter');
+
+  // Verify stored Application document has NO score fields
+  const storedApp = await f.repo.get(applied.body.data._id);
+  assert.equal(storedApp.match_score, undefined);
+  assert.equal(storedApp.analysis_total_score, undefined);
+  assert.equal(storedApp.analysis_recommendation, undefined);
+  assert.equal(storedApp.analysis_status, undefined);
+  assert.equal(storedApp.analysis_fresh, undefined);
+});

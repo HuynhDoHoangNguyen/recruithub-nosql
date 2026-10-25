@@ -371,3 +371,231 @@ test('Vector 21: Không có write vào CouchDB thật', async t => {
   assert.ok(f.repo.docs instanceof Map);
   assert.ok(Array.isArray(f.repo.writes));
 });
+
+test('TV3-UC14 Vector 01: Owner Recruiter đọc COMPLETE + fresh', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  completeCand.profile.full_name = 'Nguyễn Văn A';
+  f.repo.docs.set(completeCand._id, completeCand);
+
+  const app = (await apply(f)).body.data;
+  await f.request('POST', '/resume-analysis/compute', { application_id: app._id }, 'recruiter');
+
+  const res = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'recruiter');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.success, true);
+  assert.equal(res.body.data.application_id, app._id);
+  assert.equal(res.body.data.analysis_status, 'COMPLETE');
+  assert.equal(res.body.data.analysis_fresh, true);
+  assert.equal(res.body.data.candidate.id, completeCand._id);
+  assert.equal(res.body.data.candidate.full_name, 'Nguyễn Văn A');
+  assert.equal(res.body.data.job.id, f.job._id);
+  assert.equal(res.body.data.job.title, f.job.title);
+
+  const a = res.body.data.analysis;
+  assert.ok(a);
+  assert.equal(typeof a.scores.skill, 'number');
+  assert.equal(typeof a.scores.experience, 'number');
+  assert.equal(typeof a.scores.education, 'number');
+  assert.equal(typeof a.scores.project, 'number');
+  assert.equal(typeof a.total_score, 'number');
+  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(a.recommendation));
+  assert.ok(Array.isArray(a.matched_skills));
+  assert.ok(Array.isArray(a.missing_skills));
+  assert.ok(Array.isArray(a.project.matched_technologies));
+  assert.ok(Array.isArray(a.project.missing_technologies));
+  assert.deepEqual(a.missing_inputs, []);
+  assert.equal(a.algorithm_version, 'recruithub-scoring-mvp-v1');
+  assert.ok(a.analyzed_at);
+  assert.equal(a.evidence_metadata.available, true);
+  assert.equal(typeof a.evidence_metadata.has_synthetic_evidence, 'boolean');
+
+  // Verify DTO sanitization: no internal / sensitive fields
+  assert.equal(res.body.data._rev, undefined);
+  assert.equal(res.body.data.input_fingerprint, undefined);
+  assert.equal(res.body.data.component_details, undefined);
+  assert.equal(res.body.data.provenance, undefined);
+  assert.equal(res.body.data.email, undefined);
+  assert.equal(res.body.data.token, undefined);
+  assert.equal(a._rev, undefined);
+  assert.equal(a.input_fingerprint, undefined);
+  assert.equal(a.component_details, undefined);
+  assert.equal(a.provenance, undefined);
+  assert.equal(a.diagnostics, undefined);
+});
+
+test('TV3-UC14 Vector 02: Owner Recruiter đọc INCOMPLETE', async t => {
+  const f = await startFixture(t);
+  f.repo.docs.get(f.job._id).requirements.education = { status: 'REQUIRED', minimum_degree: 'BACHELOR' };
+
+  const app = (await apply(f)).body.data;
+  await f.request('POST', '/resume-analysis/compute', { application_id: app._id }, 'recruiter');
+
+  const res = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'recruiter');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.success, true);
+  assert.equal(res.body.data.analysis_status, 'INCOMPLETE');
+  assert.equal(res.body.data.analysis_fresh, true);
+
+  const a = res.body.data.analysis;
+  assert.ok(a);
+  assert.equal(a.scores.education, null);
+  assert.equal(a.total_score, undefined);
+  assert.equal(a.recommendation, undefined);
+  assert.ok(Array.isArray(a.missing_inputs));
+  assert.ok(a.missing_inputs.length > 0);
+});
+
+test('TV3-UC14 Vector 03: Chưa có analysis trả controlled NOT_ANALYZED', async t => {
+  const f = await startFixture(t);
+  const app = (await apply(f)).body.data;
+  // Ensure no analysis document exists
+  f.repo.docs.delete(`analysis:${app._id}`);
+
+  const res = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'recruiter');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.success, true);
+  assert.equal(res.body.data.application_id, app._id);
+  assert.equal(res.body.data.analysis_status, 'NOT_ANALYZED');
+  assert.equal(res.body.data.analysis_fresh, false);
+  assert.equal(res.body.data.analysis, null);
+  assert.equal(res.body.data.candidate.id, f.candidate._id);
+  assert.equal(res.body.data.job.id, f.job._id);
+});
+
+test('TV3-UC14 Vector 04: Stale analysis trả analysis_fresh: false mà không tự recompute hay ghi DB', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+
+  const app = (await apply(f)).body.data;
+  await f.request('POST', '/resume-analysis/compute', { application_id: app._id }, 'recruiter');
+
+  // Change candidate skill to make analysis stale
+  const updatedCandidate = structuredClone(completeCand);
+  updatedCandidate.skills.push({ name: 'TypeScript', normalized: 'typescript' });
+  updatedCandidate._rev = '2-fixture';
+  f.repo.docs.set(updatedCandidate._id, updatedCandidate);
+
+  const writesBefore = f.repo.writes.length;
+  const res = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'recruiter');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.analysis_status, 'COMPLETE');
+  assert.equal(res.body.data.analysis_fresh, false);
+  assert.equal(f.repo.writes.length, writesBefore, 'Không ghi vào DB hoặc tự recompute');
+});
+
+test('TV3-UC14 Vector 05: Legacy analysis thiếu toàn bộ input_context không crash và evidence_metadata xử lý đúng', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+
+  const app = (await apply(f)).body.data;
+  await f.request('POST', '/resume-analysis/compute', { application_id: app._id }, 'recruiter');
+
+  // Case A: Make it a legacy analysis by deleting input_context on all 4 components
+  const analysisDoc = f.repo.docs.get(`analysis:${app._id}`);
+  delete analysisDoc.component_details.skill.input_context;
+  delete analysisDoc.component_details.experience.input_context;
+  delete analysisDoc.component_details.education.input_context;
+  delete analysisDoc.component_details.project.input_context;
+
+  const resLegacy = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'recruiter');
+  assert.equal(resLegacy.status, 200);
+  assert.equal(resLegacy.body.data.analysis.evidence_metadata.available, false);
+  assert.equal(resLegacy.body.data.analysis.evidence_metadata.has_synthetic_evidence, null);
+
+  // Case B: Metadata đầy đủ và có synthetic project evidence
+  await f.request('POST', '/resume-analysis/compute', { application_id: app._id }, 'recruiter');
+  const freshDoc = f.repo.docs.get(`analysis:${app._id}`);
+  freshDoc.component_details.project.input_context.candidate_project_evidence = [
+    { technologies: ['javascript'], is_synthetic: true, provenance: null },
+  ];
+
+  const resSynthetic = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'recruiter');
+  assert.equal(resSynthetic.status, 200);
+  assert.equal(resSynthetic.body.data.analysis.evidence_metadata.available, true);
+  assert.equal(resSynthetic.body.data.analysis.evidence_metadata.has_synthetic_evidence, true);
+});
+
+test('TV3-UC14 Vector 06: Analysis sai type/schema/reference trả controlled 409', async t => {
+  const f = await startFixture(t);
+  const app = (await apply(f)).body.data;
+  const analysisId = `analysis:${app._id}`;
+
+  // Case A: Sai type
+  f.repo.docs.set(analysisId, { _id: analysisId, _rev: '1-fixture', type: 'application', application_id: app._id });
+  const resBadType = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'recruiter');
+  assert.equal(resBadType.status, 409);
+  assert.equal(resBadType.body.error.code, 'CONFLICT');
+
+  // Case B: Hỏng schema
+  f.repo.docs.delete(analysisId);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+  await f.request('POST', '/resume-analysis/compute', { application_id: app._id }, 'recruiter');
+  const stored = f.repo.docs.get(analysisId);
+  stored.total_score = 'corrupted-score';
+  const resBadSchema = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'recruiter');
+  assert.equal(resBadSchema.status, 409);
+  assert.equal(resBadSchema.body.error.code, 'INVALID_STORED_DOCUMENT');
+
+  // Case C: Reference mismatch
+  f.repo.docs.delete(analysisId);
+  await f.request('POST', '/resume-analysis/compute', { application_id: app._id }, 'recruiter');
+  const validStored = f.repo.docs.get(analysisId);
+  validStored.candidate_id = 'candidate:two';
+  const resBadRef = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'recruiter');
+  assert.equal(resBadRef.status, 409);
+  assert.equal(resBadRef.body.error.code, 'REFERENCE_MISMATCH');
+});
+
+test('TV3-UC14 Vector 07: Candidate và Admin bị 403 khi GET resume-analysis', async t => {
+  const f = await startFixture(t);
+  const app = (await apply(f)).body.data;
+
+  const resCand = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'candidate');
+  assert.equal(resCand.status, 403);
+  assert.equal(resCand.body.error.code, 'FORBIDDEN');
+
+  const resAdmin = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'admin');
+  assert.equal(resAdmin.status, 403);
+  assert.equal(resAdmin.body.error.code, 'FORBIDDEN');
+});
+
+test('TV3-UC14 Vector 08: Recruiter khác chủ Job bị 403', async t => {
+  const f = await startFixture(t);
+  const app = (await apply(f)).body.data;
+
+  const resOther = await f.request('GET', `/resume-analysis/${app._id}`, undefined, 'otherRecruiter');
+  assert.equal(resOther.status, 403);
+  assert.equal(resOther.body.error.code, 'FORBIDDEN');
+});
+
+test('TV3-UC14 Vector 09: Application không tồn tại trả 404', async t => {
+  const f = await startFixture(t);
+  const nonExistent = `application:pair:${'f'.repeat(64)}`;
+
+  const res = await f.request('GET', `/resume-analysis/${nonExistent}`, undefined, 'recruiter');
+  assert.equal(res.status, 404);
+  assert.equal(res.body.error.code, 'NOT_FOUND');
+});
+
+test('TV3-UC14 Vector 10: Route param sai format hoặc có unknown query trả 400', async t => {
+  const f = await startFixture(t);
+  const app = (await apply(f)).body.data;
+
+  // Param sai format
+  const resBadId = await f.request('GET', '/resume-analysis/not-a-valid-pair-id', undefined, 'recruiter');
+  assert.equal(resBadId.status, 400);
+  assert.equal(resBadId.body.error.code, 'VALIDATION_ERROR');
+
+  const resUpperHex = await f.request('GET', `/resume-analysis/application:pair:${'A'.repeat(64)}`, undefined, 'recruiter');
+  assert.equal(resUpperHex.status, 400);
+  assert.equal(resUpperHex.body.error.code, 'VALIDATION_ERROR');
+
+  // Unknown query param
+  const resQuery = await f.request('GET', `/resume-analysis/${app._id}?unknown_field=true`, undefined, 'recruiter');
+  assert.equal(resQuery.status, 400);
+  assert.equal(resQuery.body.error.code, 'VALIDATION_ERROR');
+});

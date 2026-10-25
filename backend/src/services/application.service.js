@@ -181,6 +181,10 @@ export class ApplicationService {
       const summary = await this.getAnalysisSummary(application._id);
       result.analysis_status = summary.analysis_status;
       result.analysis_fresh = summary.analysis_fresh;
+      if (role === 'RECRUITER' && summary.analysis_total_score !== undefined) {
+        result.analysis_total_score = summary.analysis_total_score;
+        result.analysis_recommendation = summary.analysis_recommendation;
+      }
     } else {
       result.analysis_status = 'NOT_ANALYZED';
       result.analysis_fresh = false;
