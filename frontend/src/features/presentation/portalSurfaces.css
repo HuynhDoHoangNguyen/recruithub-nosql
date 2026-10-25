@@ -1,0 +1,274 @@
+/* Presentation-only tokens. Everything is scoped to the approved portal pages
+   or the featured-jobs section; the landing hero and other routes opt out. */
+.rh-surface-page,
+.rh-featured-jobs {
+  --rh-canvas: #192d5b;
+  --rh-surface: #ffffff;
+  --rh-ink: #17243b;
+  --rh-muted: #596b84;
+  --rh-border: #dce4ef;
+  --rh-primary: #365fc3;
+  --rh-shadow: 0 2px 5px rgb(9 20 48 / 8%), 0 12px 30px rgb(9 20 48 / 13%);
+  --rh-shadow-hover: 0 4px 10px rgb(9 20 48 / 10%), 0 18px 38px rgb(9 20 48 / 18%);
+  color: var(--rh-ink);
+}
+
+main.rh-surface-page {
+  background: transparent;
+}
+
+/* Only opted-in routes paint the root canvas. No body styles, extra layers,
+   stacking contexts or overflow rules affect other routes or native dialogs. */
+#root:has(main.rh-surface-page),
+section.rh-featured-jobs {
+  background-color: #192d5b;
+  background-image:
+    radial-gradient(ellipse at 5% 0%, rgb(91 112 230 / 28%), transparent 45rem),
+    radial-gradient(ellipse at 100% 35%, rgb(55 97 171 / 20%), transparent 55rem),
+    linear-gradient(155deg, #233d7a 0%, #1c3266 48%, #17284f 100%);
+}
+
+.rh-surface-page :is(h1, h2, h3, h4),
+.rh-featured-jobs :is(h2, h3) {
+  color: var(--rh-ink);
+  overflow-wrap: anywhere;
+}
+
+.rh-surface-page :is(h2, h3, h4) { font-weight: 700; }
+.rh-surface-page .text-slate-400 { color: #697a92; }
+.rh-surface-page :is(.text-slate-500, .text-gray-500) { color: var(--rh-muted); }
+.rh-surface-page :is(.text-slate-600, .text-gray-600) { color: #4d607a; }
+
+/* Text on the navy canvas is lighter; text inside white surfaces keeps the
+   existing navy/slate palette. These selectors follow the current blocks. */
+.rh-applicants > div > header h1 { color: #f3f6ff; }
+.rh-surface-page.rh-applicants > div > header p,
+.rh-surface-page.rh-applicants > div > label,
+.rh-surface-page.rh-recruiter-dashboard > p,
+.rh-surface-page.rh-candidate-dashboard > div > section > p,
+.rh-surface-page > div > nav[aria-label='Đường dẫn'],
+.rh-surface-page > div > nav[aria-label='Đường dẫn hồ sơ'] { color: #c5d3ee; }
+.rh-surface-page > div > nav:is([aria-label='Đường dẫn'], [aria-label='Đường dẫn hồ sơ']) :is(a, span) { color: #d5e0f5; }
+.rh-surface-page > div > nav:is([aria-label='Đường dẫn'], [aria-label='Đường dẫn hồ sơ']) a:hover { color: #fff; }
+
+.rh-surface-page .card,
+.rh-surface-page .rh-panel,
+.rh-surface-page .rh-job-card,
+.rh-surface-page .rh-applicant-table,
+.rh-surface-page nav[aria-label='Phân trang'] {
+  border-color: var(--rh-border);
+  background: var(--rh-surface);
+  box-shadow: var(--rh-shadow);
+}
+
+.rh-surface-page .rh-account-header,
+.rh-surface-page .rh-summary-card {
+  background: linear-gradient(110deg, #fff, #fbfcff);
+}
+
+.rh-surface-page .rh-stat-card {
+  background: linear-gradient(135deg, #fff 60%, #f8faff);
+  box-shadow: inset 0 1px 0 #fff, var(--rh-shadow);
+}
+
+.rh-surface-page .rh-stat-card > span {
+  box-shadow: inset 0 0 0 1px rgb(81 110 158 / 6%);
+}
+
+.rh-surface-page .rh-job-card {
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.rh-surface-page .rh-job-card:hover {
+  border-color: #c3d1e5;
+  box-shadow: var(--rh-shadow-hover);
+}
+
+.rh-surface-page .rh-job-card > div[aria-hidden='true'] {
+  top: 20px;
+  bottom: 20px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(#6e8bd5, #a3b4df);
+}
+
+.rh-surface-page .rh-job-card > button[aria-expanded] {
+  background: #f7f9fc;
+  border-color: #e5ebf3;
+  color: #4e6484;
+}
+
+.rh-surface-page .rh-job-card > button[aria-expanded]:hover { background: #edf2fa; }
+.rh-surface-page .rh-job-card > div[id] { background: #fbfcff; }
+.rh-surface-page .rh-job-card :is(p, h3) { overflow-wrap: anywhere; }
+.rh-surface-page .badge-tag { background: #f0f3f8; color: #536680; }
+
+.rh-surface-page aside :is(button[aria-pressed='true'], button[role='tab'][aria-selected='true']) {
+  background: #e9effb;
+  color: #2f5197;
+  box-shadow: inset 0 0 0 1px #d5e0f5, 0 2px 4px rgb(40 65 110 / 3%);
+}
+
+.rh-surface-page aside :is(button[aria-pressed='false'], button[role='tab'][aria-selected='false']):hover {
+  background: #f2f5fb;
+  color: #324f81;
+}
+
+.rh-surface-page .rh-job-form { border-color: var(--rh-border); box-shadow: var(--rh-shadow); }
+.rh-surface-page .rh-job-form > fieldset > section {
+  border-color: #e1e7f0;
+  background: linear-gradient(130deg, #fafbfe, #f6f8fc);
+}
+.rh-surface-page .rh-job-form > fieldset > section:nth-of-type(2) { background: linear-gradient(130deg, #f5faf8, #fafcfb); }
+.rh-surface-page .rh-job-form > fieldset > section:last-of-type { background: linear-gradient(130deg, #f7f7fd, #fafbfe); }
+.rh-surface-page .form-label { color: #354962; font-weight: 600; }
+
+.rh-surface-page .input-field,
+.rh-candidate-profile .rh-profile-input,
+.rh-surface-page select {
+  border-color: #d5dfec;
+  background-color: #fff;
+  color: #243b57;
+  box-shadow: 0 1px 2px rgb(35 58 94 / 3%);
+}
+.rh-surface-page :is(input, textarea)::placeholder { color: #8896a9; }
+.rh-surface-page :is(input, select, textarea):focus-visible {
+  outline: 2px solid #83a2df;
+  outline-offset: 2px;
+  border-color: #7c9bd6;
+  box-shadow: 0 0 0 4px rgb(70 109 191 / 9%);
+}
+.rh-surface-page :is(input, textarea)[readonly] {
+  background: #f2f5f9;
+  border-color: #e4eaf2;
+  color: #728198;
+  box-shadow: none;
+}
+.rh-surface-page :is(input, select, textarea)[aria-invalid='true'] {
+  border-color: #d58c98;
+  background-color: #fffafb;
+}
+.rh-surface-page :is(input, select, textarea)[aria-invalid='true']:focus-visible {
+  outline-color: #d58c98;
+  box-shadow: 0 0 0 4px rgb(180 73 95 / 8%);
+}
+.rh-surface-page :is(input, select, textarea):disabled {
+  background: #eef2f7;
+  color: #7d8ba1;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.rh-surface-page .message-error { background: #fff5f6; border-color: #efccd3; color: #a44258; }
+.rh-surface-page .message-success { background: #f0f8f4; border-color: #cfe6da; color: #337453; }
+
+.rh-surface-page :is(button, a, input, select, textarea),
+.rh-featured-jobs :is(a, button) {
+  transition-property: background-color, border-color, box-shadow, color, opacity;
+  transition-duration: 160ms;
+  transition-timing-function: ease;
+}
+.rh-surface-page :is(.btn-primary, .rh-primary-action),
+.rh-surface-page .rh-workflow-action.bg-blue-600 {
+  background: linear-gradient(115deg, #3465ce, #535dca);
+  color: #fff;
+  border-color: #4566c4;
+  box-shadow: 0 2px 4px rgb(50 78 147 / 12%), 0 5px 12px rgb(50 78 147 / 9%);
+}
+.rh-surface-page :is(.btn-primary, .rh-primary-action):hover,
+.rh-surface-page .rh-workflow-action.bg-blue-600:hover {
+  background: linear-gradient(115deg, #2d59b8, #494fb8);
+  box-shadow: 0 3px 6px rgb(50 78 147 / 14%), 0 7px 16px rgb(50 78 147 / 10%);
+}
+.rh-surface-page :is(.btn-secondary, .rh-secondary-action) {
+  border-color: #d5dfec;
+  background: #fff;
+  color: #415879;
+  box-shadow: 0 1px 3px rgb(35 58 94 / 5%);
+}
+.rh-surface-page :is(.btn-secondary, .rh-secondary-action):hover { border-color: #bbcce5; background: #f5f8fd; }
+.rh-surface-page .rh-review-action { background: #edf2ff; border-color: #cbd9f4; color: #345db5; }
+.rh-surface-page .rh-review-action:hover { background: #e3ebfc; border-color: #aec4eb; }
+.rh-surface-page :is(button, a):is(.text-rose-700, .text-red-700) {
+  background: #fff7f7;
+  color: #af455b;
+  border-color: #ebcad1;
+  box-shadow: none;
+}
+.rh-surface-page :is(button, a):is(.text-rose-700, .text-red-700):hover { background: #fceef0; border-color: #dcaeb9; }
+.rh-surface-page :is(button, a):hover,
+.rh-featured-jobs a:hover { transform: none; }
+.rh-surface-page :is(button, a):focus-visible,
+.rh-featured-jobs a:focus-visible { outline: 3px solid #83a2df; outline-offset: 3px; }
+.rh-surface-page :is(button, a):active { box-shadow: inset 0 1px 3px rgb(35 58 94 / 10%); }
+.rh-surface-page button:disabled,
+.rh-surface-page .rh-workflow-action:disabled {
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+  filter: grayscale(1);
+  opacity: .48;
+}
+
+.rh-surface-page .rh-applicant-table thead { background: #f0f4fa; color: #536783; }
+.rh-surface-page .rh-applicant-table th { font-weight: 600; }
+.rh-surface-page .rh-applicant-table tbody tr { border-color: #e8edf5; background: #fff; transition: background-color 150ms ease; }
+.rh-surface-page .rh-applicant-table tbody tr:hover { background: #f7f9fd; }
+.rh-surface-page .rh-applicant-table td { overflow-wrap: anywhere; }
+.rh-surface-page .rh-stage-badge { box-shadow: inset 0 0 0 1px rgb(74 96 131 / 8%); }
+.rh-surface-page .rh-stage-badge.bg-sky-100 { background: #edf4ff; color: #37629b; }
+.rh-surface-page .rh-stage-badge.bg-purple-100 { background: #f0edfb; color: #6b559a; }
+.rh-surface-page .rh-stage-badge.bg-amber-100 { background: #fff4df; color: #926528; }
+.rh-surface-page .rh-stage-badge.bg-teal-100 { background: #e7f5f2; color: #34796e; }
+.rh-surface-page .rh-stage-badge.bg-emerald-100 { background: #e9f6ee; color: #32744d; }
+.rh-surface-page .rh-stage-badge.bg-rose-100 { background: #fceff2; color: #a44960; }
+.rh-surface-page .rh-stage-badge.bg-gray-200 { background: #edf0f5; color: #637187; }
+.rh-surface-page [role='progressbar'] { background-color: #e8edf5; }
+.rh-surface-page:is(.rh-company-profile, .rh-candidate-profile) [role='progressbar'] > div { background: linear-gradient(100deg, #547ee0, #6e78d8, #2da893); }
+.rh-candidate-profile .rh-profile-entry {
+  background: #f7fafd;
+  border-color: #dce5ee;
+}
+.rh-candidate-profile .rh-resume-card {
+  background: linear-gradient(110deg, #f0f6ff, #f0f8fa);
+  border-color: #d5e3ef;
+}
+.rh-candidate-profile :is(.rh-profile-entry, .rh-resume-card) :is(p, h3) { overflow-wrap: anywhere; }
+.rh-surface-page dialog { border-color: #dce4ef; box-shadow: 0 12px 30px rgb(22 39 69 / 12%), 0 30px 90px rgb(22 39 69 / 15%); }
+.rh-surface-page dialog::backdrop { background: rgb(30 43 67 / 40%); }
+
+/* Home opts in at this section only. No selectors reach hero/header/footer. */
+section.rh-featured-jobs {
+  box-shadow: inset 0 1px 0 rgb(190 209 255 / 14%), inset 0 -1px 0 rgb(7 17 43 / 20%);
+}
+.rh-featured-jobs #featured-heading { color: #f3f6ff; }
+.rh-featured-jobs #featured-heading > span { color: #a5baff; }
+.rh-featured-jobs #featured-heading + p { color: #c5d3ee; }
+.rh-featured-jobs .rh-featured-card {
+  background: #fff;
+  border-color: var(--rh-border);
+  box-shadow: var(--rh-shadow);
+}
+.rh-featured-jobs .rh-featured-card:hover { transform: none; border-color: #c2d0e4; box-shadow: var(--rh-shadow-hover); }
+.rh-featured-jobs .rh-featured-card > div[aria-hidden='true']:first-child { background: linear-gradient(90deg, #a5b9e1, #bbc8e9, #bad8d6); opacity: .85; }
+.rh-featured-jobs .rh-featured-card > div[aria-hidden='true']:nth-child(2) { opacity: .4; }
+.rh-featured-jobs .rh-featured-card h3 { font-weight: 700; }
+.rh-featured-jobs .rh-featured-card .text-slate-400 { color: #697a92; }
+.rh-featured-jobs .rh-featured-card .text-slate-500 { color: #5d6e86; }
+.rh-featured-jobs .rh-featured-card .rh-company-name { white-space: normal; overflow-wrap: anywhere; }
+.rh-featured-jobs .rh-card-salary { background: #f1f8f5; border-color: #e0eee6; }
+.rh-featured-jobs .rh-card-cta { background: #edf2fb; border-color: #d9e3f4; color: #3c60a8; box-shadow: 0 1px 2px rgb(35 58 94 / 3%); }
+.rh-featured-jobs .rh-featured-card:hover .rh-card-cta { background: #e3ebfa; border-color: #bccfec; color: #294e95; }
+.rh-featured-jobs > div a.btn-secondary { background: #fff; color: #365b9e; box-shadow: 0 2px 4px rgb(35 58 94 / 4%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rh-surface-page *, .rh-featured-jobs *,
+  .rh-surface-page :is(button, a, input, select, textarea),
+  .rh-featured-jobs :is(a, button),
+  .rh-surface-page .rh-job-card,
+  .rh-surface-page .rh-applicant-table tbody tr {
+    transition-duration: .01ms;
+    animation-duration: .01ms;
+    animation-iteration-count: 1;
+    scroll-behavior: auto;
+  }
+}

@@ -22,6 +22,7 @@ import {
 import { companyDocumentSchema } from './company.schema.js';
 import { departmentDocumentSchema } from './department.schema.js';
 import { userDocumentSchema } from './user.schema.js';
+import { recruiterContactSchema } from './recruiter-profile.schema.js';
 
 /**
  * Recruiter Business Document Schema
@@ -33,6 +34,7 @@ export const recruiterDocumentSchema = z
       .regex(/^recruiter:[a-z0-9_:-]+$/, 'Invalid Recruiter _id format. Expected prefix "recruiter:"'),
     _rev: z.string().optional(),
     type: z.literal(DOCUMENT_TYPES.RECRUITER),
+    profile: recruiterContactSchema.optional(),
     user_id: z
       .string()
       .regex(/^user:[a-f0-9]{64}$/, 'Invalid user_id reference format. Expected user:<sha256>'),

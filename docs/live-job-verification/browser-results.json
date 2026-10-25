@@ -1,0 +1,12 @@
+{
+  "origin": "http://localhost:5173",
+  "mocked": false,
+  "identitySession": false,
+  "publicJobsFirstPage": 20,
+  "firstJobId": "job:cms:J_002494",
+  "listInitialAndReload": true,
+  "detailInitialAndReload": true,
+  "tabletAndMobileNoOverflow": true,
+  "mobileNavigation": true,
+  "browserErrors": []
+}

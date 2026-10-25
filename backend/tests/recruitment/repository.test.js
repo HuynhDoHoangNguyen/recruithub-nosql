@@ -119,6 +119,7 @@ test('Setup creates named index design docs and reduces scoped stats without loa
     if (url.includes('jobs_by_recruiter')) return json({ rows: [{ key: ['recruiter:one', 'OPEN'], value: 25 }] });
     if (url.includes('job_ids_by_recruiter')) return json({ rows: [{ id: 'job:one', key: 'recruiter:one' }] });
     if (url.includes('applications_by_job_stage')) return json({ rows: [{ key: ['job:one', 'APPLIED'], value: 230 }] });
+    if (url.includes('attempts_by_job')) return json({ rows: [{ key: 'job:one', value: 240 }] });
     if (init.method === 'GET') return json({}, 404);
     return json({ ok: true, rev: '1-design' });
   });
@@ -129,6 +130,7 @@ test('Setup creates named index design docs and reduces scoped stats without loa
   assert.ok(indexes.every(request => { const body = JSON.parse(request.body); return body.ddoc === body.name; }));
   const stats = await repo.stats('recruiter:one');
   assert.equal(stats.jobs.OPEN, 25); assert.equal(stats.total_applications, 230);
+  assert.equal(stats.total_attempts, 240); assert.equal(stats.historical_attempts, 10);
   const aggregate = requests.find(request => request.url.includes('applications_by_job_stage'));
   assert.ok(aggregate.url.endsWith('?group=true'));
   assert.deepEqual(JSON.parse(aggregate.body).keys[0], ['job:one', 'APPLIED']);
@@ -141,4 +143,22 @@ test('Repository converts network/auth/conflict errors without exposing raw URLs
   await assert.rejects(() => conflict.put({ _id: 'job:one', _rev: 'stale' }), error => error.status === 409);
   const noAccess = new JobApplicationRepository(config, async () => json({}, 401));
   await assert.rejects(() => noAccess.get('job:one'), error => error.status === 503);
+});
+
+test('Candidate aggregate queries only its key range and fails explicitly if the view is missing', async () => {
+  const requests = [];
+  const repo = new JobApplicationRepository(config, async (url, init) => {
+    requests.push(new URL(url));
+    if (url.includes('attempts_by_candidate')) {
+      assert.deepEqual(JSON.parse(init.body).keys, ['candidate:one']);
+      return json({ rows: [{ key: 'candidate:one', value: 28 }] });
+    }
+    return json({ rows: [{ key: ['candidate:one', 'APPLIED'], value: 24 }, { key: ['candidate:one', 'WITHDRAWN'], value: 1 }] });
+  });
+  assert.deepEqual(await repo.candidateStats('candidate:one'), { total_applications: 25, total_attempts: 28, historical_attempts: 3, by_stage: { APPLIED: 24, WITHDRAWN: 1 } });
+  assert.equal(requests[0].searchParams.get('group'), 'true');
+  assert.deepEqual(JSON.parse(requests[0].searchParams.get('startkey')), ['candidate:one']);
+  assert.deepEqual(JSON.parse(requests[0].searchParams.get('endkey')), ['candidate:one', {}]);
+  const missing = new JobApplicationRepository(config, async () => json({}, 404));
+  await assert.rejects(() => missing.candidateStats('candidate:one'), error => error.status === 503 && error.code === 'DATABASE_NOT_INITIALIZED');
 });

@@ -12,6 +12,13 @@ import apiV1Routes from './routes/api-v1.routes.js';
 import { getAuthDatabaseConfig } from './config/auth-database.config.js';
 import { ResumeScoringService } from './services/scoring/resume-scoring.service.js';
 import { createScoringRoutes } from './routes/scoring.routes.js';
+import { getDatabaseConfig } from './config/database.config.js';
+import { PublicJobCatalogService } from './services/public-job-catalog.service.js';
+import { RecruiterProfileService } from './services/recruiter-profile.service.js';
+import { createRecruiterProfileRoutes } from './routes/recruiter-profile.routes.js';
+import { createAssetRepository } from './repositories/asset.repository.js';
+import { UploadService } from './services/upload.service.js';
+import { createUploadRoutes } from './routes/upload.routes.js';
 
 function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://localhost:5173') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
@@ -24,11 +31,11 @@ function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://l
   return origins;
 }
 
-function createConfiguredRepository(environment) {
+function createConfiguredRepository(environment, { readOnly = false } = {}) {
   let repository;
   const getRepository = () => {
     if (!repository) {
-      const config = getAuthDatabaseConfig(environment);
+      const config = readOnly ? getDatabaseConfig(environment) : getAuthDatabaseConfig(environment);
       const authHeader = config.username && config.password
         ? `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}`
         : undefined;
@@ -36,24 +43,37 @@ function createConfiguredRepository(environment) {
     }
     return repository;
   };
-  return Object.fromEntries(['get', 'put', 'find', 'scanPublicJobs', 'profile', 'allInterviews', 'view', 'stats', 'initialize']
+  // The public catalog can read the existing dataset without granting any
+  // mutation or identity capability on that database.
+  const methods = readOnly ? ['get', 'find', 'scanPublicJobs']
+    : ['get', 'put', 'find', 'scanPublicJobs', 'profile', 'allInterviews', 'view', 'stats', 'candidateStats', 'initialize'];
+  return Object.fromEntries(methods
     .map(method => [method, (...args) => getRepository()[method](...args)]));
 }
 
-export function createApp({ repository: suppliedRepository, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
+export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
   const app = express();
   const origins = configuredFrontendOrigins(jwtEnv.FRONTEND_URL);
   const repository = suppliedRepository || createConfiguredRepository(jwtEnv);
+  const publicRepository = suppliedPublicRepository || suppliedRepository || createConfiguredRepository(jwtEnv, { readOnly: true });
+  const jobs = new JobService(repository, now);
+  const assets = suppliedAssetRepository || suppliedRepository || createAssetRepository(jwtEnv);
   const scoringClock = typeof now === 'function' ? now : () => (now ? new Date(now()) : new Date());
   const scoringService = new ResumeScoringService(repository, { now: scoringClock });
   const effectiveAnalyzeApplication = analyzeApplication || scoringService.analyzeApplication;
-
+  let liveCatalog = null;
+  try { getAuthDatabaseConfig(jwtEnv); liveCatalog = jobs; } catch { /* Public dataset remains available before local Auth setup. */ }
   const dependencies = {
     authenticate: authenticate || createJwtAuthentication(repository, jwtEnv, () => now ? new Date(now()).getTime() : Date.now()),
-    jobs: new JobService(repository, now),
+    jobs,
+    recruiterProfiles: new RecruiterProfileService(repository, now, assets),
+    uploads: new UploadService(assets, repository, now),
+    publicJobs: suppliedRepository || suppliedPublicRepository ? new JobService(publicRepository, now)
+      : new PublicJobCatalogService({ live: liveCatalog, dataset: new JobService(publicRepository, now) }),
     applications: new ApplicationService(repository, {
       now,
       analyzeApplication: effectiveAnalyzeApplication,
+      assets,
       scoringService,
       getAnalysisSummary: scoringService.getAnalysisSummary,
     }),
@@ -63,7 +83,7 @@ export function createApp({ repository: suppliedRepository, authenticate, now, a
   app.use(cors({
     origin: (origin, callback) => callback(null, !origin || origins.includes(origin)),
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'If-Match'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'If-Match', 'X-File-Name'],
     exposedHeaders: ['ETag'],
   }));
   app.use(express.json({ limit: '512kb' }));
@@ -73,6 +93,8 @@ export function createApp({ repository: suppliedRepository, authenticate, now, a
   // Identity routes and Job/Application routes share one v1 namespace and auth contract.
   app.use('/api/v1', apiV1Routes);
   app.use('/api/v1', createJobRoutes(dependencies));
+  app.use('/api/v1', createRecruiterProfileRoutes(dependencies));
+  app.use('/api/v1', createUploadRoutes(dependencies));
   app.use('/api/v1/applications', createApplicationRoutes(dependencies));
   app.use('/api/v1/resume-analysis', createScoringRoutes(dependencies));
   app.get('/', (req, res) => res.json({ message: 'Welcome to RecruiHub API' }));

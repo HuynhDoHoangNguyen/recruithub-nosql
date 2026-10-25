@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BriefcaseBusiness, Building2, CalendarDays, ChartNoAxesColumnIncreasing, ChevronLeft, ChevronRight, RotateCcw, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Banknote, BriefcaseBusiness, Building2, CalendarDays, ChartNoAxesColumnIncreasing, ChevronLeft, ChevronRight, MapPin, RotateCcw, Search, SlidersHorizontal, X } from 'lucide-react';
+import CompanyLogo from '../../components/CompanyLogo';
+import { employmentLabels, salaryLabel } from '../../features/jobs/jobPresentation';
+import { seniorityLabels } from '../../features/applications/applicationPresentation';
+import { useJobMetadata } from '../../features/jobs/useJobMetadata';
 import { Link, useSearchParams } from 'react-router-dom';
 import { isPublicJobsMockMode, listPublicJobs } from '../../services/publicJobsApi';
 
 const PAGE_SIZE = 12;
+const normalizedSkills = value => value.split(',').map(skill => skill.trim()).filter(Boolean).join(',');
 
 function setOrDelete(params, key, value) {
   const normalized = typeof value === 'string' ? value.trim() : '';
@@ -11,25 +16,30 @@ function setOrDelete(params, key, value) {
   else params.delete(key);
 }
 
+
+
 function JobCard({ job }) {
   const skills = job.requiredSkills || [];
   const companyName = job.company?.name || job.company_name;
   const companyMark = companyName?.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
   return (
     <Link to={`/jobs/${encodeURIComponent(job.id)}`} className="group flex gap-3 rounded-[16px] border border-[#E5F3F8] bg-[#F8FDFF] p-3.5 shadow-[0_2px_8px_rgba(15,75,105,0.035)] transition hover:border-[#8EDCF7] hover:bg-white hover:shadow-[0_8px_22px_rgba(15,75,105,0.08)] focus:outline-none focus:ring-[3px] focus:ring-[#11B7F3]/20 sm:gap-4 sm:p-4">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#E4F7FE] text-[#079DD7] sm:h-[58px] sm:w-[58px]">
+      {job.company_logo_url ? <CompanyLogo name={companyName || job.industry} src={job.company_logo_url} className="h-12 w-12 sm:h-[58px] sm:w-[58px]" /> : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#E4F7FE] text-[#079DD7] sm:h-[58px] sm:w-[58px]">
         {companyMark ? <span className="text-sm font-bold tracking-wide">{companyMark}</span> : <BriefcaseBusiness className="h-5 w-5" aria-hidden="true" />}
-      </div>
+      </div>}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="min-w-0"><h2 className="text-[15px] font-bold tracking-tight text-[#17243B] group-hover:text-[#079DD7] sm:text-base">{job.title}</h2>
             {companyName && <p className="mt-1 text-[13px] font-medium text-[#62748A]">{companyName}</p>}</div>
-          <div className="flex items-center gap-2"><span className="shrink-0 rounded-full bg-[#E1F9F1] px-2.5 py-1 text-[11px] font-semibold text-[#078B68]">Đang tuyển</span><span className="hidden h-8 w-8 items-center justify-center rounded-lg bg-white text-[#078FBF] group-hover:bg-[#E4F7FE] sm:flex"><ChevronRight className="h-4 w-4" aria-hidden="true" /></span></div>
+          <div className="flex items-center gap-2"><span className="shrink-0 rounded-full bg-[#E1F9F1] px-2.5 py-1 text-[11px] font-semibold text-[#078B68]">{job.application_available === false ? 'Tin tham khảo' : 'Đang tuyển'}</span><span className="hidden h-8 w-8 items-center justify-center rounded-lg bg-white text-[#078FBF] group-hover:bg-[#E4F7FE] sm:flex"><ChevronRight className="h-4 w-4" aria-hidden="true" /></span></div>
         </div>
         <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-[#65758A]">
           {job.industry && <span className="inline-flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-[#16A9D8]" aria-hidden="true" />{job.industry}</span>}
           {job.seniority && <span className="inline-flex items-center gap-1.5"><ChartNoAxesColumnIncreasing className="h-3.5 w-3.5 text-[#16A9D8]" aria-hidden="true" />{job.seniority}</span>}
           {job.deadline && <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-[#16A9D8]" aria-hidden="true" />Hạn nộp {new Date(job.deadline).toLocaleDateString('vi-VN')}</span>}
+          {job.location_label && <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#16A9D8]" aria-hidden="true" />{job.location_label}{job.work_mode_label && ` · ${job.work_mode_label}`}</span>}
+          {job.salary && <span className="inline-flex items-center gap-1.5 font-semibold text-[#078B68]"><Banknote className="h-3.5 w-3.5" aria-hidden="true" />{salaryLabel(job.salary)}</span>}
+          {job.employment_type && <span>{employmentLabels[job.employment_type]}</span>}
         </div>
         {job.description && <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-[#62748A]">{job.description}</p>}
         {!!skills.length && <div className="mt-3 flex flex-wrap gap-1.5">{skills.slice(0, 4).map(skill => <span key={skill} className="rounded-full bg-[#E8F7FD] px-2.5 py-1 text-[11px] font-semibold text-[#078FBF]">{skill}</span>)}{skills.length > 4 && <span className="rounded-full bg-[#E8F7FD] px-2.5 py-1 text-[11px] font-medium text-[#62748A]">+{skills.length - 4}</span>}</div>}
@@ -42,12 +52,14 @@ function LoadingCards() {
   return <div role="status" aria-live="polite" aria-label="Đang tải tin tuyển dụng" className="space-y-4">{[1, 2, 3].map(item => <div key={item} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-6"><div className="h-5 w-2/5 rounded bg-slate-200" /><div className="mt-4 h-4 w-1/3 rounded bg-slate-100" /><div className="mt-5 h-4 w-full rounded bg-slate-100" /><div className="mt-2 h-4 w-4/5 rounded bg-slate-100" /></div>)}</div>;
 }
 
+
 export default function JobList() {
   const [params, setParams] = useSearchParams();
   const queryString = params.toString();
   const [searchDraft, setSearchDraft] = useState(params.get('q') || '');
   const [skillsDraft, setSkillsDraft] = useState(params.get('skills') || '');
   const [industryDraft, setIndustryDraft] = useState(params.get('industry') || '');
+  const metadata = useJobMetadata();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pagination, setPagination] = useState({ query: '', cursors: [undefined] });
   const [result, setResult] = useState({ jobs: [], total: null, nextPage: null });
@@ -57,7 +69,7 @@ export default function JobList() {
   const requestSequence = useRef(0);
   const filterState = useMemo(() => {
     const current = new URLSearchParams(queryString);
-    return { search: current.get('q') || '', skills: current.get('skills') || '', industry: current.get('industry') || '', seniority: current.get('seniority') || '' };
+    return { search: current.get('q') || '', skills: (current.get('skills') || '').split(',').map(skill => skill.trim()).filter(Boolean).join(','), industry: current.get('industry') || '', seniority: current.get('seniority') || '', location: current.get('location') || '', work_mode: current.get('work_mode') || '' };
   }, [queryString]);
   const pageCursors = pagination.query === queryString ? pagination.cursors : [undefined];
   const pageIndex = pageCursors.length - 1;
@@ -74,22 +86,20 @@ export default function JobList() {
     setParams(current => {
       const next = new URLSearchParams(current);
       setOrDelete(next, 'q', searchDraft);
-      setOrDelete(next, 'skills', skillsDraft);
+      setOrDelete(next, 'skills', normalizedSkills(skillsDraft));
       setOrDelete(next, 'industry', industryDraft);
       next.delete('bookmark');
       return next;
     }, { replace: true });
-  }, [industryDraft, searchDraft, setParams, skillsDraft]);
+  }, [searchDraft, skillsDraft, industryDraft, setParams]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const current = new URLSearchParams(queryString);
-      if ((current.get('q') || '') !== searchDraft.trim()
-        || (current.get('skills') || '') !== skillsDraft.trim()
-        || (current.get('industry') || '') !== industryDraft.trim()) commitTextFilters();
+      if ((current.get('q') || '') !== searchDraft.trim() || (current.get('skills') || '') !== normalizedSkills(skillsDraft) || (current.get('industry') || '') !== industryDraft.trim()) commitTextFilters();
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [commitTextFilters, industryDraft, queryString, searchDraft, skillsDraft]);
+  }, [commitTextFilters, queryString, searchDraft, skillsDraft, industryDraft]);
 
   useEffect(() => {
     const sequence = ++requestSequence.current;
@@ -108,6 +118,9 @@ export default function JobList() {
   const updateFilter = (key, value) => {
     setParams(current => {
       const next = new URLSearchParams(current);
+      setOrDelete(next, 'q', searchDraft);
+      setOrDelete(next, 'skills', normalizedSkills(skillsDraft));
+      setOrDelete(next, 'industry', industryDraft);
       setOrDelete(next, key, value);
       next.delete('bookmark');
       return next;
@@ -115,12 +128,15 @@ export default function JobList() {
   };
 
   const resetFilters = () => {
-    setSearchDraft(''); setSkillsDraft(''); setIndustryDraft('');
+    setSearchDraft('');
+    setSkillsDraft('');
+    setIndustryDraft('');
     setParams({}, { replace: true });
   };
 
-  const hasActiveFilters = Boolean(filterState.search || filterState.skills || filterState.industry || filterState.seniority);
+  const hasActiveFilters = Boolean(filterState.search || filterState.skills || filterState.industry || filterState.seniority || filterState.location || filterState.work_mode);
   const hasNext = Boolean(result.nextPage);
+
 
   return (
     <main className="min-h-screen bg-[#CDEAF4] px-4 py-6 sm:px-6 lg:py-9">
@@ -153,6 +169,8 @@ export default function JobList() {
                 <button type="button" onClick={resetFilters} disabled={!hasActiveFilters} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#078FBF] hover:text-[#05749A] disabled:cursor-not-allowed disabled:text-slate-400"><RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />Xóa lọc</button>
               </div>
               <div className="space-y-5 pt-4">
+                {metadata.loading && <p role="status" className="text-xs text-[#64748B]">Đang tải danh mục bộ lọc…</p>}
+                {metadata.error && <p role="alert" className="text-xs text-rose-700">Không tải được gợi ý bộ lọc. Bạn vẫn có thể nhập từ khóa, kỹ năng và ngành nghề.</p>}
                 <form onSubmit={event => { event.preventDefault(); commitTextFilters(); }}>
                   <label htmlFor="job-search" className="mb-1.5 block text-sm font-medium text-slate-700">Từ khóa</label>
                   <div className="flex h-10 items-center gap-2 rounded-[10px] border border-[#D7E9F0] bg-white px-3 transition focus-within:border-[#13B5EC] focus-within:ring-[3px] focus-within:ring-[#13B5EC]/15">
@@ -163,19 +181,22 @@ export default function JobList() {
                 </form>
                 <div>
                   <label htmlFor="job-skills-filter" className="mb-1.5 block text-sm font-medium text-slate-700">Kỹ năng</label>
-                  <input id="job-skills-filter" value={skillsDraft} onChange={event => setSkillsDraft(event.target.value)} placeholder="Ví dụ: React, SQL" className="h-10 w-full rounded-[10px] border border-[#D7E9F0] bg-white px-3 text-sm text-[#334155] placeholder:text-slate-400 focus:border-[#13B5EC] focus:outline-none focus:ring-[3px] focus:ring-[#13B5EC]/15" />
-                  <p className="mt-1.5 text-xs leading-5 text-[#64748B]">Nhập nhiều kỹ năng, cách nhau bằng dấu phẩy.</p>
+                  <input id="job-skills-filter" list="job-skills-options" value={skillsDraft} onChange={event => setSkillsDraft(event.target.value)} placeholder="Ví dụ: React, SQL" className="h-10 w-full rounded-[10px] border border-[#D7E9F0] bg-white px-3 text-sm text-[#334155] placeholder:text-slate-400 focus:border-[#13B5EC] focus:outline-none focus:ring-[3px] focus:ring-[#13B5EC]/15" />
+                  <datalist id="job-skills-options">{metadata.data?.skills?.map(skill => <option key={skill} value={skill} />)}</datalist>
+                  <p className="mt-1.5 text-xs leading-5 text-[#64748B]">Khớp tất cả kỹ năng, tối đa 8, cách nhau bằng dấu phẩy.</p>
                 </div>
                 <div>
                   <label htmlFor="job-industry-filter" className="mb-1.5 block text-sm font-medium text-slate-700">Ngành nghề</label>
-                  <input id="job-industry-filter" value={industryDraft} onChange={event => setIndustryDraft(event.target.value)} placeholder="Nhập đúng ngành nghề" className="h-10 w-full rounded-[10px] border border-[#D7E9F0] bg-white px-3 text-sm text-[#334155] placeholder:text-slate-400 focus:border-[#13B5EC] focus:outline-none focus:ring-[3px] focus:ring-[#13B5EC]/15" />
+                  <input id="job-industry-filter" list="job-industry-options" value={industryDraft} onChange={event => setIndustryDraft(event.target.value)} placeholder="Nhập đúng ngành nghề" className="h-10 w-full rounded-[10px] border border-[#D7E9F0] bg-white px-3 text-sm text-[#334155] placeholder:text-slate-400 focus:border-[#13B5EC] focus:outline-none focus:ring-[3px] focus:ring-[#13B5EC]/15" />
+                  <datalist id="job-industry-options">{metadata.data?.industries?.map(industry => <option key={industry} value={industry} />)}</datalist>
                 </div>
                 <div>
                   <label htmlFor="job-seniority-filter" className="mb-1.5 block text-sm font-medium text-slate-700">Cấp độ</label>
                   <select id="job-seniority-filter" value={filterState.seniority} onChange={event => updateFilter('seniority', event.target.value)} className="h-10 w-full rounded-[10px] border border-[#D7E9F0] bg-white px-3 text-sm text-[#334155] focus:border-[#13B5EC] focus:outline-none focus:ring-[3px] focus:ring-[#13B5EC]/15">
-                    <option value="">Tất cả cấp độ</option><option value="JUNIOR">Junior</option><option value="MID">Mid</option><option value="SENIOR">Senior</option>
+                    <option value="">Tất cả cấp độ</option>{(metadata.data?.seniorities?.length ? metadata.data.seniorities : Object.entries(seniorityLabels).map(([value, label]) => ({ value, label }))).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
                 </div>
+                {[['location', 'Địa điểm', metadata.data?.locations], ['work_mode', 'Hình thức làm việc', metadata.data?.work_modes]].map(([key, label, options]) => <div key={key}><label htmlFor={`job-${key}-filter`} className="mb-1.5 block text-sm font-medium text-slate-700">{label}</label><select id={`job-${key}-filter`} value={filterState[key]} onChange={event => updateFilter(key, event.target.value)} className="h-10 w-full rounded-[10px] border border-[#D7E9F0] bg-white px-3 text-sm text-[#334155] focus:border-[#13B5EC] focus:outline-none focus:ring-[3px] focus:ring-[#13B5EC]/15"><option value="">Tất cả</option>{options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>)}
               </div>
             </div>
           </aside>
@@ -198,9 +219,9 @@ export default function JobList() {
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEF2F7] pt-4">
                   <p className="text-xs text-[#64748B]">Hiển thị {result.jobs.length} kết quả trên trang {pageIndex + 1}</p>
                   <nav aria-label="Phân trang việc làm" className="flex items-center gap-2">
-                    <button type="button" disabled={pageIndex === 0 || loading} onClick={() => setPagination(current => ({ query: queryString, cursors: (current.query === queryString ? current.cursors : [undefined]).slice(0, -1) }))} className="inline-flex h-9 items-center gap-1 rounded-[9px] border border-[#DDECF2] px-3 text-sm font-medium text-[#527488] transition hover:bg-[#F3FBFE] disabled:cursor-not-allowed disabled:text-slate-300"><ChevronLeft className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Trước</span></button>
+                    <button type="button" aria-label="Trang trước" disabled={pageIndex === 0 || loading} onClick={() => setPagination(current => ({ query: queryString, cursors: (current.query === queryString ? current.cursors : [undefined]).slice(0, -1) }))} className="inline-flex h-9 items-center gap-1 rounded-[9px] border border-[#DDECF2] px-3 text-sm font-medium text-[#527488] transition hover:bg-[#F3FBFE] disabled:cursor-not-allowed disabled:text-slate-300"><ChevronLeft className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Trước</span></button>
                     <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-[9px] bg-[#12B5EC] px-2 text-sm font-semibold text-white" aria-current="page">{pageIndex + 1}</span>
-                    <button type="button" disabled={!hasNext || loading} onClick={() => setPagination(current => ({ query: queryString, cursors: [...(current.query === queryString ? current.cursors : [undefined]), result.nextPage] }))} className="inline-flex h-9 items-center gap-1 rounded-[9px] border border-[#DDECF2] px-3 text-sm font-medium text-[#078FBF] transition hover:bg-[#E8F7FD] disabled:cursor-not-allowed disabled:text-slate-300"><span className="hidden sm:inline">Tiếp</span><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
+                    <button type="button" aria-label="Trang sau" disabled={!hasNext || loading} onClick={() => setPagination(current => ({ query: queryString, cursors: [...(current.query === queryString ? current.cursors : [undefined]), result.nextPage] }))} className="inline-flex h-9 items-center gap-1 rounded-[9px] border border-[#DDECF2] px-3 text-sm font-medium text-[#078FBF] transition hover:bg-[#E8F7FD] disabled:cursor-not-allowed disabled:text-slate-300"><span className="hidden sm:inline">Tiếp</span><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
                   </nav>
                 </div>
               </>
@@ -211,4 +232,5 @@ export default function JobList() {
       </div>
     </main>
   );
+
 }

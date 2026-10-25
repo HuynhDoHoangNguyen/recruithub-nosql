@@ -15,6 +15,10 @@ describe('role-aware post-login navigation', () => {
     expect(postLoginPath('RECRUITER', '/recruiter/jobs/job%3A1/applicants?tab=all#list'))
       .toBe('/recruiter/jobs/job%3A1/applicants?tab=all#list');
   });
+  it('returns the Recruiter to the separate company profile after signing in', () => {
+    expect(postLoginPath('RECRUITER', '/recruiter/profile')).toBe('/recruiter/profile');
+    expect(postLoginPath('CANDIDATE', '/recruiter/profile')).toBe('/user/dashboard');
+  });
 
   it('returns a candidate to a valid public Job detail after login', () => {
     expect(postLoginPath('CANDIDATE', '/jobs/job%3Acms%3AJ_000001?apply=1'))

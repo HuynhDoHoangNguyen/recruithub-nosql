@@ -1,6 +1,8 @@
 # Báo cáo tổng hợp TV2 — Review hậu merge và hướng dẫn kiểm thử tích hợp
 
-Ngày cập nhật: 2026-10-24. Tài liệu này gom báo cáo hậu merge của TV2 và hướng dẫn kiểm thử chung TV1 + TV2. Các kết quả được giữ theo thời điểm báo cáo; xem phần trạng thái mới nhất ở cuối. Tài liệu triển khai TV2 vẫn ở [job-application-implementation.md](../../job-application-implementation.md).
+> **Rà soát mới nhất 25/10/2026:** [Report tổng hợp công việc, ma trận 7 UC TV2 và commit summary](TV2-review-and-commit-summary-2026-10-25.md). Phần lõi TV2 đã có API/UI và kiểm thử; còn phụ thuộc Interview/scoring TV3 và lỗi kiểm thử chung trước nghiệm thu toàn hệ thống.
+
+Ngày cập nhật phần lịch sử: 2026-10-24. Tài liệu này gom báo cáo hậu merge của TV2 và hướng dẫn kiểm thử chung TV1 + TV2. Các kết quả bên dưới được giữ theo thời điểm báo cáo. Tài liệu triển khai TV2 vẫn ở [job-application-implementation.md](../../job-application-implementation.md).
 
 ## Danh m?c
 

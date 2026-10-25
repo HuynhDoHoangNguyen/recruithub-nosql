@@ -1,5 +1,11 @@
 # Quản lý tuyển dụng và vòng đời hồ sơ ứng tuyển
 
+> Bàn giao mới nhất 25/10/2026: [JobPortal IT và bảy use case](recruitment-it-template-handoff.md). Đã tìm source đúng bản 5174, bổ sung organization context và Candidate aggregate toàn scope. Frontend 28/28 PASS; Foundation/Recruitment 59 PASS; full backend 266/288 PASS. Các nhận định/số test cũ dưới đây là lịch sử, không thay thế bằng chứng mới hoặc nghiệm thu Identity thật.
+
+> Mốc mới 25/10/2026: [sửa Public Jobs và kiểm chứng dữ liệu thật](public-jobs-live-verification.md). Đã phục hồi 25.750 business documents từ Git release đúng checksum vào local DB trống; đo live 2.500 Job, 200 OPEN thiếu published_at. Public list chuyển sang created_at/_id với index public_jobs_created_v2; API/browser thật đã hiển thị. Backend liên quan 56/56 PASS, UI 26/26 PASS (threads), full Backend 263/285 PASS. Private chưa nghiệm thu do Identity còn thiếu và users RESET_REQUIRED. Các trạng thái dữ liệu rỗng/fixtures trong ghi nhận cũ dưới đây là lịch sử.
+
+> Cập nhật 24/10/2026: đã khôi phục layout theo template và kiểm chứng Chrome; xem [bàn giao giao diện](frontend-template-restoration.md). UI 26/26 PASS, Backend liên quan 46/46 PASS; full Backend 253/275 PASS, 22 lỗi dữ liệu/Python. Trong lần xác minh này health/API công khai đã kết nối CouchDB trả 200; các thao tác có tài khoản dùng API fixture riêng, chưa phải demo Identity/CouchDB thật. Các ghi nhận môi trường ngày 23/10 bên dưới là lịch sử.
+
 Ngày cập nhật: 23/10/2026. Phạm vi: UC08, UC09, UC10, UC11, UC12, UC13, UC16. Đã sửa P1/P2/P3 sau merge trên HEAD `a832b08`; xem mục 9.
 
 ## 1. Kết quả và giới hạn nghiệm thu
