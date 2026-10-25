@@ -5,9 +5,9 @@ import api from '../../services/api';
 
 const statCards = [
   { key: 'totalUsers', label: 'Tổng người dùng', icon: FaUsers, tone: 'blue' },
-  { key: 'totalCandidates', label: 'Ứng viên', icon: FaUserTie, tone: 'violet' },
-  { key: 'active', label: 'Đang hoạt động', icon: FaUserCheck, tone: 'emerald' },
-  { key: 'locked', label: 'Đã khóa', icon: FaUserLock, tone: 'amber' },
+  { key: 'totalCandidates', label: 'Ứng viên', icon: FaUserTie, tone: 'blue' },
+  { key: 'active', label: 'Đang hoạt động', icon: FaUserCheck, tone: 'blue' },
+  { key: 'locked', label: 'Đã khóa', icon: FaUserLock, tone: 'blue' },
   { key: 'totalJobs', label: 'Tổng tin tuyển dụng', icon: FaBriefcase, tone: 'blue' },
 ];
 
@@ -43,8 +43,8 @@ function RoleBadge({ role }) {
 function RoleDistribution({ roles = {}, total = 0 }) {
   const segments = [
     { key: 'CANDIDATE', label: 'Ứng viên', color: '#2563eb' },
-    { key: 'RECRUITER', label: 'Nhà tuyển dụng', color: '#8b5cf6' },
-    { key: 'ADMIN', label: 'Admin', color: '#f59e0b' },
+    { key: 'RECRUITER', label: 'Nhà tuyển dụng', color: '#4f46e5' },
+    { key: 'ADMIN', label: 'Admin', color: '#0ea5e9' },
   ];
   const circumference = 2 * Math.PI * 42;
   let offset = 0;
@@ -329,12 +329,12 @@ const AdminDashboard = () => {
   const currentPage = users.length ? cursorHistory.length + 1 : totalCount === 0 ? 0 : cursorHistory.length + 1;
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-[#F5F7FB] px-4 py-8 text-left sm:px-6 lg:px-8">
+    <main className="min-h-[calc(100vh-4rem)] border-t-4 border-blue-600 bg-white px-4 py-8 text-left sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"><FaShieldAlt aria-hidden="true" />Khu vực quản trị</div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Tổng quan người dùng</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-blue-800">Tổng quan người dùng</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Theo dõi tài khoản và trạng thái hoạt động trên RecruiHub. Thống kê được tải trực tiếp từ CouchDB.</p>
           </div>
           <button className="btn-secondary w-fit" type="button" onClick={() => load(cursor)} disabled={loading}><FaSyncAlt className={`mr-2 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />Làm mới</button>
@@ -358,7 +358,7 @@ const AdminDashboard = () => {
             <RoleDistribution roles={stats.roles} total={stats.totalUsers || 0} />
           </article>
           <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:p-6">
-            <div className="flex items-center justify-between"><div><h2 className="font-bold text-slate-900">Trạng thái tài khoản</h2><p className="mt-1 text-sm text-slate-500">So sánh số lượng theo trạng thái</p></div><FaUserCheck className="text-lg text-emerald-600" aria-hidden="true" /></div>
+            <div className="flex items-center justify-between"><div><h2 className="font-bold text-slate-900">Trạng thái tài khoản</h2><p className="mt-1 text-sm text-slate-500">So sánh số lượng theo trạng thái</p></div><FaUserCheck className="text-lg text-blue-600" aria-hidden="true" /></div>
             <StatusDistribution statuses={stats.statuses} />
           </article>
           <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:p-6">
@@ -388,7 +388,7 @@ const AdminDashboard = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4 font-semibold">Tài khoản</th><th className="px-5 py-4 font-semibold">Vai trò</th><th className="px-5 py-4 font-semibold">Trạng thái</th><th className="px-5 py-4 font-semibold">Ngày tạo</th><th className="px-5 py-4 text-right font-semibold">Thao tác</th></tr></thead>
+                <thead className="bg-blue-50/80 text-xs uppercase tracking-wide text-blue-800"><tr><th className="px-5 py-4 font-semibold">Tài khoản</th><th className="px-5 py-4 font-semibold">Vai trò</th><th className="px-5 py-4 font-semibold">Trạng thái</th><th className="px-5 py-4 font-semibold">Ngày tạo</th><th className="px-5 py-4 text-right font-semibold">Thao tác</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">{users.map((item) => <tr key={item.id} className="transition hover:bg-blue-50/40"><td className="px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold uppercase text-blue-700">{(item.email || '?').charAt(0)}</span><div className="min-w-0"><p className="truncate font-semibold text-slate-800">{item.email}</p><p className="mt-0.5 truncate text-xs text-slate-400">{item.id}</p></div></div></td><td className="px-5 py-4"><RoleBadge role={item.role} /></td><td className="px-5 py-4"><StatusBadge status={item.account_status} /></td><td className="whitespace-nowrap px-5 py-4 text-slate-500">{item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '—'}</td><td className="px-5 py-4"><div className="flex justify-end"><UserActionSelect user={item} onView={viewUser} onStatusChange={beginStatusChange} onPasswordReset={beginPasswordReset} disabled={Boolean(statusUpdatingId)} /></div></td></tr>)}</tbody>
               </table>
             </div>

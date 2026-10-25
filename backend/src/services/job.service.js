@@ -214,11 +214,15 @@ export class JobService {
         ...(website ? { website } : {}),
       }
       : null;
+    const logoUrl = parsedCompany?.success ? companyLogoUrl(parsedCompany.data) : undefined;
 
     return {
       ...publicJobDto(job),
+      ...(job.location ? { location_label: JOB_LOCATIONS.find(option => option.value === job.location)?.label } : {}),
+      ...(job.work_mode ? { work_mode_label: WORK_MODES.find(option => option.value === job.work_mode)?.label } : {}),
       company,
       ...(company ? { company_name: company.name } : {}),
+      ...(logoUrl ? { company_logo_url: logoUrl } : {}),
     };
   }
 }

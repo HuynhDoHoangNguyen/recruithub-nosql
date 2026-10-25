@@ -40,10 +40,13 @@ it('keeps the dev detail layout and restores CV access, reapply revision and arc
   await screen.findByRole('heading', { name: 'Lịch sử các lần ứng tuyển (1)' });
   expect(screen.queryByRole('button', { name: 'Ứng tuyển lại' })).toBeNull();
 });
-it('keeps a closed job readable while preventing withdrawn applications from reapplying', async () => {
-  jobApi.publicDetail.mockResolvedValue({ ...job, status: 'CLOSED' });
+it('keeps a closed job readable through the Candidate application history only', async () => {
+  const closedJob = { ...job, status: 'CLOSED' };
+  jobApi.publicDetail.mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }));
+  current = { ...current, job: closedJob };
   renderDetail(); await screen.findByRole('heading', { name: job.title });
-  expect(screen.getByRole('button', { name: 'Ứng tuyển lại' }).disabled).toBe(true);
-  expect(screen.getByText('Đã đóng tin')).toBeTruthy();
+  expect(applicationApi.mine).toHaveBeenCalledWith({ job_id: job._id, limit: 20 });
+  expect(screen.getByText(/đã đóng tin/i)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'á»¨ng tuyá»ƒn láº¡i' })).toBeNull();
   expect(applicationApi.apply).not.toHaveBeenCalled();
 });

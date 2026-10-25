@@ -18,7 +18,7 @@ import { createAssetRepository } from './repositories/asset.repository.js';
 import { UploadService } from './services/upload.service.js';
 import { createUploadRoutes } from './routes/upload.routes.js';
 
-function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://localhost:5173') {
+function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://127.0.0.1:5177') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
   if (!origins.length || origins.some(origin => {
     try {

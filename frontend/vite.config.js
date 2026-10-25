@@ -7,7 +7,8 @@ export default defineConfig(({ mode }) => {
   const root = loadEnv(mode, fileURLToPath(new URL('..', import.meta.url)), '')
   const backend = loadEnv(mode, fileURLToPath(new URL('../backend', import.meta.url)), '')
   const local = loadEnv(mode, process.cwd(), 'VITE_')
-  const backendPort = process.env.PORT || backend.PORT || root.PORT || '5000'
+  // PORT belongs to the backend's root/backend env; do not inherit Vite's own PORT.
+  const backendPort = backend.PORT || root.PORT || '5000'
 
   return {
     cacheDir: 'node_modules/.vite/portal-dev',

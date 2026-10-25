@@ -1,17 +1,15 @@
 import axios from 'axios';
 import { getAccessToken } from '../utils/authHelper';
 
-const DEFAULT_API_ROOT = '/api';
+const API_BASE_URL = '/api';
 
-/** Keep the Axios base at /api because API modules append /v1 themselves. */
-export function normalizeApiBaseUrl(value) {
-  const configured = typeof value === 'string' && value.trim() ? value.trim() : DEFAULT_API_ROOT;
-  const withoutVersionSuffix = configured.replace(/\/+$/, '').replace(/(?:\/v1)+$/i, '');
-  return /\/api$/i.test(withoutVersionSuffix) ? withoutVersionSuffix : `${withoutVersionSuffix}/api`;
+/** Browser API calls stay same-origin and pass through the /api proxy. */
+export function normalizeApiBaseUrl() {
+  return API_BASE_URL;
 }
 
 const api = axios.create({
-  baseURL: normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL),
+  baseURL: normalizeApiBaseUrl(),
   timeout: 10000,
 });
 
