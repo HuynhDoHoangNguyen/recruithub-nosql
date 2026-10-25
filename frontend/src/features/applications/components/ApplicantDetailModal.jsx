@@ -1,14 +1,19 @@
 import { useCallback, useState } from 'react';
+import { Check, MessageSquare, Send, UserCheck, X, Save } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { applicationApi } from '../../../api/jobApplicationApi';
 import { reasonLabels, stageLabels } from '../applicationPresentation';
 import { useApiResource } from '../useApiResource';
 import { Button, ErrorMessage, Field, Modal, Resource, StageBadge } from './ApplicationUI';
+import ApplicationAttempts from './ApplicationAttempts';
 import ApplicationTimeline from './ApplicationTimeline';
+import ViewAssetButton from '../../../components/uploads/ViewAssetButton';
+import PrivateAssetImage from '../../../components/uploads/PrivateAssetImage';
+const actionIcons = { SCREENING: Check, INTERVIEW: MessageSquare, OFFER: Send, HIRED: UserCheck, REJECTED: X };
 
-export default function ApplicantDetailModal({ id, onClose, onChanged }) {
+export default function ApplicantDetailModal({ id, initialTarget = '', onClose, onChanged }) {
   const resource = useApiResource(useCallback(() => applicationApi.detail(id), [id]));
-  const [target, setTarget] = useState('');
+  const [target, setTarget] = useState(initialTarget);
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
   const [acceptedAt, setAcceptedAt] = useState('');
@@ -18,9 +23,10 @@ export default function ApplicantDetailModal({ id, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const application = resource.data;
+  const offerBlocked = target === 'OFFER' && application?.offer_eligible === false;
   async function submit(event) {
     event.preventDefault(); setError(null);
-    if (!target || (target === 'REJECTED' && !reason) || (target === 'HIRED' && (!acceptedAt || !confirmed))) {
+    if (!target || !application.allowed_transitions.includes(target) || offerBlocked || (target === 'REJECTED' && !reason) || (target === 'HIRED' && (!acceptedAt || !confirmed))) {
       setError(new Error('Chọn trạng thái và điền đầy đủ lý do hoặc bằng chứng cần thiết.')); return;
     }
     setBusy(true);
@@ -41,16 +47,23 @@ export default function ApplicantDetailModal({ id, onClose, onChanged }) {
   return <Modal title="Chi tiết hồ sơ ứng tuyển" onClose={onClose} busy={busy}>
     <ErrorMessage error={error} />
     <Resource resource={resource}>{application && <div className="space-y-5"><div><h3 className="font-semibold text-gray-900">{application.candidate.profile.full_name || 'Chưa cung cấp họ tên'}</h3>
+      {application.candidate.avatar && <div className="my-3"><PrivateAssetImage asset={application.candidate.avatar} /></div>}
       <p className="break-all text-sm text-gray-600">{application.email}</p><p className="my-2 text-sm">{application.candidate.profile.role} · {application.candidate.profile.years_experience} năm kinh nghiệm</p><StageBadge stage={application.current_stage} /></div>
       <p className="text-sm text-gray-700">Kỹ năng: {application.candidate.skills.map(skill => skill.name).join(', ') || 'Chưa cung cấp'}</p>
-      <section><h3 className="mb-2 font-semibold">CV văn bản đã nộp</h3><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-gray-50 p-4 font-sans text-sm">{application.submission?.resume_text || 'Hồ sơ lịch sử chưa có CV văn bản.'}</pre></section>
+      <section className="space-y-3"><h3 className="mb-2 font-semibold">CV đã nộp</h3><ViewAssetButton asset={application.submission?.resume_file} />{application.submission?.resume_text && <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-gray-50 p-4 font-sans text-sm">{application.submission.resume_text}</pre>}{!application.submission?.resume_text && !application.submission?.resume_file && <p className="text-sm text-slate-400">Hồ sơ lịch sử chưa có CV đính kèm.</p>}</section>
       {application.submission?.cover_letter && <section><h3 className="mb-2 font-semibold">Thư giới thiệu</h3><p className="whitespace-pre-wrap text-sm text-gray-700">{application.submission.cover_letter}</p></section>}
-      <ApplicationTimeline application={application} />
+      <ApplicationTimeline application={application} /><ApplicationAttempts application={application} />
       <p className="text-sm text-gray-500">Điểm phù hợp: Chưa tích hợp dịch vụ phân tích.</p>
       {application.current_stage === 'INTERVIEW' && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{application.interview_status === 'SCHEDULING_REQUIRED' ? 'Cần lên lịch phỏng vấn. Liên hệ bộ phận phỏng vấn để tạo vòng đánh giá.' : 'Đã có biên bản phỏng vấn. Chỉ có thể gửi offer khi tất cả các vòng hoàn tất.'}</p>}
+      {application.offer_blocker && <p className="text-sm text-amber-800">{application.offer_blocker}</p>}
       {!!application.allowed_transitions.length && <form onSubmit={submit} className="space-y-4 border-t border-gray-200 pt-5"><fieldset disabled={busy} className="space-y-4">
+        <div aria-label="Hành động xử lý hồ sơ" className="flex flex-wrap gap-2">{application.allowed_transitions.map(stage => {
+          const Icon = actionIcons[stage] || Check;
+          return <button key={stage} type="button" disabled={busy || (stage === 'OFFER' && application.offer_eligible === false)} title={stage === 'OFFER' ? application.offer_blocker : undefined} aria-pressed={target === stage} onClick={() => { setTarget(stage); setReason(''); }} className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50 ${stage === 'REJECTED' ? 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100' : 'bg-blue-600 text-white hover:bg-blue-700'}`}><Icon className="h-4 w-4" aria-hidden="true" />{{ SCREENING: 'Duyệt hồ sơ', INTERVIEW: 'Mời phỏng vấn', OFFER: 'Gửi đề nghị', HIRED: 'Xác nhận tuyển dụng', REJECTED: 'Từ chối' }[stage]}</button>;
+        })}</div>
+        {target && <p className="text-sm text-slate-600">Xác nhận thao tác: {stageLabels[target]}. {target === 'REJECTED' && 'Chọn lý do trước khi xác nhận.'}</p>}
         <Field label="Chuyển trạng thái" name="target-stage"><select id="target-stage" value={target} onChange={event => { setTarget(event.target.value); setReason(''); }} required className="w-full rounded-lg border border-gray-300 p-3">
-          <option value="">Chọn thao tác</option>{application.allowed_transitions.map(stage => <option key={stage} value={stage}>{stageLabels[stage]}</option>)}</select></Field>
+          <option value="">Chọn thao tác</option>{application.allowed_transitions.map(stage => <option key={stage} value={stage} disabled={stage === 'OFFER' && application.offer_eligible === false}>{stageLabels[stage]}</option>)}</select></Field>
         {target === 'REJECTED' && <Field label="Lý do từ chối *" name="rejection-reason"><select id="rejection-reason" value={reason} onChange={event => setReason(event.target.value)} required className="w-full rounded-lg border p-3">
           <option value="">Chọn lý do</option>{reasons.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field>}
         {target === 'HIRED' && <div className="space-y-3 rounded-lg bg-gray-50 p-4">
@@ -60,7 +73,7 @@ export default function ApplicantDetailModal({ id, onClose, onChanged }) {
           <label className="flex gap-2 text-sm"><input type="checkbox" required checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />Tôi đã kiểm tra bằng chứng ứng viên chấp nhận offer.</label>
         </div>}
         <Field label="Ghi chú nội bộ (không hiển thị cho ứng viên)" name="transition-note"><textarea id="transition-note" value={note} onChange={event => setNote(event.target.value)} maxLength={2000} rows={3} className="w-full rounded-lg border p-3" /></Field>
-        <Button type="submit" disabled={busy || !target || (target === 'REJECTED' && !reason) || (target === 'HIRED' && (!acceptedAt || !confirmed))}>{busy ? 'Đang cập nhật…' : 'Xác nhận chuyển trạng thái'}</Button>
+        <Button type="submit" className="inline-flex items-center gap-2" disabled={busy || !target || !application.allowed_transitions.includes(target) || offerBlocked || (target === 'REJECTED' && !reason) || (target === 'HIRED' && (!acceptedAt || !confirmed))}><Save className="h-4 w-4" aria-hidden="true" />{busy ? 'Đang cập nhật…' : 'Xác nhận chuyển trạng thái'}</Button>
       </fieldset></form>}
     </div>}</Resource>
   </Modal>;

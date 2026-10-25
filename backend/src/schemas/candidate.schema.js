@@ -10,6 +10,7 @@
  */
 
 import { z } from 'zod';
+import { assetReferenceSchema } from './upload.schema.js';
 import {
   AVAILABILITY_STATES,
   DOCUMENT_TYPES,
@@ -44,6 +45,8 @@ export const candidateProfileSchema = z
     experience_months: z.number().int().nonnegative('Experience months cannot be negative'),
     summary: z.string().trim().min(1).optional(),
     full_name: z.string().trim().min(1).optional(),
+    phone: z.string().trim().max(40).optional(),
+    location: z.string().trim().max(160).optional(),
   })
   .strict()
   .superRefine((profile, ctx) => {
@@ -179,6 +182,9 @@ function refineCandidateData(candidate, ctx) {
  * Base candidate object definition without reference constraints.
  */
 const candidateBaseObject = {
+  resume_file: assetReferenceSchema.optional(),
+  avatar: assetReferenceSchema.optional(),
+  languages: z.array(z.object({ name: z.string().trim().min(1).max(80), proficiency: z.string().trim().max(120).optional() }).strict()).max(20).optional(),
   _id: z
     .string()
     .regex(/^candidate:(cms:R_[0-9]{6}|[a-z0-9_-]+)$/, 'Invalid Candidate _id format'),

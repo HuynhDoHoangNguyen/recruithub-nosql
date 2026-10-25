@@ -1,5 +1,7 @@
 ﻿# Bàn giao TV2 — Recruiter Management & Application Lifecycle
 
+> Bản này là lịch sử. Xem [bàn giao RecruiHub mới nhất](recruihub-catalog-lifecycle-handoff-2026-10-25.md) để biết kết quả Identity/CouchDB đang chạy, bộ lọc và thiết kế nhiều lần nộp.
+
 Ngày kiểm tra: **25/10/2026 (Asia/Saigon)**. Branch: `feature/recruiter-management-application-lifecycle`; HEAD tham chiếu `1127fb5`. Bảo toàn thay đổi có sẵn; không checkout/merge/reset/commit/push.
 
 ## 1. Kết quả và giới hạn

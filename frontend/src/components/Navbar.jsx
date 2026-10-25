@@ -33,8 +33,8 @@ const Navbar = () => {
 	};
 
 	const isActive = (path) => location.pathname === path;
-	const profileRoute = user?.role === 'recruiter' ? '/recruiter/dashboard#organization' : '/profile';
-	const profileActive = user?.role === 'recruiter' ? isActive('/recruiter/dashboard') && location.hash === '#organization' : isActive('/profile');
+	const profileRoute = user?.role === 'recruiter' ? '/recruiter/profile' : '/profile';
+	const profileActive = isActive(profileRoute);
 
 	const roleLabel = {
 		'admin': { text: 'Admin', color: 'bg-amber-100 text-amber-800 border-amber-300' },
@@ -51,20 +51,17 @@ const Navbar = () => {
 					<div className="flex items-center gap-8">
 						<Link to="/" className="flex items-center gap-2.5 group">
 							<div className="h-10 w-10 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-800 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform duration-200">
-								<span className="text-white font-extrabold text-xl tracking-tight">J</span>
+								<span className="text-white font-extrabold text-xl tracking-tight">R</span>
 							</div>
 							<div className="flex flex-col">
 								<div className="flex items-center gap-1.5">
 									<span className="text-xl font-extrabold text-slate-900 tracking-tight">
-										JobPortal
+										RecruiHub
 									</span>
 									<span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded tracking-wider uppercase">
 										IT
 									</span>
 								</div>
-								<span className="text-[10px] text-slate-400 font-medium -mt-1 hidden sm:block">
-									Ít nhưng mà chất
-								</span>
 							</div>
 						</Link>
 
@@ -80,9 +77,6 @@ const Navbar = () => {
 								}`}
 							>
 								<span>Việc Làm IT</span>
-								<span className="bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.2 rounded-full animate-pulse">
-									HOT
-								</span>
 							</Link>
 
 							{user && (

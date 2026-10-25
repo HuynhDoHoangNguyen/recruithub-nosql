@@ -40,22 +40,68 @@ All conditions are required:
 3. Job `status == OPEN`.
 4. Apply time is not later than Job `deadline`; the inclusive boundary is evaluated in UTC.
 5. Job has valid Company, Department and Recruiter references.
-6. No lifetime Application exists for the Candidate–Job pair.
+6. No Application exists for the Candidate–Job pair, or its current attempt is `WITHDRAWN` and the reapply request supplies the current `expected_rev` and a new UUID `request_id`.
 7. Client does not provide `_id`, `current_stage`, history or score; Backend constructs them.
 
 Failure creates no partial Application.
 
-### 3.2. Lifetime uniqueness and concurrency
+### 3.2. Pair uniqueness, application attempts and concurrency (updated 25/10/2026)
 
 `APPROVED_MVP`:
 
-- Exactly one lifetime Application is allowed for each Candidate–Job pair.
-- Re-application remains prohibited after `HIRED`, `REJECTED` or `WITHDRAWN`.
+- Exactly one Application document is allowed for each Candidate–Job pair. Its top-level fields describe the current attempt.
+- Re-application is allowed only after `WITHDRAWN`, subject to all Apply preconditions. `HIRED` and `REJECTED` remain blocked.
 - The deterministic pair ID is `application:pair:<sha256(candidate_id + "\n" + job_id)>`.
-- Concurrent Apply requests target the same ID. One create succeeds; the other receives CouchDB `409`, reads the existing document and returns `DUPLICATE_APPLICATION`.
+- Concurrent different Apply requests target the same ID/revision. One write succeeds; the other receives `409` and must refresh. The server does not overwrite the winner.
+- A UUID `request_id` identifies a submission intent. A retry of the same committed request and CV returns the current document without writing, including after withdrawal or Job closure. A reused key with a different CV is a conflict; a key belonging to an archived attempt is already processed and cannot start another attempt.
 - A Mango query is not an atomic uniqueness boundary.
 
-`REJECTED_MVP`: allowing a new cycle after a terminal state. It needs an application-cycle key and a separate atomic active-cycle constraint, increasing concurrency and generator complexity.
+Reapply archives the previous attempt as a `WITHDRAWN` snapshot in `previous_attempts`, increments `attempt_number`, stores the new submission and starts a fresh `null → APPLIED` history. Never append `WITHDRAWN → APPLIED` to an existing history. Each history retains its terminal semantics. Existing documents without attempt fields represent attempt 1; no historical dataset rewrite is needed.
+
+The current attempt and each archived attempt keep their own CV, cover letter, timestamps and history. Candidate DTOs redact internal notes/evidence/actor IDs in every attempt. Current counts count pair documents once; `total_attempts` and `historical_attempts` are separate reduced counts within Candidate or Recruiter ownership scope.
+
+Interview records use optional `application_attempt` (legacy default 1). Attempt 1 keeps the existing ID; later IDs are `interview:<pair digest>:attempt:<attempt>:<round>`. Only current-attempt interviews participate in status, round handling and OFFER validation. A new attempt requests a fresh analysis context and exposes no old score. The separate TV3 analysis integration must bind its freshness key to the attempt before exposing scores.
+
+### 3.3. Job close and reopen
+
+The owning Recruiter may close DRAFT/OPEN Jobs and reopen CLOSED Jobs via `PATCH /jobs/:id/status` with `{ status: 'OPEN', expected_rev, deadline? }`. Reopen validates organization references, the entire merged Job schema and a future deadline **before** writing. A new deadline is accepted only with OPEN status. Generic editing of CLOSED Jobs remains blocked. Revision conflicts return 409; clients reload rather than overwrite. Closing/reopening never changes an Application, its attempts, terminal decisions or history.
+
+### 3.4. Public catalog optional fields and filters
+
+`location` uses the canonical keys from `JOB_LOCATIONS`; `work_mode` is `HYBRID`, `REMOTE` or `ONSITE`. Both are optional. Create/edit persist real selections; editing may clear either using null, which removes it from persistence. Missing values display “Chưa cập nhật” and never match a selected location/work mode.
+
+`GET /jobs/metadata` combines canonical options with normalized skills/industries from every OPEN Job in the live and historical catalogs. Keyword, industry, seniority, location, work mode and skill filters combine with AND; multiple skills also use AND. An unfiltered list uses `public_jobs_created_v2`; filtered queries scan the Job ID range in bounded batches and evaluate the whole dataset rather than one UI page. Cursor hashes bind all filters. No salary, benefit, company size, HOT or verification facts are inferred.
+
+### 3.5. Recruiter job details, deletion and business profile (25/10/2026)
+
+- New Job forms offer INTERN, FRESHER, JUNIOR and SENIOR. Stored MID documents remain valid and editable without automatic conversion. Candidate seniority/scoring contracts are unchanged.
+- Optional `employment_type` is FULL_TIME, PART_TIME, CONTRACT or INTERNSHIP and is independent of HYBRID/REMOTE/ONSITE `work_mode`.
+- Optional salary is NEGOTIABLE or a monthly RANGE with positive min/max, max >= min and VND/USD currency. Missing historical salary remains unknown. No template salary is inferred.
+- The owning Recruiter may delete a Job from lists via DELETE with `expected_rev`. The same atomic write marks it CLOSED and sets `deleted_at`. Public detail/list and Recruiter list/job statistics exclude it; edit/reopen/new Apply are blocked. CVs, attempts and stage histories remain untouched and readable by their authorized owners. Repeating deletion is idempotent. No database drop or Application cascade deletion occurs.
+- Recruiters may edit their own optional contact `profile` and their scoped Company's display fields/website/address/description/logo URL, each against the corresponding revision. Email, role, User ID, Company ID and Department ID are immutable through these endpoints. Company display changes are shared by the Company's Jobs; membership is unchanged.
+- Logo URLs accept only http/https without embedded credentials. The browser uses initials when the URL is absent or the image fails. Profile completion reflects provided fields, not a hardcoded percentage.
+
+### 3.6. Uploaded CVs and profile images (25/10/2026)
+
+- CVs accept DOC, DOCX and PDF strictly below 5 × 1024 × 1024 bytes. Logos/avatars accept PNG/JPEG/WEBP under the same limit. Backend verifies signatures/container metadata and bounds image dimensions.
+- Files are immutable CouchDB attachments in the isolated writable database. Candidate/Company/Application documents hold validated metadata references, not client-provided binary or file paths.
+- Submission requires uploaded CV and/or resume text. Clients provide an owned resume asset ID; server snapshots metadata. Saved profile CV selection is explicit. File-only profile edits do not require unrelated career edits.
+- Replacing/removing profile files leaves existing submissions and archived attempts intact. Reapply/retry revision and request-key checks remain effective.
+- CV downloads require ownership or a referencing Application under the Recruiter's owned Job scope. Avatars are private to Candidate/authorized Recruiter. Public logo endpoints accept only logo-purpose assets; CV responses are attachment/private/no-store with nosniff and integrity verification.
+  - UI logo URL entry is replaced by file selection; legacy URL data stays readable.
+  - Browser CV preview uses the same authorization/integrity checks as download. PDF bytes are fetched privately and opened through a temporary browser Blob URL; DOC/DOCX are extracted to escaped plain text by a bounded worker (10 seconds, 128 MB V8 heap, at most 500,000 displayed characters). No external document viewer receives files. Word preview does not preserve page layout/images and is not input to the scoring engine.
+  - PDF validation accepts a header within the first 1,024 bytes and padding after EOF, then parses the document/page tree before storage. Original bytes are preserved; a signature-only fake PDF is rejected. Existing <5 MB limit remains enforced before parsing.
+  - Candidate profile supports optional phone/location and languages, with explicit view/edit and ETag-protected save. These contact fields do not change scoring inputs or historical Application snapshots.
+  - Candidate application list and Recruiter job list request 5 records per page using backend bookmarks; changing their stage/status filter resets to page 1. Aggregate statistics cover all matching owned records, independently of the current page.
+
+### 3.7. Self-service profile validation (25/10/2026)
+
+- Contact numbers are optional. A supplied number must match the portal's Vietnamese contact format: local mobile `0[35789]` + 8 digits, local fixed line `02` + 9 digits, or the corresponding `+84`/`84` prefix replacing `0`. Spaces, dots, hyphens and parentheses are accepted as formatting. This validates structure, not ownership/active subscription; no OTP verification is implied.
+- Both Candidate and Recruiter forms show field errors on blur/save and block invalid submissions. APIs repeat validation before writes. Legacy documents stay readable so invalid contacts can be corrected without a data migration.
+- Names must contain letters, be at least 2 characters and have no HTML tags. Candidate name max 120; Recruiter max 160. Candidate years of experience is an integer from 0 to 80. All text fields have bounded lengths and reject control characters, with newlines allowed in descriptions.
+- Candidate collection bounds: skills 100, languages 20, education 30, experience 50, projects 50. Normalized skill names and language names must be unique. New/edited dates must be real `YYYY-MM` or `YYYY-MM-DD` dates from year 1900, with end >= start. Unchanged historical date strings/ranges remain intact.
+- Company name/industry require at least 2 characters; website is optional, max 2048 characters and must use HTTP/HTTPS without embedded credentials. Account email, roles, organization membership, file ownership and revisions remain server-controlled.
+- Landing hero/featured cards use live API job data. Static decorative content describes features; no invented employer verification, live activity, job counts or match scores are shown.
 
 ## 4. Application state definitions
 
@@ -75,7 +121,7 @@ Failure creates no partial Application.
 
 | From | To | Actor | Preconditions | Result/history |
 |---|---|---|---|---|
-| — | `APPLIED` | Candidate/system | Apply preconditions pass; lifetime pair does not exist | Create Application; initial Candidate event |
+| — | `APPLIED` | Candidate/system | Apply preconditions pass; pair absent or current attempt WITHDRAWN with revision/request key | Create document or archive previous attempt; fresh initial Candidate event |
 | `APPLIED` | `SCREENING` | Recruiter | Job scope valid; revision/current stage match | Append `SCREENING_STARTED` |
 | `APPLIED` | `REJECTED` | Recruiter | Scope valid; rejection reason code present | Append terminal rejection |
 | `APPLIED` | `WITHDRAWN` | Candidate | Own Application; revision/current stage match | Append terminal withdrawal |
@@ -109,7 +155,7 @@ Additional locked semantics:
 - Candidate withdrawal is allowed only in `APPLIED`, `SCREENING` and `INTERVIEW`.
 - Candidate cannot withdraw in `OFFER`.
 - Offer declined/expired is `OFFER → REJECTED` with a required reason code such as `OFFER_DECLINED` or `OFFER_EXPIRED`.
-- `HIRED`, `REJECTED` and `WITHDRAWN` cannot transition further.
+- `HIRED`, `REJECTED` and `WITHDRAWN` cannot transition further within an attempt. A separate reapply command may start a fresh attempt after WITHDRAWN only.
 
 `REJECTED_MVP`: add a distinct `DECLINED` stage or allow `OFFER → WITHDRAWN`. Both would change the approved seven-stage model.
 
@@ -203,7 +249,7 @@ All twelve rows are locked as `APPROVED_MVP`. Rejected alternatives are preserve
 |---:|---|---|---|---|---|---|
 | 1 | Partial profile schema | Permit partial `education`, aggregate `experience_summary`, empty detailed arrays with availability | Require full school/employer/project objects | Matches audited source without fabrication | Zod optionality and generator | `APPROVED_MVP` |
 | 2 | Canonical email ownership | User only; Candidate/Recruiter reference User | Duplicate email in profile documents | Avoids conflicting canonical values | User ID, lookup and response composition | `APPROVED_MVP` |
-| 3 | Re-application policy | One lifetime Application per Candidate–Job | New cycle after terminal state | Deterministic ID gives atomic duplicate protection | Application identity/cardinality | `APPROVED_MVP` |
+| 3 | Re-application policy | One pair document; new attempt after WITHDRAWN only | New attempt after HIRED/REJECTED | Deterministic ID + expected revision + request key give atomic duplicate protection | Application attempts/history | `APPROVED_MVP`, updated 25/10/2026 |
 | 4 | Pipeline state | Persist only `current_stage` | Mirror `current_stage` in `status` | Single source of truth | Schema, queries and APIs | `APPROVED_MVP` |
 | 5 | Withdraw transitions | APPLIED/SCREENING/INTERVIEW only | Also allow OFFER | Preserves seven-stage model and explicit offer outcome | Transition constants/tests | `APPROVED_MVP` |
 | 6 | Interview recovery | Transition first; idempotent create and reconciliation | Create during SCREENING then transition | Keeps Interview creation invariant simple | Service orchestration and repair | `APPROVED_MVP` |
@@ -231,7 +277,7 @@ All twelve rows are locked as `APPROVED_MVP`. Rejected alternatives are preserve
 |---|---|---|
 | BR-01 | First eligible Apply | One APPLIED Application and initial event |
 | BR-02 | Concurrent duplicate Apply | One create; other maps `409` to duplicate |
-| BR-03 | Reapply after WITHDRAWN | Rejected under lifetime policy |
+| BR-03 | Reapply after WITHDRAWN | New APPLIED attempt if OPEN/future deadline/profile/scope valid; preserve previous attempt |
 | BR-04 | Candidate withdraws APPLIED | WITHDRAWN terminal event |
 | BR-05 | Candidate withdraws INTERVIEW | WITHDRAWN terminal event |
 | BR-06 | Candidate withdraws OFFER | Rejected; no mutation |

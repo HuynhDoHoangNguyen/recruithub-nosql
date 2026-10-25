@@ -6,9 +6,9 @@ import { jobApi } from '../api/jobApplicationApi';
 const developmentFixturesEnabled = import.meta.env.DEV && import.meta.env.VITE_PUBLIC_JOBS_MODE === 'fixtures';
 export const isPublicJobsMockMode = developmentFixturesEnabled;
 
-export async function listPublicJobs({ search = '', skills = '', industry = '', seniority = '', sort = 'newest', page = 1, pageSize = 12, bookmark, signal } = {}) {
+export async function listPublicJobs({ search = '', skills = '', industry = '', seniority = '', location = '', work_mode = '', sort = 'newest', page = 1, pageSize = 12, bookmark, signal } = {}) {
   if (developmentFixturesEnabled) return filterSortAndPageJobs(publicJobFixtures, { search, skills, industry, seniority, sort, page, pageSize });
-  const response = await jobApi.publicList({ limit: pageSize, q: search, skills, industry, ...(seniority ? { seniority } : {}), ...(bookmark ? { bookmark } : {}) }, { signal });
+  const response = await jobApi.publicList({ limit: pageSize, q: search, skills, industry, ...(location ? { location } : {}), ...(work_mode ? { work_mode } : {}), ...(seniority ? { seniority } : {}), ...(bookmark ? { bookmark } : {}) }, { signal });
   return {
     jobs: (response.items || []).map(normalizeJob),
     total: null,

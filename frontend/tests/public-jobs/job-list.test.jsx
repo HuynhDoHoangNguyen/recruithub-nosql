@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import JobList from '../../src/pages/Jobs/JobList';
 import { listPublicJobs } from '../../src/services/publicJobsApi';
+import { jobApi } from '../../src/api/jobApplicationApi';
 
 vi.mock('../../src/services/publicJobsApi', () => ({ isPublicJobsMockMode: false, listPublicJobs: vi.fn() }));
+vi.mock('../../src/api/jobApplicationApi', () => ({ jobApi: { metadata: vi.fn() } }));
 
 function LocationText() {
   const location = useLocation();
@@ -21,17 +23,19 @@ beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   listPublicJobs.mockResolvedValue({ jobs: [], total: null, nextPage: null });
+  jobApi.metadata.mockResolvedValue({ skills: ['JavaScript', 'SQL'], industries: ['SaaS'], locations: [{ value: 'VN-HN', label: 'Hà Nội' }], work_modes: [{ value: 'REMOTE', label: 'Remote' }], seniorities: [{ value: 'MID', label: 'Có kinh nghiệm' }] });
 });
 
 describe('Public Job search UI', () => {
   it('restores filters from URL and requests them from the API', async () => {
     renderJobs('/jobs?q=Backend&skills=JavaScript%2C%20SQL&industry=SaaS&seniority=MID');
     expect(screen.getByLabelText('Tìm theo vị trí, mô tả, ngành nghề hoặc kỹ năng').value).toBe('Backend');
-    expect(screen.getByLabelText('Kỹ năng').value).toBe('JavaScript, SQL');
+    expect((await screen.findByLabelText('JavaScript')).checked).toBe(true);
+    expect(screen.getByLabelText('SQL').checked).toBe(true);
     expect(screen.getByLabelText('Ngành nghề').value).toBe('SaaS');
-    expect(screen.getByLabelText('Cấp độ').value).toBe('MID');
+    expect(screen.getByLabelText('Có kinh nghiệm').checked).toBe(true);
     await waitFor(() => expect(listPublicJobs).toHaveBeenCalledWith(expect.objectContaining({
-      search: 'Backend', skills: 'JavaScript, SQL', industry: 'SaaS', seniority: 'MID', page: 1, pageSize: 12,
+      search: 'Backend', skills: 'JavaScript,SQL', industry: 'SaaS', seniority: 'MID', page: 1, pageSize: 12,
     })));
   });
 
@@ -40,9 +44,9 @@ describe('Public Job search UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Xóa lọc' }));
     await waitFor(() => expect(screen.getByTestId('location-search').textContent).toBe(''));
     expect(screen.getByLabelText('Tìm theo vị trí, mô tả, ngành nghề hoặc kỹ năng').value).toBe('');
-    expect(screen.getByLabelText('Kỹ năng').value).toBe('');
+    expect((await screen.findByLabelText('JavaScript')).checked).toBe(false);
     expect(screen.getByLabelText('Ngành nghề').value).toBe('');
-    expect(screen.getByLabelText('Cấp độ').value).toBe('');
+    expect(screen.getByLabelText('Tất cả cấp bậc').checked).toBe(true);
   });
 
   it('shows the empty state without inventing an exact total', async () => {
@@ -60,7 +64,7 @@ describe('Public Job search UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
     await waitFor(() => expect(listPublicJobs).toHaveBeenCalledTimes(2));
     expect(listPublicJobs.mock.calls[1][0]).toMatchObject({ page: 2, bookmark: 'cursor-next' });
-    fireEvent.change(screen.getByLabelText('Cấp độ'), { target: { value: 'MID' } });
+    fireEvent.click(await screen.findByLabelText('Có kinh nghiệm'));
     await waitFor(() => expect(listPublicJobs).toHaveBeenCalledTimes(3));
     expect(listPublicJobs.mock.calls[2][0]).toMatchObject({ page: 1, bookmark: undefined, seniority: 'MID' });
   });

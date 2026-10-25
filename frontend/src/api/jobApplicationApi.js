@@ -16,15 +16,22 @@ async function unwrap(request) {
   }
 }
 export const jobApi = {
+  metadata: () => unwrap(client.get('/v1/jobs/metadata')),
   context: () => unwrap(client.get('/v1/recruiter/context')),
   list: params => unwrap(client.get('/v1/recruiter/jobs', { params })),
   stats: () => unwrap(client.get('/v1/recruiter/stats')),
   detail: id => unwrap(client.get(`/v1/recruiter/jobs/${idPath(id)}`)),
   create: payload => unwrap(client.post('/v1/jobs', payload)),
   edit: (id, payload) => unwrap(client.patch(`/v1/jobs/${idPath(id)}`, payload)),
-  status: (id, status, expected_rev) => unwrap(client.patch(`/v1/jobs/${idPath(id)}/status`, { status, expected_rev })),
+  remove: (id, expected_rev) => unwrap(client.delete(`/v1/jobs/${idPath(id)}`, { data: { expected_rev } })),
+  status: (id, status, expected_rev, deadline) => unwrap(client.patch(`/v1/jobs/${idPath(id)}/status`, { status, expected_rev, ...(deadline ? { deadline } : {}) })),
   publicList: (params, { signal } = {}) => unwrap(client.get('/v1/jobs', { params, signal })),
   publicDetail: id => unwrap(client.get(`/v1/jobs/${idPath(id)}`)),
+};
+export const recruiterProfileApi = {
+  get: () => unwrap(client.get('/v1/recruiter/profile')),
+  update: payload => unwrap(client.patch('/v1/recruiter/profile', payload)),
+  updateCompany: payload => unwrap(client.patch('/v1/recruiter/company', payload)),
 };
 export const applicationApi = {
   stats: () => unwrap(client.get('/v1/applications/stats')),

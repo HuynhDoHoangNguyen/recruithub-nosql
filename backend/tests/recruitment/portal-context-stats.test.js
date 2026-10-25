@@ -14,7 +14,7 @@ test('Candidate statistics aggregate beyond a page and never include another Can
   assert.equal(page.body.data.items.length, 1);
   const stats = await f.request('GET', '/applications/stats');
   assert.equal(stats.status, 200);
-  assert.deepEqual(stats.body.data, { total_applications: 25, by_stage: { APPLIED: 25 } });
+  assert.deepEqual(stats.body.data, { total_applications: 25, total_attempts: 25, historical_attempts: 0, by_stage: { APPLIED: 25 } });
   assert.equal((await f.request('GET', '/applications/stats', undefined, 'recruiter')).status, 403);
 });
 

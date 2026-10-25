@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { jobController } from '../controllers/job.controller.js';
 import { applicationController } from '../controllers/application.controller.js';
 import { requireRoles, validate } from '../middleware/job-application.middleware.js';
-import { applicantQuerySchema, createJobRequestSchema, editJobRequestSchema, jobListQuerySchema, jobParamsSchema, publicJobQuerySchema, statusRequestSchema } from '../schemas/job-application-request.schema.js';
+import { applicantQuerySchema, createJobRequestSchema, editJobRequestSchema, jobListQuerySchema, jobParamsSchema, publicJobQuerySchema, statusRequestSchema, deleteJobRequestSchema } from '../schemas/job-application-request.schema.js';
 
 export function createJobRoutes({ authenticate, jobs, publicJobs = jobs, applications }) {
   const router = Router();
@@ -19,6 +19,8 @@ export function createJobRoutes({ authenticate, jobs, publicJobs = jobs, applica
   router.get('/jobs/:id/applicants', ...recruiter, validate(jobParamsSchema, 'params'), validate(applicantQuerySchema, 'query'), applicationController(applications).applicants);
   router.patch('/jobs/:id/status', ...recruiter, validate(jobParamsSchema, 'params'), validate(statusRequestSchema), controller.status);
   router.patch('/jobs/:id', ...recruiter, validate(jobParamsSchema, 'params'), validate(editJobRequestSchema), controller.edit);
+  router.delete('/jobs/:id', ...recruiter, validate(jobParamsSchema, 'params'), validate(deleteJobRequestSchema), controller.remove);
+  router.get('/jobs/metadata', publicController.metadata);
   router.get('/jobs/:id', validate(jobParamsSchema, 'params'), publicController.publicDetail);
   return router;
 }

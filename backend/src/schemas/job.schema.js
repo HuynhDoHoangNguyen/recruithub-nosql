@@ -10,13 +10,14 @@
  */
 
 import { z } from 'zod';
+import { JOB_LOCATIONS, WORK_MODES, JOB_SENIORITY_VALUES, EMPLOYMENT_TYPES } from '../constants/job-catalog.constants.js';
+import { salarySchema } from './job-compensation.schema.js';
 import {
   CANONICAL_DEGREES,
   DOCUMENT_TYPES,
   ID_PREFIXES,
   JOB_STATUSES,
   REQUIREMENT_STATUSES,
-  SENIORITY_LEVELS,
 } from '../constants/document.constants.js';
 import {
   canonicalDegreeSchema,
@@ -162,6 +163,7 @@ export const jobRequirementsSchema = z
  * Shared refinement logic for Job documents.
  */
 function refineJobData(job, ctx) {
+  if (job.deleted_at && job.status !== 'CLOSED') ctx.addIssue({ code: 'custom', path: ['deleted_at'], message: 'Deleted jobs must remain CLOSED.' });
   // 1. Check duplicate skills within required_skills
   const seenReq = new Set();
   if (Array.isArray(job.required_skills)) {
@@ -235,6 +237,11 @@ function refineJobData(job, ctx) {
  * Base Job fields without organization references.
  */
 const jobBaseObject = {
+  employment_type: z.enum(EMPLOYMENT_TYPES.map(option => option.value)).optional(),
+  salary: salarySchema.optional(),
+  deleted_at: isoDateTimeSchema.optional(),
+  location: z.enum(JOB_LOCATIONS.map(option => option.value)).optional(),
+  work_mode: z.enum(WORK_MODES.map(option => option.value)).optional(),
   _id: z
     .string()
     .regex(/^job:(cms:J_[0-9]{6}|[a-z0-9_-]+)$/, 'Invalid Job _id format'),
@@ -242,11 +249,7 @@ const jobBaseObject = {
   type: z.literal(DOCUMENT_TYPES.JOB),
   source_job_id: z.string().optional(),
   title: z.string().trim().min(1, 'Job title cannot be empty'),
-  seniority: z.enum([
-    SENIORITY_LEVELS.JUNIOR,
-    SENIORITY_LEVELS.MID,
-    SENIORITY_LEVELS.SENIOR,
-  ]),
+  seniority: z.enum(JOB_SENIORITY_VALUES),
   industry: z.string().trim().min(1, 'Industry cannot be empty'),
   description: z.string().trim().min(1, 'Description cannot be empty'),
   responsibilities: z.array(z.string().trim().min(1)),

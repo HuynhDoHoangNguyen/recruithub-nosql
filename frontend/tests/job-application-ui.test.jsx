@@ -15,7 +15,7 @@ import AppRoutes from '../src/routes/AppRoutes';
 import { removeAccessToken, setAccessToken } from '../src/utils/authHelper';
 
 vi.mock('../src/api/jobApplicationApi', () => ({
-  jobApi: { context: vi.fn(), list: vi.fn(), stats: vi.fn(), detail: vi.fn(), create: vi.fn(), edit: vi.fn(), status: vi.fn(), publicList: vi.fn(), publicDetail: vi.fn() },
+  jobApi: { metadata: vi.fn(), context: vi.fn(), list: vi.fn(), stats: vi.fn(), detail: vi.fn(), create: vi.fn(), edit: vi.fn(), status: vi.fn(), publicList: vi.fn(), publicDetail: vi.fn() },
   applicationApi: { stats: vi.fn(), context: vi.fn(), apply: vi.fn(), mine: vi.fn(), detail: vi.fn(), applicants: vi.fn(), withdraw: vi.fn(), transition: vi.fn() },
 }));
 vi.mock('../src/context/useAuth', () => ({ useAuth: () => ({ user: window.__verifiedTestUser || null, loading: false, logout: vi.fn() }) }));
@@ -30,6 +30,8 @@ const application = { _id: 'application:pair:test', _rev: '1-fixture', current_s
   stage_history: [{ from_stage: null, to_stage: 'APPLIED', timestamp: '2026-10-22T12:00:00Z', actor_role: 'CANDIDATE' }] };
 
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); removeAccessToken(); window.__verifiedTestUser = null; applicationApi.context.mockResolvedValue({ candidate, email: application.email });
+  jobApi.metadata.mockResolvedValue({ locations: [{ value: 'VN-HN', label: 'Hà Nội' }], work_modes: [{ value: 'REMOTE', label: 'Remote' }], skills: ['javascript'], industries: ['SaaS'], seniorities: [] });
+  jobApi.publicList.mockResolvedValue({ items: [] });
   jobApi.context.mockResolvedValue({ company: { name: 'Công ty kiểm thử' }, department: { name: 'Kỹ thuật' } });
   applicationApi.stats.mockResolvedValue({ total_applications: 25, by_stage: { APPLIED: 24, WITHDRAWN: 1 } });
 });
@@ -77,20 +79,20 @@ describe('Apply and submission', () => {
     render(<ApplyModal job={job} onClose={vi.fn()} onSubmitted={onSubmitted} onRefresh={vi.fn()} />);
     await screen.findByText(application.email);
     const submit = screen.getByRole('button', { name: 'Xác nhận nộp hồ sơ' });
-    fireEvent.submit(submit.closest('form')); expect(await screen.findByText('Vui lòng nhập CV văn bản.')).toBeTruthy();
+    fireEvent.submit(submit.closest('form')); expect(await screen.findByText('Đính kèm file CV hoặc nhập CV văn bản.')).toBeTruthy();
     expect(applicationApi.apply).not.toHaveBeenCalled();
-    await user.type(screen.getByLabelText('CV văn bản *'), 'CV gửi nhà tuyển dụng');
+    await user.type(screen.getByLabelText('CV văn bản (khi không đính kèm file)'), 'CV gửi nhà tuyển dụng');
     await user.type(screen.getByLabelText('Thư giới thiệu (không bắt buộc)'), 'Xin chào');
     await user.click(submit);
     expect(screen.getByRole('button', { name: 'Đang nộp…' }).disabled).toBe(true);
-    expect(applicationApi.apply).toHaveBeenCalledWith({ job_id: job._id, submission: { resume_text: 'CV gửi nhà tuyển dụng', cover_letter: 'Xin chào' } });
+    expect(applicationApi.apply).toHaveBeenCalledWith({ job_id: job._id, request_id: expect.any(String), submission: { resume_text: 'CV gửi nhà tuyển dụng', cover_letter: 'Xin chào' } });
     resolve(application); await waitFor(() => expect(onSubmitted).toHaveBeenCalledWith(application));
   });
   it('shows duplicate feedback and refreshes current state without claiming success', async () => {
     applicationApi.apply.mockRejectedValue(Object.assign(new Error('Bạn đã nộp hồ sơ.'), { status: 409, code: 'DUPLICATE_APPLICATION' }));
     const refresh = vi.fn(); const submitted = vi.fn();
     render(<ApplyModal job={job} onClose={vi.fn()} onSubmitted={submitted} onRefresh={refresh} />);
-    fireEvent.change(await screen.findByLabelText('CV văn bản *'), { target: { value: 'CV' } });
+    fireEvent.change(await screen.findByLabelText('CV văn bản (khi không đính kèm file)'), { target: { value: 'CV' } });
     fireEvent.submit(screen.getByRole('button', { name: 'Xác nhận nộp hồ sơ' }).closest('form'));
     await screen.findByText('Bạn đã nộp hồ sơ.'); expect(refresh).toHaveBeenCalledOnce(); expect(submitted).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Xác nhận nộp hồ sơ' }).disabled).toBe(true);
@@ -120,12 +122,32 @@ it('recruiter reads saved CV and uses only server-approved transitions with reje
   expect(await screen.findByText('CV đã lưu')).toBeTruthy(); expect(screen.getByText('Thư giới thiệu đã lưu')).toBeTruthy();
   const select = screen.getByLabelText('Chuyển trạng thái');
   expect([...select.options].map(option => option.value)).toEqual(['', 'SCREENING', 'REJECTED']);
-  fireEvent.change(select, { target: { value: 'REJECTED' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Duyệt hồ sơ', exact: true }));
+  expect(select.value).toBe('SCREENING');
+  fireEvent.click(screen.getByRole('button', { name: 'Từ chối', exact: true }));
   expect(screen.getByText('Xác nhận chuyển trạng thái').disabled).toBe(true);
   fireEvent.change(screen.getByLabelText('Lý do từ chối *'), { target: { value: 'QUALIFICATIONS_MISMATCH' } });
   fireEvent.submit(screen.getByText('Xác nhận chuyển trạng thái').closest('form'));
   await waitFor(() => expect(applicationApi.transition).toHaveBeenCalledWith(application, { to_stage: 'REJECTED', reason_code: 'QUALIFICATIONS_MISMATCH' }));
   await waitFor(() => expect(changed).toHaveBeenCalledOnce());
+});
+
+it('explains missing current-attempt interview evidence and disables the visible offer action', async () => {
+  applicationApi.detail.mockResolvedValue({ ...application, current_stage: 'INTERVIEW', allowed_transitions: ['OFFER', 'REJECTED'],
+    interview_status: 'SCHEDULING_REQUIRED', offer_eligible: false, offer_blocker: 'Cần hoàn tất phỏng vấn của lần hiện tại.' });
+  render(<ApplicantDetailModal id={application._id} onClose={vi.fn()} onChanged={vi.fn()} />);
+  expect((await screen.findByRole('button', { name: 'Gửi đề nghị' })).disabled).toBe(true);
+  expect(screen.getByText('Cần hoàn tất phỏng vấn của lần hiện tại.')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Từ chối', exact: true }).disabled).toBe(false);
+});
+
+it('withdrawn job detail restores the reapply CTA with the archived attempt revision', async () => {
+  verifiedUserFor('CANDIDATE');
+  jobApi.publicDetail.mockResolvedValue(job); applicationApi.mine.mockResolvedValue({ items: [{ ...application, current_stage: 'WITHDRAWN' }] });
+  render(<MemoryRouter initialEntries={['/jobs/job%3Acms%3AJ_000001']}><AppRoutes /></MemoryRouter>);
+  const buttons = await screen.findAllByRole('button', { name: 'Ứng tuyển lại', exact: true });
+  fireEvent.click(buttons[0]); await screen.findByLabelText('CV văn bản (khi không đính kèm file)');
+  expect(screen.getByLabelText('CV văn bản (khi không đính kèm file)').value).toBe('');
 });
 
 it('conflicting transition reports the error and reloads the actual application', async () => {
@@ -174,8 +196,13 @@ it('candidate tracker reloads persisted stage and CV after remount', async () =>
   verifiedUserFor('CANDIDATE'); setAccessToken('test-token');
   applicationApi.mine.mockResolvedValue({ items: [{ ...application, current_stage: 'WITHDRAWN' }], has_more: false });
   const mount = () => render(<MemoryRouter initialEntries={['/user/dashboard']}><AppRoutes /></MemoryRouter>);
-  const first = mount(); await screen.findByText('CV đã lưu'); expect(screen.queryByRole('button', { name: 'Rút đơn ứng tuyển' })).toBeNull(); first.unmount();
-  mount(); await screen.findByText('CV đã lưu'); expect(applicationApi.mine).toHaveBeenCalledTimes(2);
+  const first = mount();
+  fireEvent.click(await screen.findByRole('button', { name: /Xem chi tiết, CV và lịch sử/ }));
+  await screen.findByText('CV đã lưu'); expect(screen.queryByRole('button', { name: 'Rút đơn ứng tuyển' })).toBeNull(); first.unmount();
+  mount();
+  const expand = await screen.findByRole('button', { name: /Xem chi tiết, CV và lịch sử/ });
+  expect(screen.queryByText('CV đã lưu')).toBeNull();
+  fireEvent.click(expand); await screen.findByText('CV đã lưu'); expect(applicationApi.mine).toHaveBeenCalledTimes(2);
   expect(screen.getByRole('region', { name: 'Thống kê toàn bộ hồ sơ của tôi' }).textContent).toContain('25');
   expect(screen.getByRole('button', { name: /Đã nộp/ }).textContent).toContain('24');
 });
@@ -185,6 +212,7 @@ it('aggregate failure keeps saved applications visible and displays unknown tota
   applicationApi.mine.mockResolvedValue({ items: [application], has_more: false });
   applicationApi.stats.mockRejectedValueOnce(new Error('Không tải được thống kê.'));
   render(<MemoryRouter initialEntries={['/user/dashboard']}><AppRoutes /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button', { name: /Xem chi tiết, CV và lịch sử/ }));
   await screen.findByText('CV đã lưu');
   await screen.findByText('Không tải được thống kê.');
   const stats = screen.getByRole('region', { name: 'Thống kê toàn bộ hồ sơ của tôi' });
@@ -192,4 +220,15 @@ it('aggregate failure keeps saved applications visible and displays unknown tota
   expect(stats.textContent).not.toContain('25');
   fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
   await waitFor(() => expect(stats.textContent).toContain('25'));
+});
+
+it('historical catalog detail explains why Apply is disabled without submitting to another database', async () => {
+  verifiedUserFor('CANDIDATE');
+  jobApi.publicDetail.mockResolvedValue({ ...job, application_available: false, catalog_source: 'dataset' });
+  applicationApi.mine.mockResolvedValue({ items: [] });
+  render(<MemoryRouter initialEntries={['/jobs/job%3Acms%3AJ_000001']}><AppRoutes /></MemoryRouter>);
+  const button = (await screen.findAllByRole('button', { name: 'Ứng tuyển ngay' }))[0];
+  expect(button.disabled).toBe(true);
+  expect(screen.getByText(/Tin tham khảo từ bộ dữ liệu/)).toBeTruthy();
+  expect(applicationApi.apply).not.toHaveBeenCalled();
 });

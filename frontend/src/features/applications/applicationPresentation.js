@@ -1,7 +1,7 @@
-export const stageLabels = { APPLIED: 'Đã nộp', SCREENING: 'Sàng lọc', INTERVIEW: 'Phỏng vấn', OFFER: 'Đề nghị nhận việc',
+export const stageLabels = { APPLIED: 'Đã nộp — chờ xét duyệt', SCREENING: 'Đã duyệt sơ bộ — đang sàng lọc', INTERVIEW: 'Phỏng vấn', OFFER: 'Đề nghị nhận việc',
   HIRED: 'Đã tuyển', REJECTED: 'Đã từ chối', WITHDRAWN: 'Đã rút đơn' };
 export const jobStatusLabels = { DRAFT: 'Bản nháp', OPEN: 'Đang tuyển', CLOSED: 'Đã đóng' };
-export const seniorityLabels = { JUNIOR: 'Mới bắt đầu', MID: 'Có kinh nghiệm', SENIOR: 'Cao cấp' };
+export const seniorityLabels = { INTERN: 'Intern', FRESHER: 'Fresher', JUNIOR: 'Junior', MID: 'Mid-level', SENIOR: 'Senior' };
 export const degreeLabels = { HIGH_SCHOOL: 'Trung học', BACHELOR: 'Cử nhân', MASTER: 'Thạc sĩ', DOCTORATE: 'Tiến sĩ' };
 export const reasonLabels = { SCREENING_REJECTED: 'Không qua sàng lọc', INTERVIEW_FAILED: 'Không đạt phỏng vấn',
   OFFER_DECLINED: 'Ứng viên từ chối offer', OFFER_EXPIRED: 'Offer hết hạn', POSITION_FILLED: 'Vị trí đã đủ người',

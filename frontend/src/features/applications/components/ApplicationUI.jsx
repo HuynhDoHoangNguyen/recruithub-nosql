@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { stageLabels } from '../applicationPresentation';
 
 export function Page({ title, subtitle, action, children }) {
@@ -32,9 +33,11 @@ export function StageFilter({ value, onChange }) {
     <option value="">Tất cả trạng thái</option>{Object.entries(stageLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
   </select></label>;
 }
-export function Pagination({ pager, data, loading }) {
-  return <nav aria-label="Phân trang" className="flex flex-wrap items-center justify-end gap-3"><Button secondary disabled={loading || pager.page === 1} onClick={pager.previous}>Trang trước</Button>
-    <span className="text-sm text-gray-600">Trang {pager.page}</span><Button secondary disabled={loading || !data?.has_more} onClick={() => pager.next(data.bookmark)}>Trang sau</Button></nav>;
+export function Pagination({ pager, data, loading, pageSize, itemCount, noun = 'tin' }) {
+  return <nav aria-label="Phân trang" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-blue-100 bg-white px-4 py-4 shadow-sm">
+    <p className="text-xs text-slate-500">{pageSize ? <>{pageSize} {noun} / trang{!loading && itemCount > 0 && <> · Đang hiển thị {(pager.page - 1) * pageSize + 1}–{(pager.page - 1) * pageSize + itemCount}</>}</> : 'Điều hướng danh sách'}</p>
+    <div className="flex items-center gap-2"><Button secondary className="inline-flex items-center gap-1.5 !rounded-xl !border-blue-200 !px-3 !py-2.5 hover:!bg-blue-50" disabled={loading || pager.page === 1} onClick={pager.previous}><ChevronLeft className="h-4 w-4" aria-hidden="true" />Trang trước</Button>
+    <span aria-current="page" className="flex min-w-12 items-center justify-center rounded-xl border border-blue-500 bg-gradient-to-br from-blue-600 to-indigo-600 px-3 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/20">Trang {pager.page}</span><Button className="inline-flex items-center gap-1.5 !rounded-xl !border !border-blue-500 !bg-gradient-to-r !from-blue-600 !to-indigo-600 !px-3 !py-2.5 shadow-md shadow-blue-500/20 hover:shadow-blue-500/35" disabled={loading || !data?.has_more} onClick={() => pager.next(data.bookmark)}>Trang sau<ChevronRight className="h-4 w-4" aria-hidden="true" /></Button></div></nav>;
 }
 export function Field({ label, name, error, children }) {
   return <div><label htmlFor={name} className="form-label">{label}</label>{children}

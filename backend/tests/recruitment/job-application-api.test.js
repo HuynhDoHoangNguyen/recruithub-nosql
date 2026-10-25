@@ -34,9 +34,9 @@ test('Job create/edit/publish/close validates schema and real recruiter scope', 
   assert.equal(published.status, 200); job = published.body.data; assert.ok(job.published_at);
   const closed = await f.request('PATCH', `/jobs/${job._id}/status`, { status: 'CLOSED', expected_rev: job._rev }, 'recruiter');
   assert.equal(closed.status, 200);
-  assert.equal((await f.request('PATCH', `/jobs/${job._id}/status`, { status: 'OPEN', expected_rev: closed.body.data._rev }, 'recruiter')).status, 409);
   const list = await f.request('GET', '/recruiter/jobs?status=CLOSED', undefined, 'recruiter');
   assert.deepEqual(list.body.data.items.map(item => item._id), [job._id]);
+  assert.equal((await f.request('PATCH', `/jobs/${job._id}/status`, { status: 'OPEN', expected_rev: closed.body.data._rev }, 'recruiter')).status, 200);
 });
 
 test('Recruiter organization scope is enforced for cross-company Job and Application access', async t => {
@@ -213,7 +213,7 @@ test('Ownership and DTOs prevent cross-user reads, recruiter impersonation, admi
   assert.deepEqual((await f.request('GET', '/applications/my-applications', undefined, 'otherCandidate')).body.data.items, []);
 });
 
-test('Withdraw is allowed only from three stages, retains history and blocks re-application after every terminal', async t => {
+test('Withdraw is allowed only from three stages and reapplication requires a fresh request and expected revision', async t => {
   for (const stage of ['APPLIED', 'SCREENING', 'INTERVIEW']) {
     const f = await startFixture(t); let app = (await apply(f)).body.data;
     if (stage !== 'APPLIED') app = (await advance(f, app, 'SCREENING')).body.data;
@@ -222,7 +222,7 @@ test('Withdraw is allowed only from three stages, retains history and blocks re-
     const withdrawn = await f.request('PATCH', `/applications/${app._id}/withdraw`, mutation(app));
     assert.equal(withdrawn.status, 200); assert.equal(withdrawn.body.data.current_stage, 'WITHDRAWN');
     assert.equal(withdrawn.body.data.stage_history.length, app.stage_history.length + 1);
-    assert.equal((await apply(f)).body.error.code, 'DUPLICATE_APPLICATION');
+    assert.equal((await apply(f)).body.error.code, 'CONFLICT');
     assert.equal((await f.request('PATCH', `/applications/${app._id}/withdraw`, mutation(withdrawn.body.data))).status, 400);
   }
   const f = await startFixture(t); const app = (await apply(f)).body.data;

@@ -12,7 +12,7 @@ import { formatDate } from '../src/features/applications/applicationPresentation
 const session = vi.hoisted(() => ({ user: null, login: vi.fn(), logout: vi.fn(), loading: false }));
 vi.mock('../src/context/useAuth', () => ({ useAuth: () => session }));
 vi.mock('../src/api/jobApplicationApi', () => ({
-  jobApi: { context: vi.fn(), list: vi.fn(), stats: vi.fn(), detail: vi.fn(), create: vi.fn(), edit: vi.fn(), status: vi.fn(), publicList: vi.fn(), publicDetail: vi.fn() },
+  jobApi: { metadata: vi.fn(), context: vi.fn(), list: vi.fn(), stats: vi.fn(), detail: vi.fn(), create: vi.fn(), edit: vi.fn(), status: vi.fn(), publicList: vi.fn(), publicDetail: vi.fn() },
   applicationApi: { stats: vi.fn(), context: vi.fn(), apply: vi.fn(), mine: vi.fn(), detail: vi.fn(), applicants: vi.fn(), withdraw: vi.fn(), transition: vi.fn() },
 }));
 vi.mock('../src/services/api', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
@@ -28,6 +28,7 @@ function DestinationProbe() {
 }
 const mount = route => render(<MemoryRouter initialEntries={[route]}><Navbar /><AppRoutes /><DestinationProbe /></MemoryRouter>);
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); session.user = null;
+  jobApi.metadata.mockResolvedValue({ locations: [], work_modes: [], seniorities: [], skills: [], industries: [] });
   jobApi.context.mockResolvedValue({ company: { name: 'Công ty kiểm thử' }, department: { name: 'Kỹ thuật' } });
 });
 
@@ -51,7 +52,7 @@ it('preserves Jobs filter layout, Navbar and retry when the API fails', async ()
   mount('/jobs');
   await screen.findByRole('alert');
   expect(screen.getByRole('heading', { name: 'Tuyển Dụng Việc Làm IT Toàn Quốc' })).toBeTruthy();
-  expect(screen.getByRole('heading', { name: /Bộ Lọc Nâng Cao/ })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: /Bộ lọc nâng cao/ })).toBeTruthy();
   expect(screen.getByRole('navigation', { name: 'Điều hướng chính' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
   await screen.findByText('Chưa tìm thấy việc làm phù hợp');

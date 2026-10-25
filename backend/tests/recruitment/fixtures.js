@@ -20,6 +20,7 @@ function user(name, role) {
 export class MemoryRepository {
   constructor(docs) { this.docs = new Map(docs.map(doc => [doc._id, { ...structuredClone(doc), _rev: '1-fixture' }])); this.writes = []; }
   async get(id) { return structuredClone(this.docs.get(id) || null); }
+  async readContent(id) { return Buffer.from(this.docs.get(id)._attachments.content.data, 'base64'); }
   async put(doc) {
     if (this.beforePut) await this.beforePut(doc);
     const existing = this.docs.get(doc._id);
@@ -35,7 +36,7 @@ export class MemoryRepository {
   }
   async find(selector, { limit = 20, bookmark, sort = [] } = {}) {
     const values = [...this.docs.values()].filter(doc => Object.entries(selector).every(([key, value]) =>
-      typeof value === 'object' ? doc[key] >= value.$gte : doc[key] === value));
+      typeof value === 'object' ? ('$exists' in value ? (doc[key] !== undefined) === value.$exists : doc[key] >= value.$gte) : doc[key] === value));
     values.sort((a, b) => {
       for (const entry of sort) {
         const [field, direction] = Object.entries(entry)[0];
@@ -56,13 +57,14 @@ export class MemoryRepository {
   async allInterviews(id) { return structuredClone([...this.docs.values()].filter(doc => doc.type === 'interview' && doc.application_id === id)); }
   async candidateStats(id) {
     const apps = [...this.docs.values()].filter(doc => doc.type === 'application' && doc.candidate_id === id);
-    return { total_applications: apps.length, by_stage: apps.reduce((result, app) => ({ ...result, [app.current_stage]: (result[app.current_stage] || 0) + 1 }), {}) };
+    return { total_applications: apps.length, total_attempts: apps.reduce((sum, app) => sum + (app.attempt_number || 1), 0), historical_attempts: apps.reduce((sum, app) => sum + (app.attempt_number || 1), 0) - apps.length, by_stage: apps.reduce((result, app) => ({ ...result, [app.current_stage]: (result[app.current_stage] || 0) + 1 }), {}) };
   }
   async stats(id) {
-    const jobs = [...this.docs.values()].filter(doc => doc.type === 'job' && doc.recruiter_id === id);
+    const jobs = [...this.docs.values()].filter(doc => doc.type === 'job' && doc.recruiter_id === id && !doc.deleted_at);
     const apps = [...this.docs.values()].filter(doc => doc.type === 'application' && jobs.some(job => job._id === doc.job_id));
     const counts = (items, field) => items.reduce((result, item) => ({ ...result, [item[field]]: (result[item[field]] || 0) + 1 }), {});
-    return { jobs: counts(jobs, 'status'), applications: counts(apps, 'current_stage'), total_applications: apps.length };
+    const total_attempts = apps.reduce((sum, app) => sum + (app.attempt_number || 1), 0);
+    return { jobs: counts(jobs, 'status'), applications: counts(apps, 'current_stage'), total_applications: apps.length, total_attempts, historical_attempts: total_attempts - apps.length };
   }
 }
 
@@ -114,7 +116,7 @@ export async function startFixture(t, options = {}) {
       ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
     return { status: response.status, body: await response.json() };
   }
-  return { ...fixture, request, jwtEnv };
+  return { ...fixture, request, jwtEnv, origin: `http://127.0.0.1:${server.address().port}` };
 }
 export const submission = { resume_text: 'Tôi xây dựng API với JavaScript và CouchDB.', cover_letter: 'Kính gửi bộ phận tuyển dụng.' };
 export const mutation = (app, action = {}) => ({ expected_rev: app._rev, expected_stage: app.current_stage, ...action });

@@ -165,7 +165,7 @@ async function compareReference(browser, fixture, candidate, recruiter, base, sh
   await candidate.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('link',{name:'Việc Làm IT',exact:true}).click();
   await candidate.getByRole('heading',{name:'Browser verification edited',exact:true}).click();
   await candidate.getByRole('button',{name:'Nộp hồ sơ ứng tuyển',exact:true}).click();
-  await candidate.getByLabel('CV văn bản *',{exact:true}).fill('Browser submitted JavaScript CV');
+  await candidate.getByLabel('CV văn bản (khi không đính kèm file)',{exact:true}).fill('Browser submitted JavaScript CV');
   await candidate.getByLabel('Thư giới thiệu (không bắt buộc)',{exact:true}).fill('Browser cover letter');
   await shot(candidate,'app-apply-modal-desktop');
   await candidate.keyboard.press('Tab');

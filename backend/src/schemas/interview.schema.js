@@ -28,9 +28,10 @@ export const interviewDocumentSchema = z
   .object({
     _id: z
       .string()
-      .regex(/^interview:[a-f0-9]{64}:[0-9]+$/, 'Invalid Interview _id format. Expected interview:<app_digest>:<round>'),
+      .regex(/^interview:[a-f0-9]{64}:(?:attempt:[0-9]+:)?[0-9]+$/, 'Invalid Interview _id format'),
     _rev: z.string().optional(),
     type: z.literal(DOCUMENT_TYPES.INTERVIEW),
+    application_attempt: z.number().int().positive().optional(),
     application_id: z
       .string()
       .regex(/^application:pair:[a-f0-9]{64}$/, 'Invalid application_id reference format'),
@@ -70,7 +71,7 @@ export const interviewDocumentSchema = z
     if (interview.application_id && interview.round) {
       let expectedId;
       try {
-        expectedId = interviewIdFromRound(interview.application_id, interview.round);
+        expectedId = interviewIdFromRound(interview.application_id, interview.round, interview.application_attempt || 1);
       } catch (err) {
         ctx.addIssue({
           code: 'custom',

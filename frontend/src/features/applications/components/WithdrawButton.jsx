@@ -8,7 +8,7 @@ export default function WithdrawButton({ application, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   async function withdraw() {
-    if (!window.confirm('Xác nhận rút đơn? Bạn sẽ không thể nộp lại cho vị trí này.')) return;
+    if (!window.confirm('Xác nhận rút đơn? CV và lịch sử lần này sẽ được giữ lại. Bạn có thể nộp lại nếu tin vẫn mở và còn hạn.')) return;
     setBusy(true); setError(null);
     try { await applicationApi.withdraw(application); toast.success('Đã rút đơn ứng tuyển.'); await onChanged(); }
     catch (failure) { setError(failure); toast.error(failure.message); if (failure.status === 409) await onChanged(); }

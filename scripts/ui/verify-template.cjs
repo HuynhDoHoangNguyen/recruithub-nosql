@@ -1,4 +1,4 @@
-﻿const fs = require('node:fs');
+const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { createRequire } = require('node:module');
@@ -142,7 +142,7 @@ fs.mkdirSync(output, { recursive: true });
   const candidate = await pageFor('candidate');
   await candidate.goto(base+'/jobs/'+encodeURIComponent(job._id));
   await candidate.getByRole('button',{name:'Nộp hồ sơ ứng tuyển',exact:true}).click();
-  await candidate.getByLabel('CV văn bản *',{exact:true}).fill('Browser submitted JavaScript CV');
+  await candidate.getByLabel('CV văn bản (khi không đính kèm file)',{exact:true}).fill('Browser submitted JavaScript CV');
   await candidate.getByLabel('Thư giới thiệu (không bắt buộc)',{exact:true}).fill('Browser cover letter');
   await shot(candidate,'app-apply-modal-desktop');
   await candidate.keyboard.press('Tab');
