@@ -6,6 +6,7 @@ import { provenanceSchema } from '../../src/schemas/common.schema.js';
 import { validateWrite } from '../../src/services/job.service.js';
 import { applicationIdFromPair } from '../../src/utils/id.utils.js';
 import { advance, apply, interviewFor, jobInput, mutation, startFixture, submission } from './fixtures.js';
+import { ResumeScoringService } from '../../src/services/scoring/resume-scoring.service.js';
 
 test('new writes reject unavailable classification while the stored-document schema accepts it', () => {
   const schema = z.object({ provenance: provenanceSchema });
@@ -220,7 +221,8 @@ test('Concurrent and sequential Apply create exactly one lifetime document, incl
   const results = await Promise.all([apply(f), apply(f)]);
   assert.deepEqual(results.map(item => item.status).sort(), [201, 409]);
   assert.equal(results.find(item => item.status === 409).body.error.code, 'DUPLICATE_APPLICATION');
-  assert.equal(f.repo.writes.length, 1);
+  assert.equal(f.repo.writes.filter(doc => doc.type === 'application').length, 1);
+  assert.equal(f.repo.writes.filter(doc => doc.type === 'resume_analysis').length, 1);
   const duplicate = await apply(f); assert.equal(duplicate.body.error.code, 'DUPLICATE_APPLICATION');
   const recovery = await f.request('GET', `/applications/my-applications?job_id=${f.job._id}`);
   assert.equal(recovery.body.data.items.length, 1);
@@ -383,4 +385,304 @@ test('Post-write response loss recovers by pair lookup, and a CouchDB write conf
   const latest = await f.repo.get(existing._id);
   assert.equal(latest.current_stage, 'APPLIED'); assert.deepEqual(latest.stage_history, old.stage_history);
   assert.equal(latest.recruiter_note, 'Ghi chú cập nhật đồng thời');
+});
+
+function createCompleteCandidateFixture(baseCandidate) {
+  return {
+    ...structuredClone(baseCandidate),
+    skills: [
+      { name: 'JavaScript', normalized: 'javascript' },
+      { name: 'CouchDB', normalized: 'couchdb' },
+    ],
+    profile: {
+      role: 'Backend Engineer',
+      seniority: 'MID',
+      industry: 'SaaS',
+      years_experience: 2,
+      experience_months: 24,
+    },
+    education: [
+      {
+        degree: 'BACHELOR',
+        institution: 'Đại học Bách Khoa',
+        field_of_study: 'Công nghệ thông tin',
+      },
+    ],
+    experience: [
+      {
+        employer: 'Công ty Công nghệ',
+        role: 'Backend Engineer',
+        start_date: '2024-01-01',
+        end_date: '2026-01-01',
+        description: 'Phát triển backend',
+      },
+    ],
+    projects: [
+      {
+        name: 'Dự án Tuyển dụng NoSQL',
+        technologies: ['JavaScript', 'CouchDB'],
+        description: 'Phát triển hệ thống',
+      },
+    ],
+    data_availability: {
+      skills: 'AVAILABLE',
+      experience: 'AVAILABLE',
+      education: 'AVAILABLE',
+      projects: 'AVAILABLE',
+    },
+  };
+}
+
+test('TV3-UC22-002 Vector 01: Apply lưu Application trước rồi mới tạo Resume Analysis', async t => {
+  const f = await startFixture(t);
+  const putOrder = [];
+  const origPut = f.repo.put.bind(f.repo);
+  f.repo.put = async (doc) => {
+    putOrder.push(doc.type);
+    if (doc.type === 'resume_analysis') {
+      const appInRepo = await f.repo.get(doc.application_id);
+      assert.ok(appInRepo, 'Application phải tồn tại trong repository trước khi lưu analysis');
+      assert.equal(appInRepo.current_stage, 'APPLIED');
+    }
+    return origPut(doc);
+  };
+  const res = await apply(f);
+  assert.equal(res.status, 201);
+  assert.deepEqual(putOrder, ['application', 'resume_analysis']);
+});
+
+test('TV3-UC22-002 Vector 02: Scoring COMPLETE làm response trả COMPLETE và analysis_fresh: true', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+  const res = await apply(f);
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.analysis_status, 'COMPLETE');
+  assert.equal(res.body.data.analysis_fresh, true);
+  const storedAnalysis = await f.repo.get(`analysis:${res.body.data._id}`);
+  assert.ok(storedAnalysis);
+  assert.equal(storedAnalysis.analysis_status, 'COMPLETE');
+});
+
+test('TV3-UC22-002 Vector 03: Scoring INCOMPLETE làm response trả INCOMPLETE và analysis_fresh: true', async t => {
+  const f = await startFixture(t);
+  f.repo.docs.get(f.job._id).requirements.education = { status: 'REQUIRED', minimum_degree: 'BACHELOR' };
+  const res = await apply(f);
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.analysis_status, 'INCOMPLETE');
+  assert.equal(res.body.data.analysis_fresh, true);
+  const storedAnalysis = await f.repo.get(`analysis:${res.body.data._id}`);
+  assert.ok(storedAnalysis);
+  assert.equal(storedAnalysis.analysis_status, 'INCOMPLETE');
+});
+
+test('TV3-UC22-002 Vector 04 & 05: Scoring failure vẫn trả HTTP 201, PENDING_RETRY và không xóa Application', async t => {
+  const f = await startFixture(t, {
+    analyzeApplication: async () => {
+      throw new Error('Scoring engine temporary offline');
+    },
+  });
+  const res = await apply(f);
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.analysis_status, 'PENDING_RETRY');
+  assert.equal(res.body.data.analysis_fresh, false);
+  const storedApp = await f.repo.get(res.body.data._id);
+  assert.ok(storedApp, 'Application phải tồn tại trong repo và không bị rollback/xóa');
+  assert.equal(storedApp.current_stage, 'APPLIED');
+});
+
+test('TV3-UC22-002 Vector 06: Hook giả trả COMPLETE nhưng không persist trả REQUESTED và fresh false', async t => {
+  let customCalls = 0;
+  const f = await startFixture(t, {
+    analyzeApplication: async () => {
+      customCalls++;
+      return { analysis_status: 'COMPLETE', analysis_fresh: true };
+    },
+  });
+  const res = await apply(f);
+  assert.equal(res.status, 201);
+  assert.equal(customCalls, 1, 'Hook được gọi đúng một lần');
+  const storedAnalysis = await f.repo.get(`analysis:${res.body.data._id}`);
+  assert.equal(storedAnalysis, null, 'Không có analysis document');
+  assert.equal(res.body.data.analysis_status, 'REQUESTED', 'Response là REQUESTED khi không persist');
+  assert.equal(res.body.data.analysis_fresh, false, 'analysis_fresh === false khi không persist');
+});
+
+test('TV3-UC22-002: Hook giả trả INCOMPLETE nhưng không persist trả REQUESTED và fresh false', async t => {
+  let customCalls = 0;
+  const f = await startFixture(t, {
+    analyzeApplication: async () => {
+      customCalls++;
+      return { analysis_status: 'INCOMPLETE', analysis_fresh: true };
+    },
+  });
+  const res = await apply(f);
+  assert.equal(res.status, 201);
+  assert.equal(customCalls, 1, 'Hook được gọi đúng một lần');
+  const storedAnalysis = await f.repo.get(`analysis:${res.body.data._id}`);
+  assert.equal(storedAnalysis, null, 'Không có analysis document');
+  assert.equal(res.body.data.analysis_status, 'REQUESTED');
+  assert.equal(res.body.data.analysis_fresh, false);
+});
+
+test('TV3-UC22-002: Hook persist analysis hợp lệ rồi trả undefined, response lấy trạng thái thật từ summary', async t => {
+  let hookCalled = 0;
+  let scoringService;
+  const f = await startFixture(t, {
+    analyzeApplication: async (appId) => {
+      hookCalled++;
+      if (!scoringService) {
+        scoringService = new ResumeScoringService(f.repo, { now: f.now });
+      }
+      await scoringService.analyzeApplication(appId);
+      return undefined; // Hook trả undefined sau khi đã persist hợp lệ
+    },
+  });
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+
+  const res = await apply(f);
+  assert.equal(res.status, 201);
+  assert.equal(hookCalled, 1, 'Hook được gọi đúng một lần');
+  assert.equal(res.body.data.analysis_status, 'COMPLETE', 'Response lấy trạng thái COMPLETE từ persisted summary');
+  assert.equal(res.body.data.analysis_fresh, true, 'analysis_fresh: true từ persisted summary');
+  const storedAnalysis = await f.repo.get(`analysis:${res.body.data._id}`);
+  assert.ok(storedAnalysis, 'Analysis document đã được persist');
+  assert.equal(storedAnalysis.analysis_status, 'COMPLETE');
+});
+
+test('TV3-UC22-002: Corrupted persisted analysis sau hook không được báo COMPLETE/fresh, trả PENDING_RETRY', async t => {
+  let hookCalled = 0;
+  const f = await startFixture(t, {
+    analyzeApplication: async (appId) => {
+      hookCalled++;
+      // Hook ghi document hỏng schema / sai type vào database
+      await f.repo.put({
+        _id: `analysis:${appId}`,
+        type: 'resume_analysis',
+        total_score: 'corrupted-not-a-number',
+      });
+      return { analysis_status: 'COMPLETE', analysis_fresh: true }; // Hook giả vờ báo COMPLETE
+    },
+  });
+  const res = await apply(f);
+  assert.equal(res.status, 201);
+  assert.equal(hookCalled, 1);
+  assert.equal(res.body.data.analysis_status, 'PENDING_RETRY', 'Corrupted analysis không được tin cậy, chuyển thành PENDING_RETRY');
+  assert.equal(res.body.data.analysis_fresh, false);
+  const storedApp = await f.repo.get(res.body.data._id);
+  assert.ok(storedApp, 'Application không bị rollback');
+});
+
+test('TV3-UC22-002 Vector 07: Đọc Application chưa có analysis trả NOT_ANALYZED và analysis_fresh: false', async t => {
+  const f = await startFixture(t, {
+    analyzeApplication: async () => null,
+  });
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+  const readRes = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'candidate');
+  assert.equal(readRes.status, 200);
+  assert.equal(readRes.body.data.analysis_status, 'NOT_ANALYZED');
+  assert.equal(readRes.body.data.analysis_fresh, false);
+});
+
+test('TV3-UC22-002 Vector 08: Đọc Application có fresh COMPLETE analysis trả COMPLETE và analysis_fresh: true', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+  const readRes = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'candidate');
+  assert.equal(readRes.status, 200);
+  assert.equal(readRes.body.data.analysis_status, 'COMPLETE');
+  assert.equal(readRes.body.data.analysis_fresh, true);
+});
+
+test('TV3-UC22-002 Vector 09: Đọc Application có fresh INCOMPLETE analysis trả INCOMPLETE và analysis_fresh: true', async t => {
+  const f = await startFixture(t);
+  f.repo.docs.get(f.job._id).requirements.education = { status: 'REQUIRED', minimum_degree: 'BACHELOR' };
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+  const readRes = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'candidate');
+  assert.equal(readRes.status, 200);
+  assert.equal(readRes.body.data.analysis_status, 'INCOMPLETE');
+  assert.equal(readRes.body.data.analysis_fresh, true);
+});
+
+test('TV3-UC22-002 Vector 10: Candidate thay đổi làm DTO trả analysis_fresh: false', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+  const updatedCandidate = structuredClone(completeCand);
+  updatedCandidate.skills.push({ name: 'TypeScript', normalized: 'typescript' });
+  updatedCandidate._rev = '2-fixture';
+  f.repo.docs.set(updatedCandidate._id, updatedCandidate);
+
+  const readRes = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'candidate');
+  assert.equal(readRes.status, 200);
+  assert.equal(readRes.body.data.analysis_status, 'COMPLETE', 'Giữ nguyên status COMPLETE đã lưu');
+  assert.equal(readRes.body.data.analysis_fresh, false, 'Candidate thay đổi khiến analysis trở nên stale');
+});
+
+test('TV3-UC22-002 Vector 11: Job thay đổi làm DTO trả analysis_fresh: false', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+  const updatedJob = structuredClone(await f.repo.get(f.job._id));
+  updatedJob.required_skills.push('redis');
+  updatedJob._rev = '2-fixture';
+  f.repo.docs.set(updatedJob._id, updatedJob);
+
+  const readRes = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'candidate');
+  assert.equal(readRes.status, 200);
+  assert.equal(readRes.body.data.analysis_status, 'COMPLETE', 'Giữ nguyên status COMPLETE đã lưu');
+  assert.equal(readRes.body.data.analysis_fresh, false, 'Job thay đổi khiến analysis trở nên stale');
+});
+
+test('TV3-UC22-002 Vector 12: Corrupted analysis không được báo là fresh (chặn bằng controlled 409)', async t => {
+  const f = await startFixture(t);
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+  const analysisId = `analysis:${applied.body.data._id}`;
+  const analysisDoc = f.repo.docs.get(analysisId);
+  analysisDoc.total_score = 'corrupted-non-number';
+
+  const readRes = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'candidate');
+  assert.equal(readRes.status, 409, 'Trả controlled error 409 khi stored analysis bị corrupted');
+  assert.equal(readRes.body.error.code, 'INVALID_STORED_DOCUMENT');
+});
+
+test('TV3-UC22-002 Vector 13: Candidate DTO không lộ breakdown, scores hoặc dữ liệu nội bộ ngoài contract', async t => {
+  const f = await startFixture(t);
+  const completeCand = createCompleteCandidateFixture(f.candidate);
+  f.repo.docs.set(completeCand._id, completeCand);
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+  const readRes = await f.request('GET', `/applications/${applied.body.data._id}`, undefined, 'candidate');
+  assert.equal(readRes.status, 200);
+  const dto = readRes.body.data;
+  assert.equal(dto.total_score, undefined);
+  assert.equal(dto.scores, undefined);
+  assert.equal(dto.component_details, undefined);
+  assert.equal(dto.matched_skills, undefined);
+  assert.equal(dto.missing_skills, undefined);
+  assert.equal(dto.confidence, undefined);
+  assert.equal(dto.input_fingerprint, undefined);
+  assert.equal(dto.algorithm_version, undefined);
+  assert.equal(dto.analysis_status, 'COMPLETE');
+  assert.equal(dto.analysis_fresh, true);
+});
+
+test('TV3-UC22-002 Vector 14: Không có match_score hoặc analysis_status trong stored Application', async t => {
+  const f = await startFixture(t);
+  const applied = await apply(f);
+  assert.equal(applied.status, 201);
+  const storedApp = await f.repo.get(applied.body.data._id);
+  assert.equal(storedApp.match_score, undefined);
+  assert.equal(storedApp.analysis_status, undefined);
+  assert.equal(storedApp.analysis_fresh, undefined);
 });

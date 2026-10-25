@@ -10,6 +10,8 @@ import { createApplicationRoutes } from './routes/application.routes.js';
 import databaseHealthRoutes from './routes/database-health.routes.js';
 import apiV1Routes from './routes/api-v1.routes.js';
 import { getAuthDatabaseConfig } from './config/auth-database.config.js';
+import { ResumeScoringService } from './services/scoring/resume-scoring.service.js';
+import { createScoringRoutes } from './routes/scoring.routes.js';
 
 function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://localhost:5173') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
@@ -42,10 +44,20 @@ export function createApp({ repository: suppliedRepository, authenticate, now, a
   const app = express();
   const origins = configuredFrontendOrigins(jwtEnv.FRONTEND_URL);
   const repository = suppliedRepository || createConfiguredRepository(jwtEnv);
+  const scoringClock = typeof now === 'function' ? now : () => (now ? new Date(now()) : new Date());
+  const scoringService = new ResumeScoringService(repository, { now: scoringClock });
+  const effectiveAnalyzeApplication = analyzeApplication || scoringService.analyzeApplication;
+
   const dependencies = {
     authenticate: authenticate || createJwtAuthentication(repository, jwtEnv, () => now ? new Date(now()).getTime() : Date.now()),
     jobs: new JobService(repository, now),
-    applications: new ApplicationService(repository, { now, analyzeApplication }),
+    applications: new ApplicationService(repository, {
+      now,
+      analyzeApplication: effectiveAnalyzeApplication,
+      scoringService,
+      getAnalysisSummary: scoringService.getAnalysisSummary,
+    }),
+    scoring: scoringService,
   };
 
   app.use(cors({
@@ -62,6 +74,7 @@ export function createApp({ repository: suppliedRepository, authenticate, now, a
   app.use('/api/v1', apiV1Routes);
   app.use('/api/v1', createJobRoutes(dependencies));
   app.use('/api/v1/applications', createApplicationRoutes(dependencies));
+  app.use('/api/v1/resume-analysis', createScoringRoutes(dependencies));
   app.get('/', (req, res) => res.json({ message: 'Welcome to RecruiHub API' }));
   app.use('/api/v1', (req, res, next) => next(new ApiError(404, 'NOT_FOUND', 'Không tìm thấy API.')));
   app.use(jobApplicationErrorHandler);

@@ -8,10 +8,22 @@ import { validateInterviewEvidenceForOffer, validateInterviewTimeline } from '..
 import { acceptanceSchema } from '../schemas/job-application-request.schema.js';
 import { candidateDto, candidateScope, descendingSort, ownedJob, parseStored, publicJobDto, requireDocument, runtimeProvenance, validateJobReferences } from './job-application-scope.service.js';
 import { validateWrite } from './job.service.js';
+import { ResumeScoringService } from './scoring/resume-scoring.service.js';
 
 export class ApplicationService {
-  constructor(repository, { now = () => new Date(), analyzeApplication } = {}) {
-    this.repo = repository; this.now = now; this.analyzeApplication = analyzeApplication;
+  constructor(repository, { now = () => new Date(), analyzeApplication, scoringService, getAnalysisSummary } = {}) {
+    this.repo = repository;
+    this.now = typeof now === 'function' ? now : () => (now ? new Date(now()) : new Date());
+    this.analyzeApplication = analyzeApplication;
+    this.scoringService = scoringService;
+    this.getAnalysisSummary = getAnalysisSummary || (scoringService ? scoringService.getAnalysisSummary : undefined);
+    if (!this.getAnalysisSummary && repository) {
+      const defaultScoring = this.scoringService || new ResumeScoringService(repository, { now: this.now });
+      this.getAnalysisSummary = defaultScoring.getAnalysisSummary;
+      if (!this.analyzeApplication) {
+        this.analyzeApplication = defaultScoring.analyzeApplication;
+      }
+    }
   }
   async context(user) {
     return { candidate: candidateDto(await candidateScope(this.repo, user)), email: user.email };
@@ -40,11 +52,29 @@ export class ApplicationService {
       throw error;
     }
     let analysisStatus = 'NOT_ANALYZED';
+    let analysisFresh = false;
     if (this.analyzeApplication) {
-      try { await this.analyzeApplication(saved._id); analysisStatus = 'REQUESTED'; }
-      catch { analysisStatus = 'PENDING_RETRY'; }
+      try {
+        await this.analyzeApplication(saved._id);
+        if (this.getAnalysisSummary) {
+          const summary = await this.getAnalysisSummary(saved._id);
+          if (summary.analysis_status === 'COMPLETE' || summary.analysis_status === 'INCOMPLETE') {
+            analysisStatus = summary.analysis_status;
+            analysisFresh = summary.analysis_fresh;
+          } else {
+            analysisStatus = 'REQUESTED';
+            analysisFresh = false;
+          }
+        } else {
+          analysisStatus = 'REQUESTED';
+          analysisFresh = false;
+        }
+      } catch {
+        analysisStatus = 'PENDING_RETRY';
+        analysisFresh = false;
+      }
     }
-    return { ...response, _rev: saved._rev, analysis_status: analysisStatus };
+    return { ...response, _rev: saved._rev, analysis_status: analysisStatus, analysis_fresh: analysisFresh };
   }
   async authorize(user, id) {
     const application = parseStored(applicationDocumentSchema, await requireDocument(this.repo, id, 'application'));
@@ -86,7 +116,6 @@ export class ApplicationService {
       from_stage: event.from_stage, to_stage: event.to_stage, timestamp: event.timestamp, actor_role: event.actor_role,
     });
     result.allowed_transitions = APPROVED_TRANSITIONS.filter(rule => rule.from === application.current_stage && rule.actors.includes(role)).map(rule => rule.to);
-    result.analysis_status = 'NOT_ANALYZED'; // Scoring service integration is deliberately explicit.
     if (role === 'RECRUITER') {
       const candidate = parseStored(candidateDocumentSchema, await requireDocument(this.repo, application.candidate_id, 'candidate'));
       const user = await requireDocument(this.repo, candidate.user_id, 'user');
@@ -98,6 +127,14 @@ export class ApplicationService {
         const interviews = await this.repo.allInterviews(application._id);
         result.interview_status = interviews.length ? 'RECORDED' : 'SCHEDULING_REQUIRED';
       }
+    }
+    if (this.getAnalysisSummary && application._rev) {
+      const summary = await this.getAnalysisSummary(application._id);
+      result.analysis_status = summary.analysis_status;
+      result.analysis_fresh = summary.analysis_fresh;
+    } else {
+      result.analysis_status = 'NOT_ANALYZED';
+      result.analysis_fresh = false;
     }
     return result;
   }
