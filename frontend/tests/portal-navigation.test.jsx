@@ -51,10 +51,10 @@ it('preserves Jobs filter layout, Navbar and retry when the API fails', async ()
   jobApi.publicList.mockRejectedValueOnce(new Error('Không kết nối được máy chủ API.')).mockResolvedValue({ items: [], has_more: false });
   mount('/jobs');
   await screen.findByRole('alert');
-  expect(screen.getByRole('heading', { name: 'Tuyển Dụng Việc Làm IT Toàn Quốc' })).toBeTruthy();
-  expect(screen.getByRole('heading', { name: /Bộ lọc nâng cao/ })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'Job Search Dashboard' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'Tìm việc' })).toBeTruthy();
   expect(screen.getByRole('navigation', { name: 'Điều hướng chính' })).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Thử tải lại' }));
   await screen.findByText('Chưa tìm thấy việc làm phù hợp');
   expect(jobApi.publicList).toHaveBeenCalledTimes(2);
 });

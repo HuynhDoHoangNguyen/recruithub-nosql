@@ -35,7 +35,7 @@ export default function JobForm({ job, organization, onSaved, onConflict }) {
       if (failure.status === 409) { toast.error(failure.message); await onConflict?.(); }
     } finally { setBusy(false); }
   }
-  return <form onSubmit={submit} className="relative overflow-hidden w-full bg-white p-6 sm:p-10 rounded-3xl border border-blue-200 shadow-lg shadow-blue-900/5 space-y-8" noValidate>
+  return <form onSubmit={submit} className="rh-job-form relative overflow-hidden w-full bg-white p-6 sm:p-10 rounded-3xl border border-blue-200 shadow-lg shadow-blue-900/5 space-y-8" noValidate>
     <div aria-hidden="true" className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400" />
     <header className="border-b border-slate-100 pb-5"><span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Dành cho Nhà tuyển dụng</span>
       <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">{job ? 'Chỉnh Sửa Tin Tuyển Dụng IT' : 'Đăng Tin Tuyển Dụng IT Mới'}</h1>

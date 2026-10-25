@@ -35,7 +35,7 @@ describe('Public Job search UI', () => {
     expect(screen.getByLabelText('Kỹ năng').value).toBe('JavaScript, SQL');
 
     expect(screen.getByLabelText('Ngành nghề').value).toBe('SaaS');
-    expect(screen.getByLabelText('Có kinh nghiệm').checked).toBe(true);
+    expect(screen.getByLabelText('Cấp độ').value).toBe('MID');
     await waitFor(() => expect(listPublicJobs).toHaveBeenCalledWith(expect.objectContaining({
       search: 'Backend', skills: 'JavaScript,SQL', industry: 'SaaS', seniority: 'MID', page: 1, pageSize: 12,
     })));
@@ -50,7 +50,7 @@ describe('Public Job search UI', () => {
     expect(screen.getByLabelText('Kỹ năng').value).toBe('');
 
     expect(screen.getByLabelText('Ngành nghề').value).toBe('');
-    expect(screen.getByLabelText('Tất cả cấp bậc').checked).toBe(true);
+    expect(screen.getByLabelText('Cấp độ').value).toBe('');
   });
 
   it('shows the empty state without inventing an exact total', async () => {
@@ -65,10 +65,10 @@ describe('Public Job search UI', () => {
       .mockResolvedValue({ jobs: [{ id: 'job:filtered', title: 'Filtered job', status: 'OPEN', industry: 'SaaS', seniority: 'MID', requiredSkills: [] }], nextPage: null });
     renderJobs();
     expect(await screen.findByText('First job')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Tiếp' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
     await waitFor(() => expect(listPublicJobs).toHaveBeenCalledTimes(2));
     expect(listPublicJobs.mock.calls[1][0]).toMatchObject({ page: 2, bookmark: 'cursor-next' });
-    fireEvent.click(await screen.findByLabelText('Có kinh nghiệm'));
+    fireEvent.change(screen.getByLabelText('Cấp độ'), { target: { value: 'MID' } });
     await waitFor(() => expect(listPublicJobs).toHaveBeenCalledTimes(3));
     expect(listPublicJobs.mock.calls[2][0]).toMatchObject({ page: 1, bookmark: undefined, seniority: 'MID' });
   });
@@ -90,5 +90,17 @@ describe('Public Job search UI', () => {
     await act(async () => { resolveOld({ jobs: [{ id: 'job:old', title: 'Old result', status: 'OPEN', industry: 'SaaS', seniority: 'MID', requiredSkills: [] }], nextPage: null }); });
     expect(screen.queryByText('Old result')).toBeNull();
     expect(screen.getByText('React Engineer')).toBeTruthy();
+  });
+
+  it('submits skill and industry drafts together, then keeps them when selecting a location', async () => {
+    renderJobs();
+    fireEvent.change(searchInput(), { target: { value: 'Backend' } });
+    fireEvent.change(screen.getByLabelText('Kỹ năng'), { target: { value: 'JavaScript, SQL' } });
+    fireEvent.change(screen.getByLabelText('Ngành nghề'), { target: { value: 'SaaS' } });
+    fireEvent.submit(searchInput().closest('form'));
+    await waitFor(() => expect(listPublicJobs).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'Backend', skills: 'JavaScript,SQL', industry: 'SaaS', page: 1 })));
+    fireEvent.change(screen.getByLabelText('Địa điểm'), { target: { value: 'VN-HN' } });
+    await waitFor(() => expect(listPublicJobs).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'Backend', skills: 'JavaScript,SQL', industry: 'SaaS', location: 'VN-HN', bookmark: undefined })));
+    expect(screen.getByRole('heading', { name: 'Job Search Dashboard' })).toBeTruthy();
   });
 });

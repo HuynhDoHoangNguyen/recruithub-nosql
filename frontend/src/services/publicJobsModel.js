@@ -6,7 +6,7 @@ export function normalizeJob(job) {
     seniority: job.seniority,
     industry: job.industry,
     employment_type: job.employment_type, salary: job.salary, company_logo_url: job.company_logo_url,
-    location_label: job.location_label, work_mode_label: job.work_mode_label, location: job.location, work_mode: job.work_mode, requirements: job.requirements,
+    location_label: job.location_label, work_mode_label: job.work_mode_label, location: job.location, work_mode: job.work_mode,
     description: job.description,
     responsibilities: job.responsibilities || [],
     requirements: job.requirements || {},

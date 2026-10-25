@@ -1,5 +1,9 @@
 # RecruiHub NoSQL
 
+> Tinh chỉnh UI: [nền navy có chiều sâu, đồng bộ bảy trang và hồ sơ ứng viên, ảnh trước/sau và kiểm thử](docs/surface-polish-verification/README.md).
+
+> Sửa sau merge dev: [giữ giao diện mới, sửa import/state/filter và nối lại CV/nộp lại hồ sơ](docs/reports/TV2/dev-merge-repair-2026-10-25.md).
+
 > Tổng hợp TV2: [report hiện trạng, đối chiếu 7 use case, việc còn phụ thuộc và nội dung commit](docs/reports/TV2/TV2-review-and-commit-summary-2026-10-25.md).
 
 > Hồ sơ và trang chủ: [ràng buộc Candidate/Recruiter, kiểm tra số điện thoại và thiết kế banner/việc làm tiêu biểu](docs/reports/TV2/profile-validation-home-handoff-2026-10-25.md).

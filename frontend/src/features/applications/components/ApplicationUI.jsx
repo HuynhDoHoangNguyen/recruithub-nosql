@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { stageLabels } from '../applicationPresentation';
 
-export function Page({ title, subtitle, action, children }) {
-  return <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8"><div className="mx-auto max-w-7xl space-y-6">
+export function Page({ title, subtitle, action, children, className = '' }) {
+  return <main className={`min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8 ${className}`}><div className="mx-auto max-w-7xl space-y-6">
     <header className="flex flex-wrap items-start justify-between gap-4"><div>
       <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">{title}</h1>{subtitle && <p className="mt-2 text-sm text-slate-500">{subtitle}</p>}</div>{action}</header>{children}
   </div></main>;
@@ -26,7 +26,7 @@ export function Resource({ resource, empty = false, emptyMessage = 'Chưa có d�
 export function StageBadge({ stage }) {
   const colors = { APPLIED: 'bg-sky-100 text-sky-800', SCREENING: 'bg-purple-100 text-purple-800', INTERVIEW: 'bg-amber-100 text-amber-800',
     OFFER: 'bg-teal-100 text-teal-800', HIRED: 'bg-emerald-100 text-emerald-800', REJECTED: 'bg-rose-100 text-rose-800', WITHDRAWN: 'bg-gray-200 text-gray-700' };
-  return <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${colors[stage] || ''}`}>{stageLabels[stage] || stage}</span>;
+  return <span className={`rh-stage-badge inline-block rounded-full px-3 py-1 text-xs font-semibold ${colors[stage] || ''}`}>{stageLabels[stage] || stage}</span>;
 }
 export function StageFilter({ value, onChange }) {
   return <label className="block text-sm font-semibold text-gray-700">Trạng thái hồ sơ<select className="input-field mt-2" value={value} onChange={event => onChange(event.target.value)}>

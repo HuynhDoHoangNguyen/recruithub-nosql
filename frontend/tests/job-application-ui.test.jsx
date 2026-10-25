@@ -227,7 +227,7 @@ it('historical catalog detail explains why Apply is disabled without submitting 
   jobApi.publicDetail.mockResolvedValue({ ...job, application_available: false, catalog_source: 'dataset' });
   applicationApi.mine.mockResolvedValue({ items: [] });
   render(<MemoryRouter initialEntries={['/jobs/job%3Acms%3AJ_000001']}><AppRoutes /></MemoryRouter>);
-  const button = (await screen.findAllByRole('button', { name: 'Ứng tuyển ngay' }))[0];
+  const button = await screen.findByRole('button', { name: 'Nộp hồ sơ ứng tuyển' });
   expect(button.disabled).toBe(true);
   expect(screen.getByText(/Tin tham khảo từ bộ dữ liệu/)).toBeTruthy();
   expect(applicationApi.apply).not.toHaveBeenCalled();

@@ -1,13 +1,13 @@
 import { useCallback, useState } from 'react';
-import { ArrowLeft, BriefcaseBusiness, Building2, CalendarDays, Check, ClipboardList, Clock3, ExternalLink, FileCheck2, FileText, FolderKanban, GraduationCap, ListChecks, Send } from 'lucide-react';
+import { ArrowLeft, Banknote, BriefcaseBusiness, Building2, CalendarDays, Check, ClipboardList, ExternalLink, FileCheck2, FileText, FolderKanban, GraduationCap, ListChecks, MapPin, Send } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { ArrowUpRight, BriefcaseBusiness, CalendarDays, MapPin, Send, Layers, Building2, Banknote, Clock3 } from 'lucide-react';
 import CompanyLogo from '../../components/CompanyLogo';
 import ViewAssetButton from '../../components/uploads/ViewAssetButton';
 import { employmentLabels, salaryLabel } from '../../features/jobs/jobPresentation';
-import { applicationApi, jobApi } from '../../api/jobApplicationApi';
+import { applicationApi } from '../../api/jobApplicationApi';
 import { useAuth } from '../../context/useAuth';
+import { getPublicJob, isPublicJobsMockMode } from '../../services/publicJobsApi';
 
 import { deadlineIsOpen, degreeLabels, normalizeRole, seniorityLabels, stageLabels } from '../../features/applications/applicationPresentation';
 
@@ -58,10 +58,11 @@ export default function JobDetails() {
   const [showApply, setShowApply] = useState(false);
   const [message, setMessage] = useState('');
   const resource = useApiResource(useCallback(async () => {
-    const job = await jobApi.publicDetail(id);
-    const applications = candidate ? await applicationApi.mine({ job_id: id }) : { items: [] };
+    const job = await getPublicJob(id);
+    if (!job) throw Object.assign(new Error('Không tìm thấy tin tuyển dụng.'), { status: 404 });
+    const applications = isCandidate && !isPublicJobsMockMode && job.application_available !== false ? await applicationApi.mine({ job_id: id, limit: 20 }) : { items: [] };
     return { job, application: applications.items[0] };
-  }, [id, candidate]));
+  }, [id, isCandidate]));
   const { job, application } = resource.data || {};
 
   const responsibilities = Array.isArray(job?.responsibilities) ? job.responsibilities.filter(Boolean) : [];
@@ -76,7 +77,7 @@ export default function JobDetails() {
   const hasRequirements = Boolean(requirements.general?.length || hasKnownRequirements);
   const hasSkills = Boolean(requiredSkills.length || optionalSkills.length);
   const deadline = dateLabel(job?.deadline);
-  const canApply = deadlineIsOpen(job);
+  const canApply = deadlineIsOpen(job) && !isPublicJobsMockMode && job?.application_available !== false;
 
   if (resource.loading) return <LoadingDetail />;
   if (resource.error) return <DetailError error={resource.error} retry={resource.reload} />;
@@ -87,20 +88,22 @@ export default function JobDetails() {
       <div className="space-y-5">
       <nav aria-label="Điều hướng" className="flex items-center gap-2 text-sm text-[#64748B]"><Link to="/jobs" className="font-semibold text-[#078FBF] hover:underline">Việc làm</Link><span aria-hidden="true">/</span><span>Chi tiết</span></nav>
       {isPublicJobsMockMode && <p role="note" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Đây là tin minh họa trong chế độ phát triển. Chức năng nộp hồ sơ chỉ hoạt động với tin từ API.</p>}
-      {notice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>}
+      {message && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</p>}
 
       <header className="rounded-[17px] border border-[#E5F3F8] bg-[#F8FDFF] p-5 sm:p-7">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex min-w-0 gap-4"><div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-[#E4F7FE] text-[#079DD7] sm:flex"><BriefcaseBusiness size={25} aria-hidden="true" /></div>
+          <div className="flex min-w-0 gap-4">{job.company_logo_url ? <CompanyLogo name={job.company?.name || job.company_name || job.industry} src={job.company_logo_url} className="h-14 w-14" /> : <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-[#E4F7FE] text-[#079DD7] sm:flex"><BriefcaseBusiness size={25} aria-hidden="true" /></div>}
             <div className="min-w-0"><p className="mb-1 text-sm font-semibold text-[#078FBF]">{job.company?.name || job.company_name || 'Cơ hội nghề nghiệp'}</p><h1 className="break-words text-2xl font-bold leading-tight text-[#17243B] sm:text-3xl">{job.title}</h1>
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#64748B]">
                 {job.industry && <span className="inline-flex items-center gap-1.5"><Building2 size={15} />{job.industry}</span>}
                 {job.seniority && <span className="inline-flex items-center gap-1.5"><BriefcaseBusiness size={15} />{seniorityLabels[job.seniority] || job.seniority}</span>}
                 {deadline && <span className="inline-flex items-center gap-1.5"><CalendarDays size={15} />Hạn nộp {deadline}</span>}
+                {job.location_label && <span className="inline-flex items-center gap-1.5"><MapPin size={15} />{job.location_label}{job.work_mode_label && ` · ${job.work_mode_label}`}</span>}
+                {job.salary && <span className="inline-flex items-center gap-1.5 font-semibold text-[#078B68]"><Banknote size={15} />{salaryLabel(job.salary)}</span>}
               </div>
             </div>
           </div>
-          <span className={`w-fit shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold ${canApply ? 'bg-[#E1F9F1] text-[#078B68]' : 'bg-amber-50 text-amber-800'}`}>{canApply ? 'Đang tuyển' : 'Đã hết hạn'}</span>
+          <span className={`w-fit shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold ${canApply ? 'bg-[#E1F9F1] text-[#078B68]' : 'bg-amber-50 text-amber-800'}`}>{job.application_available === false ? 'Tin tham khảo' : canApply ? 'Đang tuyển' : job.status === 'CLOSED' ? 'Đã đóng tin' : 'Đã hết hạn'}</span>
         </div>
       </header>
 
@@ -129,21 +132,28 @@ export default function JobDetails() {
               {job.industry && <div className="flex items-center justify-between gap-3 py-3"><dt className="inline-flex items-center gap-2 text-[#64748B]"><Building2 size={15} className="text-[#12A8D8]" />Ngành nghề</dt><dd className="text-right font-semibold text-[#17243B]">{job.industry}</dd></div>}
               {job.seniority && <div className="flex items-center justify-between gap-3 py-3"><dt className="inline-flex items-center gap-2 text-[#64748B]"><BriefcaseBusiness size={15} className="text-[#12A8D8]" />Cấp độ</dt><dd className="text-right font-semibold text-[#17243B]">{seniorityLabels[job.seniority] || job.seniority}</dd></div>}
               <div className="flex items-center justify-between gap-3 py-3"><dt className="inline-flex items-center gap-2 text-[#64748B]"><CalendarDays size={15} className="text-[#12A8D8]" />Hạn nộp</dt><dd className="text-right font-semibold text-[#17243B]">{deadline || 'Chưa có thông tin'}</dd></div>
+              {job.salary && <div className="flex items-center justify-between gap-3 py-3"><dt className="text-[#64748B]">Mức lương</dt><dd className="text-right font-semibold text-[#078B68]">{salaryLabel(job.salary)}</dd></div>}
+              {job.employment_type && <div className="flex items-center justify-between gap-3 py-3"><dt className="text-[#64748B]">Loại hợp đồng</dt><dd className="text-right font-semibold text-[#17243B]">{employmentLabels[job.employment_type]}</dd></div>}
             </dl>
-            {application ? <div className="mt-4 space-y-4 border-t border-[#E5F0F4] pt-4"><p className="text-sm font-semibold text-[#17243B]">Hồ sơ của bạn: {stageLabels[application.current_stage] || application.current_stage}</p><ApplicationTimeline application={application} /><WithdrawButton application={application} onChanged={resource.reload} /></div>
+            {job.application_available === false && <p className="mt-4 rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800">Tin tham khảo từ bộ dữ liệu. Chọn tin đang nhận hồ sơ để ứng tuyển.</p>}
+            {application ? <div className="mt-4 space-y-4 border-t border-[#E5F0F4] pt-4"><p className="text-sm font-semibold text-[#17243B]">Hồ sơ của bạn: {stageLabels[application.current_stage] || application.current_stage}</p><ApplicationTimeline application={application} />
+              <details><summary className="cursor-pointer text-sm font-semibold text-[#078FBF]">Xem CV và thư giới thiệu đã nộp</summary><div className="mt-3 space-y-3"><ViewAssetButton asset={application.submission?.resume_file} />{application.submission?.resume_text && <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-[#F8FDFF] p-3 font-sans text-sm">{application.submission.resume_text}</pre>}{!application.submission?.resume_text && !application.submission?.resume_file && <p className="text-xs text-[#64748B]">Hồ sơ lịch sử chưa có CV đính kèm.</p>}{application.submission?.cover_letter && <p className="whitespace-pre-wrap break-words text-sm text-[#64748B]">{application.submission.cover_letter}</p>}</div></details>
+              <ApplicationAttempts application={application} /><WithdrawButton application={application} onChanged={resource.reload} />
+              {application.current_stage === 'WITHDRAWN' && <div><button type="button" disabled={!canApply} onClick={() => setShowApply(true)} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#12B5EC] px-4 py-3 font-semibold text-white hover:bg-[#079DD7] disabled:cursor-not-allowed disabled:bg-slate-300"><Send size={17} />Ứng tuyển lại</button><p className="mt-2 text-xs leading-5 text-[#64748B]">CV và lịch sử lần trước được giữ riêng.{!canApply && ' Tin hiện không nhận hồ sơ mới.'}</p></div>}
+            </div>
               : isPublicJobsMockMode ? <p className="mt-5 rounded-lg bg-slate-50 p-3 text-sm text-[#64748B]">Ứng tuyển khả dụng khi dùng tin tuyển dụng thật từ API.</p>
                 : isCandidate ? <><button type="button" disabled={!canApply} onClick={() => setShowApply(true)} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#12B5EC] px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-[#079DD7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-100 disabled:cursor-not-allowed disabled:bg-slate-300"><Send size={17} />Nộp hồ sơ ứng tuyển</button>{!canApply && <p className="mt-2 text-sm text-[#64748B]">Tin đã hết hạn nhận hồ sơ.</p>}</>
                   : !user ? <div className="mt-5 space-y-3"><Link className="block rounded-lg bg-[#12B5EC] px-4 py-3 text-center font-semibold text-white hover:bg-[#079DD7]" to="/login" state={{ from: `${location.pathname}${location.search}` }}>Đăng nhập để ứng tuyển</Link><Link className="block text-center text-sm font-semibold text-[#078FBF] hover:underline" to="/register">Đăng ký tài khoản ứng viên</Link></div>
                     : <p className="mt-5 rounded-lg bg-slate-50 p-3 text-sm text-[#64748B]">Chỉ tài khoản ứng viên mới có thể nộp hồ sơ.</p>}
           </section>
-          {job.company && <section className="rounded-[17px] border border-[#E5F3F8] bg-[#F8FDFF] p-5 sm:p-6"><h2 className="flex items-center gap-2 text-lg font-bold text-[#17243B]"><Building2 size={19} className="text-[#12A8D8]" />Thông tin công ty</h2>
-            <p className="mt-4 font-semibold text-[#17243B]">{job.company.name}</p>{job.company.industry && <p className="mt-1 text-sm text-[#64748B]">{job.company.industry}</p>}
-            {job.company.website && /^https?:\/\//i.test(job.company.website) && <a href={job.company.website} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#078FBF] hover:underline">Website công ty <ExternalLink size={14} /></a>}
+          {(job.company || job.company_name) && <section className="rounded-[17px] border border-[#E5F3F8] bg-[#F8FDFF] p-5 sm:p-6"><h2 className="flex items-center gap-2 text-lg font-bold text-[#17243B]"><Building2 size={19} className="text-[#12A8D8]" />Thông tin công ty</h2>
+            <p className="mt-4 font-semibold text-[#17243B]">{job.company?.name || job.company_name}</p>{job.company?.industry && <p className="mt-1 text-sm text-[#64748B]">{job.company.industry}</p>}
+            {job.company?.website && /^https?:\/\//i.test(job.company.website) && <a href={job.company.website} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#078FBF] hover:underline">Website công ty <ExternalLink size={14} /></a>}
           </section>}
         </aside>
       </div>
       </div>
     </div>
-    {showApply && <ApplyModal job={job} onClose={() => setShowApply(false)} onRefresh={resource.reload} onSubmitted={() => { setShowApply(false); setNotice('Đã nộp hồ sơ thành công. Bạn có thể theo dõi tiến trình tại đây.'); toast.success('Đã nộp hồ sơ.'); resource.reload(); }} />}
+    {showApply && <ApplyModal job={job} previousApplication={application?.current_stage === 'WITHDRAWN' ? application : undefined} onClose={() => setShowApply(false)} onRefresh={resource.reload} onSubmitted={() => { setShowApply(false); setMessage('Đã nộp hồ sơ thành công. Bạn có thể theo dõi tiến trình tại đây.'); toast.success('Đã nộp hồ sơ.'); resource.reload(); }} />}
   </main>;
 }
