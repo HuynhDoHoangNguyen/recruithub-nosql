@@ -23,6 +23,7 @@ import {
   isoDateTimeSchema,
   provenanceSchema,
 } from './common.schema.js';
+import { normalizeSkill } from '../utils/normalization.utils.js';
 
 /**
  * Job Experience Requirement Schema.
@@ -121,18 +122,18 @@ export const jobProjectRequirementSchema = z
           path: ['required_technologies'],
         });
       } else {
-        // Check uniqueness of technologies
+        // Check canonical uniqueness with the shared versioned skill policy.
         const seen = new Set();
         data.required_technologies.forEach((tech, idx) => {
-          const lower = tech.toLowerCase();
-          if (seen.has(lower)) {
+          const canonical = normalizeSkill(tech);
+          if (seen.has(canonical)) {
             ctx.addIssue({
               code: 'custom',
               message: `Duplicate technology in required_technologies: "${tech}"`,
               path: ['required_technologies', idx],
             });
           }
-          seen.add(lower);
+          seen.add(canonical);
         });
       }
     } else {
@@ -166,15 +167,15 @@ function refineJobData(job, ctx) {
   const seenReq = new Set();
   if (Array.isArray(job.required_skills)) {
     job.required_skills.forEach((skill, idx) => {
-      const lower = skill.toLowerCase();
-      if (seenReq.has(lower)) {
+      const canonical = normalizeSkill(skill);
+      if (seenReq.has(canonical)) {
         ctx.addIssue({
           code: 'custom',
           message: `Duplicate skill in required_skills: "${skill}"`,
           path: ['required_skills', idx],
         });
       }
-      seenReq.add(lower);
+      seenReq.add(canonical);
     });
   }
 
@@ -182,23 +183,23 @@ function refineJobData(job, ctx) {
   const seenOpt = new Set();
   if (Array.isArray(job.optional_skills)) {
     job.optional_skills.forEach((skill, idx) => {
-      const lower = skill.toLowerCase();
-      if (seenOpt.has(lower)) {
+      const canonical = normalizeSkill(skill);
+      if (seenOpt.has(canonical)) {
         ctx.addIssue({
           code: 'custom',
           message: `Duplicate skill in optional_skills: "${skill}"`,
           path: ['optional_skills', idx],
         });
       }
-      seenOpt.add(lower);
+      seenOpt.add(canonical);
     });
   }
 
   // 3. Disjoint check: required_skills and optional_skills must NOT overlap (Rule 9)
   if (Array.isArray(job.optional_skills)) {
     job.optional_skills.forEach((skill, idx) => {
-      const lower = skill.toLowerCase();
-      if (seenReq.has(lower)) {
+      const canonical = normalizeSkill(skill);
+      if (seenReq.has(canonical)) {
         ctx.addIssue({
           code: 'custom',
           message: `Skill "${skill}" cannot be present in both required_skills and optional_skills`,

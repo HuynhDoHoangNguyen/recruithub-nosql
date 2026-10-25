@@ -91,6 +91,11 @@ export const DEGREE_RANKS = Object.freeze({
   DOCTORATE: 4,
 });
 
+// Fingerprint configuration identifiers. Any behavior or mapping change must
+// use a new identifier so stored analyses are invalidated deterministically.
+export const SKILL_NORMALIZATION_VERSION = 'skill-normalization-v1';
+export const DEGREE_MAPPING_VERSION = 'degree-mapping-v1';
+
 /**
  * Approved Degree mapping table (DATA-02A Section 7 / Section 13).
  * Normalizes source education terms to canonical degree tiers.

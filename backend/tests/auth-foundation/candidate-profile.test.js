@@ -50,9 +50,34 @@ test('profile update uses the authenticated owner, allowlists fields and require
 test('profile update keeps unrelated availability values and marks supplied skill data available', async () => {
   const repository = makeRepo();
   const service = new CandidateProfileService({ candidateRepository: repository });
-  await service.updateMyProfile(userId, { skills: [{ name: 'Node.js', normalized: 'node.js' }] }, '1-profile');
+  await service.updateMyProfile(userId, { skills: [{ name: 'NodeJS', normalized: 'forged-value' }] }, '1-profile');
+  assert.deepEqual(repository.updates[0].doc.skills, [{ name: 'NodeJS', normalized: 'node.js' }]);
   assert.equal(repository.updates[0].doc.data_availability.skills, 'PARTIAL');
   assert.equal(repository.updates[0].doc.data_availability.education, 'UNAVAILABLE');
+  assert.equal(repository.updates[0].doc.profile.full_name, 'Demo User');
+});
+
+test('profile update accepts name-only skills and derives canonical normalized values', async () => {
+  const repository = makeRepo();
+  const service = new CandidateProfileService({ candidateRepository: repository });
+  await service.updateMyProfile(userId, { skills: [{ name: ' React.js ' }] }, '1-profile');
+  assert.deepEqual(repository.updates[0].doc.skills, [{ name: 'React.js', normalized: 'react' }]);
+});
+
+test('profile update rejects alias-equivalent duplicate skills before repository write', async () => {
+  const repository = makeRepo();
+  const service = new CandidateProfileService({ candidateRepository: repository });
+
+  await assert.rejects(
+    () => service.updateMyProfile(userId, {
+      skills: [
+        { name: 'NodeJS', normalized: 'nodejs' },
+        { name: 'node.js', normalized: 'node.js' },
+      ],
+    }, '1-profile'),
+    { code: 'VALIDATION_ERROR' },
+  );
+  assert.equal(repository.updates.length, 0);
 });
 
 test('profile PATCH preserves legacy unavailable classification, origins, and unrelated availability', async () => {

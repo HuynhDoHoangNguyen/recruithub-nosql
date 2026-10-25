@@ -118,6 +118,24 @@ test('Job normalization rejects alias collisions, overlaps, conditional requirem
   ]) assert.equal((await f.request('POST', '/jobs', { ...jobInput, ...changes }, 'recruiter')).status, 400);
   const created = await f.request('POST', '/jobs', { ...jobInput, required_skills: [' JS ', 'NodeJS'] }, 'recruiter');
   assert.equal(created.status, 201); assert.deepEqual(created.body.data.required_skills, ['javascript', 'node.js']);
+
+  const current = f.repo.docs.get(f.job._id);
+  const original = structuredClone(current);
+  const writesBefore = f.repo.writes.length;
+  const rejectedUpdate = await f.request('PATCH', `/jobs/${current._id}`, {
+    requirements: {
+      ...current.requirements,
+      project: { status: 'REQUIRED', required_technologies: ['NodeJS', 'node.js'] },
+    },
+    expected_rev: current._rev,
+  }, 'recruiter');
+  assert.equal(rejectedUpdate.status, 400);
+  assert.equal(rejectedUpdate.body.error.code, 'VALIDATION_ERROR');
+  assert.equal(rejectedUpdate.body.error.details.some(detail => (
+    detail.field === 'requirements.project.required_technologies.1'
+  )), true);
+  assert.equal(f.repo.writes.length, writesBefore);
+  assert.deepEqual(f.repo.docs.get(current._id), original);
 });
 
 test('Job updates preserve historical unavailable provenance while new writes reject it', async t => {

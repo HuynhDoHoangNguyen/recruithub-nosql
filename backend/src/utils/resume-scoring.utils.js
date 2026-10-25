@@ -15,9 +15,11 @@ import { createHash } from 'node:crypto';
 import {
   APPLICATION_STAGES,
   AVAILABILITY_STATES,
+  DEGREE_MAPPING_VERSION,
   DEGREE_RANKS,
   DOCUMENT_TYPES,
   REQUIREMENT_STATUSES,
+  SKILL_NORMALIZATION_VERSION,
 } from '../constants/document.constants.js';
 import {
   normalizeSkill,
@@ -32,15 +34,91 @@ import {
   RECOMMENDATION_LEVELS,
 } from '../schemas/resume-analysis.schema.js';
 
+const VALID_AVAILABILITY_STATES = new Set(Object.values(AVAILABILITY_STATES));
+const AVAILABILITY_CODE_NAMES = Object.freeze({
+  skill: 'SKILLS',
+  experience: 'EXPERIENCE',
+  education: 'EDUCATION',
+  project: 'PROJECTS',
+});
+
+function canonicalProvenanceOrNull(provenance) {
+  if (!provenance || typeof provenance !== 'object' || Array.isArray(provenance)) return null;
+  return canonicalizeValue(provenance);
+}
+
+function componentInputContext(candidateAvailability, candidateProvenance, jobProvenance) {
+  return {
+    candidate_availability: VALID_AVAILABILITY_STATES.has(candidateAvailability)
+      ? candidateAvailability
+      : null,
+    candidate_provenance: canonicalProvenanceOrNull(candidateProvenance),
+    job_provenance: canonicalProvenanceOrNull(jobProvenance),
+  };
+}
+
+function canonicalProjectEvidence(projects) {
+  if (!Array.isArray(projects)) return [];
+
+  const evidence = projects.map((project) => {
+    const technologies = new Set();
+    if (Array.isArray(project?.technologies)) {
+      for (const technology of project.technologies) {
+        if (typeof technology !== 'string' || !technology.trim()) continue;
+        technologies.add(normalizeSkill(technology));
+      }
+    }
+
+    return canonicalizeValue({
+      technologies: Array.from(technologies).sort(),
+      is_synthetic: typeof project?.is_synthetic === 'boolean' ? project.is_synthetic : null,
+      provenance: canonicalProvenanceOrNull(project?.provenance),
+    });
+  });
+
+  return evidence.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+}
+
+function candidateAvailabilityIssue(component, availability) {
+  if (VALID_AVAILABILITY_STATES.has(availability)) return null;
+  const missing = availability === undefined || availability === null;
+  const codeName = AVAILABILITY_CODE_NAMES[component];
+  return {
+    component,
+    code: `${missing ? 'MISSING' : 'INVALID'}_CANDIDATE_${codeName}_AVAILABILITY`,
+    message: missing
+      ? `Candidate ${component} availability is missing`
+      : `Candidate ${component} availability is invalid: ${String(availability)}`,
+  };
+}
+
 /**
  * Calculates Skill Score (50%, SKILL-COV).
  * 
  * @param {string[]} jobRequiredSkills 
  * @param {Array<string|{name: string, normalized?: string}>} candidateSkills 
- * @param {string} [candidateAvailability=AVAILABILITY_STATES.AVAILABLE]
+ * @param {string} candidateAvailability
  * @returns {{ score: number|null, matched: string[], missing: string[], details: Object, missingInput?: Object }}
  */
-export function calculateSkillScore(jobRequiredSkills, candidateSkills, candidateAvailability = AVAILABILITY_STATES.AVAILABLE) {
+export function calculateSkillScore(jobRequiredSkills, candidateSkills, candidateAvailability) {
+  const availabilityIssue = candidateAvailabilityIssue('skill', candidateAvailability);
+  if (availabilityIssue) {
+    return {
+      score: null,
+      matched: [],
+      missing: [],
+      details: {
+        formula_id: 'SKILL-COV',
+        matched_count: 0,
+        required_count: Array.isArray(jobRequiredSkills) ? jobRequiredSkills.length : 0,
+        matched_skills: [],
+        missing_skills: [],
+        unrounded_score: null,
+      },
+      missingInput: availabilityIssue,
+    };
+  }
+
   if (candidateAvailability === AVAILABILITY_STATES.UNAVAILABLE) {
     return {
       score: null,
@@ -128,6 +206,30 @@ export function calculateSkillScore(jobRequiredSkills, candidateSkills, candidat
     }
   }
 
+  if (
+    candidateAvailability !== AVAILABILITY_STATES.NONE_DECLARED &&
+    normalizedCandidateSet.size === 0
+  ) {
+    return {
+      score: null,
+      matched: [],
+      missing: requiredList,
+      details: {
+        formula_id: 'SKILL-COV',
+        matched_count: 0,
+        required_count: requiredList.length,
+        matched_skills: [],
+        missing_skills: requiredList,
+        unrounded_score: null,
+      },
+      missingInput: {
+        component: 'skill',
+        code: 'MISSING_CANDIDATE_SKILL_EVIDENCE',
+        message: 'Candidate skill availability requires non-empty valid skill evidence',
+      },
+    };
+  }
+
   const matched = [];
   const missing = [];
 
@@ -161,11 +263,28 @@ export function calculateSkillScore(jobRequiredSkills, candidateSkills, candidat
  * 
  * @param {Object} jobExperienceReq 
  * @param {number|null|undefined} candidateMonths 
- * @param {string} [candidateAvailability=AVAILABILITY_STATES.AVAILABLE]
+ * @param {string} candidateAvailability
  * @returns {{ score: number|null, details: Object, missingInput?: Object }}
  */
-export function calculateExperienceScore(jobExperienceReq, candidateMonths, candidateAvailability = AVAILABILITY_STATES.AVAILABLE) {
+export function calculateExperienceScore(jobExperienceReq, candidateMonths, candidateAvailability) {
   const reqStatus = jobExperienceReq?.status;
+  const availabilityIssue = candidateAvailabilityIssue('experience', candidateAvailability);
+  if (availabilityIssue) {
+    return {
+      score: null,
+      details: {
+        formula_id: 'EXP-A',
+        candidate_months: null,
+        required_months: reqStatus === REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED &&
+          typeof jobExperienceReq?.required_months === 'number'
+          ? jobExperienceReq.required_months
+          : null,
+        requirement_status: reqStatus || 'UNAVAILABLE',
+        unrounded_score: null,
+      },
+      missingInput: availabilityIssue,
+    };
+  }
 
   if (reqStatus === REQUIREMENT_STATUSES.EXPERIENCE.NO_MINIMUM) {
     return {
@@ -275,11 +394,27 @@ export function calculateExperienceScore(jobExperienceReq, candidateMonths, cand
  * 
  * @param {Object} jobEducationReq 
  * @param {Array<Object|string>} candidateEducation 
- * @param {string} [candidateAvailability=AVAILABILITY_STATES.AVAILABLE]
+ * @param {string} candidateAvailability
  * @returns {{ score: number|null, details: Object, missingInput?: Object }}
  */
-export function calculateEducationScore(jobEducationReq, candidateEducation, candidateAvailability = AVAILABILITY_STATES.AVAILABLE) {
+export function calculateEducationScore(jobEducationReq, candidateEducation, candidateAvailability) {
   const reqStatus = jobEducationReq?.status;
+  const availabilityIssue = candidateAvailabilityIssue('education', candidateAvailability);
+  if (availabilityIssue) {
+    return {
+      score: null,
+      details: {
+        formula_id: 'EDU-B',
+        candidate_degree: null,
+        candidate_rank: null,
+        minimum_degree: null,
+        minimum_rank: null,
+        requirement_status: reqStatus || 'UNAVAILABLE',
+        unrounded_score: null,
+      },
+      missingInput: availabilityIssue,
+    };
+  }
 
   // Determine candidate's highest normalized degree rank
   let highestDegree = null;
@@ -388,6 +523,29 @@ export function calculateEducationScore(jobEducationReq, candidateEducation, can
       };
     }
 
+    if (
+      candidateAvailability !== AVAILABILITY_STATES.NONE_DECLARED &&
+      highestDegree === null
+    ) {
+      return {
+        score: null,
+        details: {
+          formula_id: 'EDU-B',
+          candidate_degree: null,
+          candidate_rank: null,
+          minimum_degree: minDegree,
+          minimum_rank: minRank,
+          requirement_status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED,
+          unrounded_score: null,
+        },
+        missingInput: {
+          component: 'education',
+          code: 'MISSING_CANDIDATE_EDUCATION_EVIDENCE',
+          message: 'Candidate education availability requires valid degree evidence',
+        },
+      };
+    }
+
     const score = highestRank >= minRank ? 100 : 0;
     return {
       score,
@@ -427,11 +585,27 @@ export function calculateEducationScore(jobEducationReq, candidateEducation, can
  * 
  * @param {Object} jobProjectReq 
  * @param {Array<Object>} candidateProjects 
- * @param {string} [candidateAvailability=AVAILABILITY_STATES.AVAILABLE]
+ * @param {string} candidateAvailability
  * @returns {{ score: number|null, details: Object, missingInput?: Object }}
  */
-export function calculateProjectScore(jobProjectReq, candidateProjects, candidateAvailability = AVAILABILITY_STATES.AVAILABLE) {
+export function calculateProjectScore(jobProjectReq, candidateProjects, candidateAvailability) {
   const reqStatus = jobProjectReq?.status;
+  const availabilityIssue = candidateAvailabilityIssue('project', candidateAvailability);
+  if (availabilityIssue) {
+    return {
+      score: null,
+      details: {
+        formula_id: 'PROJ-A',
+        candidate_technologies: [],
+        required_technologies: [],
+        matched_technologies: [],
+        missing_technologies: [],
+        requirement_status: reqStatus || 'UNAVAILABLE',
+        unrounded_score: null,
+      },
+      missingInput: availabilityIssue,
+    };
+  }
 
   // Collect candidate normalized technologies across all projects
   const candTechSet = new Set();
@@ -550,6 +724,26 @@ export function calculateProjectScore(jobProjectReq, candidateProjects, candidat
       };
     }
 
+    if (candTechList.length === 0) {
+      return {
+        score: null,
+        details: {
+          formula_id: 'PROJ-A',
+          candidate_technologies: [],
+          required_technologies: reqTechList,
+          matched_technologies: [],
+          missing_technologies: reqTechList,
+          requirement_status: REQUIREMENT_STATUSES.PROJECT.REQUIRED,
+          unrounded_score: null,
+        },
+        missingInput: {
+          component: 'project',
+          code: 'MISSING_CANDIDATE_PROJECT_EVIDENCE',
+          message: 'Candidate project availability requires valid technology evidence',
+        },
+      };
+    }
+
     const matched = [];
     const missing = [];
     for (const tech of reqTechList) {
@@ -604,9 +798,17 @@ export function calculateProjectScore(jobProjectReq, candidateProjects, candidat
  * @param {Object} params.candidate
  * @param {Object} params.job
  * @param {string} [params.algorithmVersion=SCORING_ALGORITHM_VERSION]
+ * @param {string} [params.skillNormalizationVersion=SKILL_NORMALIZATION_VERSION]
+ * @param {string} [params.degreeMappingVersion=DEGREE_MAPPING_VERSION]
  * @returns {string} 64-hex SHA-256 fingerprint
  */
-export function computeInputFingerprint({ candidate, job, algorithmVersion = SCORING_ALGORITHM_VERSION }) {
+export function computeInputFingerprint({
+  candidate,
+  job,
+  algorithmVersion = SCORING_ALGORITHM_VERSION,
+  skillNormalizationVersion = SKILL_NORMALIZATION_VERSION,
+  degreeMappingVersion = DEGREE_MAPPING_VERSION,
+}) {
   if (!candidate || !job) {
     throw new Error('computeInputFingerprint requires candidate and job objects');
   }
@@ -642,21 +844,32 @@ export function computeInputFingerprint({ candidate, job, algorithmVersion = SCO
     }
   }
 
-  // 4. Candidate project technologies (sorted array)
+  // 4. Candidate project technologies and provenance. Project display fields
+  // are intentionally excluded; project and technology order are canonicalized.
   const candTechSet = new Set();
+  const projectEvidence = [];
   if (Array.isArray(candidate.projects)) {
     for (const proj of candidate.projects) {
+      const projectTechSet = new Set();
       if (Array.isArray(proj.technologies)) {
         for (const t of proj.technologies) {
           if (typeof t === 'string' && t.trim()) {
             try {
-              candTechSet.add(normalizeSkill(t));
+              const normalizedTechnology = normalizeSkill(t);
+              candTechSet.add(normalizedTechnology);
+              projectTechSet.add(normalizedTechnology);
             } catch (_) {}
           }
         }
       }
+      projectEvidence.push(canonicalizeValue({
+        technologies: Array.from(projectTechSet).sort(),
+        is_synthetic: proj?.is_synthetic === true,
+        provenance: proj?.provenance ? canonicalizeValue(proj.provenance) : null,
+      }));
     }
   }
+  projectEvidence.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
 
   // 5. Job required skills (sorted array)
   const jobReqSkillsSet = new Set();
@@ -698,6 +911,10 @@ export function computeInputFingerprint({ candidate, job, algorithmVersion = SCO
 
   const payload = {
     algorithm_version: algorithmVersion,
+    normalization_versions: {
+      skill: skillNormalizationVersion,
+      degree: degreeMappingVersion,
+    },
     weights: SCORING_WEIGHTS,
     thresholds: RECOMMENDATION_THRESHOLDS,
     candidate: {
@@ -706,11 +923,12 @@ export function computeInputFingerprint({ candidate, job, algorithmVersion = SCO
       experience_months: expMonths,
       education_degrees: Array.from(candDegreesSet).sort(),
       project_technologies: Array.from(candTechSet).sort(),
+      project_evidence: projectEvidence,
       availability: {
-        skills: candidate.data_availability?.skills || AVAILABILITY_STATES.AVAILABLE,
-        experience: candidate.data_availability?.experience || AVAILABILITY_STATES.AVAILABLE,
-        education: candidate.data_availability?.education || AVAILABILITY_STATES.AVAILABLE,
-        projects: candidate.data_availability?.projects || AVAILABILITY_STATES.AVAILABLE,
+        skills: candidate.data_availability?.skills ?? null,
+        experience: candidate.data_availability?.experience ?? null,
+        education: candidate.data_availability?.education ?? null,
+        projects: candidate.data_availability?.projects ?? null,
       },
     },
     job: {
@@ -764,19 +982,19 @@ export function evaluateResumeAnalysis({ application, candidate, job, analyzedAt
   }
 
   // 1. Skill Score
-  const candSkillAvail = candidate.data_availability?.skills || AVAILABILITY_STATES.AVAILABLE;
+  const candSkillAvail = candidate.data_availability?.skills;
   const skillRes = calculateSkillScore(job.required_skills, candidate.skills, candSkillAvail);
 
   // 2. Experience Score
-  const candExpAvail = candidate.data_availability?.experience || AVAILABILITY_STATES.AVAILABLE;
+  const candExpAvail = candidate.data_availability?.experience;
   const expRes = calculateExperienceScore(job.requirements?.experience, candidate.profile?.experience_months, candExpAvail);
 
   // 3. Education Score
-  const candEduAvail = candidate.data_availability?.education || AVAILABILITY_STATES.AVAILABLE;
+  const candEduAvail = candidate.data_availability?.education;
   const eduRes = calculateEducationScore(job.requirements?.education, candidate.education, candEduAvail);
 
   // 4. Project Score
-  const candProjAvail = candidate.data_availability?.projects || AVAILABILITY_STATES.AVAILABLE;
+  const candProjAvail = candidate.data_availability?.projects;
   const projRes = calculateProjectScore(job.requirements?.project, candidate.projects, candProjAvail);
 
   const missingInputs = [];
@@ -812,6 +1030,8 @@ export function evaluateResumeAnalysis({ application, candidate, job, analyzedAt
 
   const fingerprint = computeInputFingerprint({ candidate, job });
   const analysisId = `analysis:${application._id}`;
+  const candidateProvenance = candidate.provenance;
+  const jobProvenance = job.provenance;
 
   const defaultProvenance = {
     classification: 'derived',
@@ -834,10 +1054,25 @@ export function evaluateResumeAnalysis({ application, candidate, job, analyzedAt
     matched_skills: skillRes.matched,
     missing_skills: skillRes.missing,
     component_details: {
-      skill: skillRes.details,
-      experience: expRes.details,
-      education: eduRes.details,
-      project: projRes.details,
+      skill: {
+        ...skillRes.details,
+        input_context: componentInputContext(candSkillAvail, candidateProvenance, jobProvenance),
+      },
+      experience: {
+        ...expRes.details,
+        input_context: componentInputContext(candExpAvail, candidateProvenance, jobProvenance),
+      },
+      education: {
+        ...eduRes.details,
+        input_context: componentInputContext(candEduAvail, candidateProvenance, jobProvenance),
+      },
+      project: {
+        ...projRes.details,
+        input_context: {
+          ...componentInputContext(candProjAvail, candidateProvenance, jobProvenance),
+          candidate_project_evidence: canonicalProjectEvidence(candidate.projects),
+        },
+      },
     },
     missing_inputs: missingInputs,
     algorithm_version: SCORING_ALGORITHM_VERSION,

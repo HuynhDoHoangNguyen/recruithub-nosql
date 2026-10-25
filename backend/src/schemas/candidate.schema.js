@@ -27,6 +27,7 @@ import {
   provenanceSchema,
   skillItemSchema,
 } from './common.schema.js';
+import { normalizeSkill } from '../utils/normalization.utils.js';
 
 /**
  * Candidate profile object schema.
@@ -64,21 +65,27 @@ export const candidateProfileSchema = z
  * 3. data_availability consistency with actual array contents.
  */
 function refineCandidateData(candidate, ctx) {
-  // 1. Skill uniqueness
+  // 1. Skill canonical consistency and uniqueness
   if (Array.isArray(candidate.skills)) {
     const seenSkills = new Set();
     candidate.skills.forEach((skill, index) => {
-      const normalized = skill?.normalized;
-      if (normalized) {
-        if (seenSkills.has(normalized)) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `Duplicate normalized skill detected: "${normalized}"`,
-            path: ['skills', index, 'normalized'],
-          });
-        }
-        seenSkills.add(normalized);
+      if (!skill?.name || !skill?.normalized) return;
+      const canonical = normalizeSkill(skill.name);
+      if (skill.normalized !== canonical) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Normalized skill "${skill.normalized}" must equal canonical value "${canonical}" derived from name`,
+          path: ['skills', index, 'normalized'],
+        });
       }
+      if (seenSkills.has(canonical)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate normalized skill detected (canonical collision): "${canonical}"`,
+          path: ['skills', index, 'normalized'],
+        });
+      }
+      seenSkills.add(canonical);
     });
   }
 
