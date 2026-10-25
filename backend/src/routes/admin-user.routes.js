@@ -63,6 +63,16 @@ export function createAdminUserRouter({ servicesFactory = createDefaultServices 
     } catch (error) { return sendApiError(res, error); }
   });
 
+  router.post('/users/:id/password-reset', async (req, res) => {
+    try {
+      if (!idSchema.safeParse(req.params.id).success) return res.status(400).json(errorResponse('VALIDATION_ERROR', 'User ID is invalid.', null));
+      const revision = (req.get('if-match') ?? '').replace(/^"|"$/g, '');
+      const result = await getServices().admin.issuePasswordReset(req.params.id, revision);
+      if (result.revision) res.set('ETag', `"${result.revision}"`);
+      return res.json(successResponse({ user: result.user, temporaryPassword: result.temporaryPassword, expiresAt: result.expiresAt }, 'One-time reset credential issued.'));
+    } catch (error) { return sendApiError(res, error); }
+  });
+
   router.get('/stats', async (_req, res) => {
     try {
       const stats = await getServices().statistics.getStatistics();

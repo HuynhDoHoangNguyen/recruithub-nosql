@@ -30,6 +30,7 @@ Báo cáo TV1 + TV2 và hướng dẫn kiểm thử được chuyển sang [báo
 22. [TV1 UC24 — Admin Lock/Unlock Users](#uc24-full-report)
 23. [TV1 UC25 — CouchDB MapReduce Statistics](#uc25-full-report)
 24. [Kiểm toán công việc TV1 trên ba nhánh](#three-branch-audit)
+25. [UC23–UC25: database chính, Admin actions và cập nhật UI](#admin-primary-db-runtime-follow-up)
 
 
 <a id="rp-tv1-couchdb-client-repository"></a>
@@ -3244,3 +3245,59 @@ flowchart LR
 The source contains substantial TV1 implementation, but current Git delivery state and test results do not support a blanket “complete” claim. Candidate Auth/Profile paths and Admin UI have focused automated coverage, Job API tests pass, and UC25 has a recorded live demo verification. The major acceptance gaps are the missing requested branch, uncommitted Admin work, Recruiter registration test failures, four Job List UI test failures, missing browser E2E, and production UC25 view deployment. No production DB writes were performed; `recruitment_db` remains strict read-only.
 
 **Overall TV1 status: PARTIAL — implementation exists; integration, branch provenance, and UI/runtime acceptance remain incomplete.**
+
+---
+
+<a id="admin-primary-db-runtime-follow-up"></a>
+
+## Cập nhật UC23–UC25, Admin actions và UI — 2026-10-25
+
+Bản này hợp nhất trạng thái database chính và các điều chỉnh Admin mới nhất. Báo cáo chi tiết nguồn: [RP-TV1-admin-real-database-runtime-follow-up.md](RP-TV1-admin-real-database-runtime-follow-up.md). Các báo cáo audit trước đó giữ nguyên như hồ sơ lịch sử; dữ liệu dưới đây là snapshot tại ngày ghi nhận, không phải số liệu cố định.
+
+### Cấu hình chạy local
+
+Root `.env` (file local bị Git ignore) dùng các giá trị không bí mật sau để Frontend và Backend cùng trỏ tới database chính:
+
+```dotenv
+COUCHDB_DATABASE=recruitment_db
+AUTH_COUCHDB_DATABASE=recruitment_db
+AUTH_ALLOW_PRIMARY_DATABASE=true
+PORT=5010
+FRONTEND_URL=http://127.0.0.1:5177
+```
+
+Trong `frontend/.env.local`:
+
+```dotenv
+VITE_API_BASE_URL=http://127.0.0.1:5010/api
+```
+
+Không ghi CouchDB password hoặc JWT secret vào báo cáo. Sau khi sửa `.env`, khởi động lại Backend; sau khi sửa `frontend/.env.local`, khởi động lại Vite. Dùng UI `http://127.0.0.1:5177/` cùng API `http://127.0.0.1:5010`; các process cũ ở cổng khác có thể còn chạy source/config cũ.
+
+### UC25 MapReduce và snapshot database
+
+Các design documents thống kê đã được cài vào database mục tiêu. Admin Statistics lấy User/Candidate aggregates từ `tv1_admin_statistics` và Job status từ view TV2 `job_application/jobs_by_recruiter`; endpoint không dùng số ước tính hoặc fallback scan. View `user_count_by_filter` được thêm bằng `npm run db:admin-statistics`, script idempotent chỉ thêm view còn thiếu và từ chối ghi đè định nghĩa khác source.
+
+Tại lượt kiểm tra, `GET /api/v1/admin/stats` trả 200 với 10,152 Users, 10,001 Candidates, 150 Recruiters, 1 Admin; trạng thái gồm 2 ACTIVE, 0 LOCKED và 10,150 RESET_REQUIRED; có 2,500 Jobs (2,300 DRAFT, 200 OPEN, 0 CLOSED). Database có 25,755 documents, gồm các tài khoản/hồ sơ synthetic dùng cho kiểm thử và design documents. Candidate tổng hợp được khóa rồi mở khóa qua UC24. Các thao tác này đã ghi vào `recruitment_db`, do đó đây là thay đổi trên DB thật dù dùng email `example.invalid`.
+
+### Admin User List, UC23 và UC24
+
+- Cột **Thao tác** dùng một danh sách **Chọn thao tác** gọn. Mở danh sách để chọn **Chi tiết** hoặc hành động hợp lệ theo vai trò/trạng thái; thao tác không còn chiếm nhiều nút trên mỗi dòng.
+- `CANDIDATE`/`RECRUITER` ở `ACTIVE` có **Khóa tài khoản**; ở `LOCKED` có **Mở khóa tài khoản**. Cả hai vẫn có bước xác nhận và yêu cầu revision hiện tại.
+- Với `RESET_REQUIRED`, danh sách cho phép **Reset mật khẩu**. Admin xác nhận cấp credential ngẫu nhiên dùng một lần, hết hạn sau 24 giờ. Credential rõ chỉ hiện một lần cho Admin; DB chỉ lưu Argon2id hash có hạn dùng, tài khoản vẫn `RESET_REQUIRED` cho tới khi chủ tài khoản tự đặt mật khẩu mới.
+- Tài khoản ADMIN chỉ xem chi tiết; đổi trạng thái/khôi phục do operator quản lý. Quy tắc này tránh Admin thay trạng thái Admin qua endpoint thông thường.
+- Danh sách có hiển thị trang hiện tại/tổng số trang. Bộ lọc/search và số trang dùng `totalCount` chính xác theo query/view. Biểu đồ phân bổ vai trò đặt legend dưới donut và cho phép nhãn xuống dòng để vừa thẻ hẹp.
+
+### Reset mật khẩu và hiện/ẩn mật khẩu
+
+Admin reset qua `POST /api/v1/admin/users/:id/password-reset`; chủ tài khoản dùng public `POST /api/v1/auth/reset-password` tại trang `/reset-password`. Backend kiểm tra credential chưa hết hạn/chưa dùng, xác minh liên kết Candidate hoặc Recruiter (kể cả Company/Department scope), rồi cập nhật đúng User bằng `_rev` và chuyển trạng thái sang `ACTIVE`. Credential không dùng lại được. Email delivery chưa có; credential phải được chuyển qua kênh riêng. Thao tác này cập nhật User được chọn trong `recruitment_db`.
+
+Đăng nhập và Đăng ký có nút mắt cho mật khẩu (và xác nhận mật khẩu). Trang Đặt mật khẩu mới có nút mắt riêng cho mã dùng một lần, mật khẩu mới và nhập lại mật khẩu; các trường ẩn mặc định và có thể hiện/ẩn độc lập.
+
+### Verification và giới hạn
+
+- Backend 5010 health, Admin list/detail/stats trả 200; CORS preflight từ UI origin 5177 thành công.
+- UC24 Candidate tổng hợp: Lock thành công, token bị từ chối khi LOCKED, Unlock thành công.
+- Frontend production build sau các UI cập nhật gần nhất: **PASS** (Vite 8.3.3); bundle 524.42 kB, có cảnh báo vượt ngưỡng 500 kB.
+- Không chạy automated suite lại cho lần sửa UI gần nhất; chưa xác minh thao tác click, hiển thị menu, reset-password hoặc responsive bằng browser E2E.
+- Báo cáo follow-up đầy đủ: [RP-TV1-admin-real-database-runtime-follow-up.md](RP-TV1-admin-real-database-runtime-follow-up.md). Không commit/stage được thực hiện trong các cập nhật này.

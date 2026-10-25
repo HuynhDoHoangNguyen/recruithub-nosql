@@ -14,6 +14,10 @@ export const ADMIN_USER_STATISTICS_DESIGN = Object.freeze({
       map: 'function (doc) { if (doc.type === "user" && doc.account_status) emit(doc.account_status, 1); }',
       reduce: '_count',
     }),
+    user_count_by_filter: Object.freeze({
+      map: 'function (doc) { if (doc.type === "user" && doc.role && doc.account_status && doc.email_normalized) { var filters = [[null, null], [doc.role, null], [null, doc.account_status], [doc.role, doc.account_status]]; for (var i = 0; i < filters.length; i += 1) emit([filters[i][0], filters[i][1], doc.email_normalized], 1); } }',
+      reduce: '_count',
+    }),
     user_total: Object.freeze({
       map: 'function (doc) { if (doc.type === "user") emit(null, 1); }',
       reduce: '_count',

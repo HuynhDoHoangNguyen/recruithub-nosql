@@ -50,7 +50,7 @@ function RoleDistribution({ roles = {}, total = 0 }) {
   let offset = 0;
 
   return (
-    <div className="mt-5 flex flex-col items-center gap-5 sm:flex-row sm:justify-between">
+    <div className="mt-5 flex min-w-0 flex-col items-center gap-5">
       <div className="relative h-40 w-40 shrink-0" role="img" aria-label="Biểu đồ vòng tròn phân bổ tài khoản theo vai trò">
         <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90 overflow-visible">
           <circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" strokeWidth="12" />
@@ -64,11 +64,11 @@ function RoleDistribution({ roles = {}, total = 0 }) {
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-3xl font-bold tracking-tight text-slate-900">{total}</span><span className="text-xs font-medium text-slate-500">tài khoản</span></div>
       </div>
-      <div className="grid w-full gap-3 sm:max-w-xs">
+      <div className="grid w-full max-w-sm gap-3">
         {segments.map((segment) => {
           const value = Number(roles[segment.key] || 0);
           const percent = total ? Math.round((value / total) * 100) : 0;
-          return <div key={segment.key} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3"><div className="flex min-w-0 items-center gap-2.5"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} /><span className="truncate text-sm font-medium text-slate-600">{segment.label}</span></div><span className="whitespace-nowrap text-sm font-bold text-slate-900">{value} <span className="font-medium text-slate-400">({percent}%)</span></span></div>;
+          return <div key={segment.key} className="flex min-w-0 items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3"><div className="flex min-w-0 flex-1 items-start gap-2.5"><span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} /><span className="min-w-0 whitespace-normal break-words text-sm font-medium leading-5 text-slate-600">{segment.label}</span></div><span className="shrink-0 whitespace-nowrap text-sm font-bold text-slate-900">{value} <span className="font-medium text-slate-400">({percent}%)</span></span></div>;
         })}
       </div>
     </div>
@@ -111,10 +111,40 @@ function JobStatusDistribution({ jobs = {} }) {
   </div>;
 }
 
+function UserActionSelect({ user, onView, onStatusChange, onPasswordReset, disabled = false }) {
+  const canManageStatus = ['CANDIDATE', 'RECRUITER'].includes(user.role) && ['ACTIVE', 'LOCKED'].includes(user.account_status);
+  const canResetPassword = ['CANDIDATE', 'RECRUITER'].includes(user.role) && user.account_status === 'RESET_REQUIRED';
+
+  const handleChange = (event) => {
+    const selected = event.currentTarget.value;
+    event.currentTarget.value = '';
+    if (selected === 'details') onView(user.id);
+    if (selected === 'status') onStatusChange(user);
+    if (selected === 'reset') onPasswordReset(user);
+  };
+
+  return (
+    <select
+      defaultValue=""
+      onChange={handleChange}
+      disabled={disabled}
+      aria-label={`Thao tác cho ${user.email}`}
+      className="input-field !h-9 !w-36 !py-1.5 text-xs font-semibold"
+    >
+      <option value="">Chọn thao tác</option>
+      <option value="details">Chi tiết</option>
+      {canManageStatus && <option value="status">{user.account_status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}</option>}
+      {canResetPassword && <option value="reset">Reset mật khẩu</option>}
+      {user.role === 'ADMIN' && <option value="admin-managed" disabled>Admin do operator quản lý</option>}
+    </select>
+  );
+}
+
 const AdminDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
+  const [totalCount, setTotalCount] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
@@ -131,10 +161,14 @@ const AdminDashboard = () => {
   const [statusUpdatingId, setStatusUpdatingId] = useState('');
   const [statusError, setStatusError] = useState('');
   const [pendingStatusChange, setPendingStatusChange] = useState(null);
+  const [pendingPasswordReset, setPendingPasswordReset] = useState(null);
+  const [issuedResetCredential, setIssuedResetCredential] = useState(null);
+  const [resetCredentialCopied, setResetCredentialCopied] = useState(false);
 
   const load = useCallback(async (next = null) => {
     setLoading(true);
     setError('');
+    setTotalCount(null);
     setStatsLoading(true);
     setStatsError('');
     const params = { limit: 20, ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}), ...(role ? { role } : {}), ...(status ? { status } : {}), ...(next ? { cursor: next } : {}) };
@@ -151,6 +185,8 @@ const AdminDashboard = () => {
     setStatsLoading(false);
     if (usersResult.status === 'fulfilled') {
       setUsers(usersResult.value.data?.data?.users || []);
+      const count = usersResult.value.data?.data?.totalCount;
+      setTotalCount(Number.isSafeInteger(count) && count >= 0 ? count : null);
       setNextCursor(usersResult.value.data?.data?.nextCursor || null);
       setCursor(next);
     } else {
@@ -240,7 +276,57 @@ const AdminDashboard = () => {
     }
   };
 
+  const beginPasswordReset = async (item) => {
+    if (!['CANDIDATE', 'RECRUITER'].includes(item.role) || item.account_status !== 'RESET_REQUIRED' || statusUpdatingId) return;
+    setStatusError('');
+    setIssuedResetCredential(null);
+    setStatusUpdatingId(item.id);
+    try {
+      const response = await api.get(`/v1/admin/users/${encodeURIComponent(item.id)}`);
+      const detail = response.data?.data?.user;
+      const revision = response.headers?.etag?.replace(/^"|"$/g, '') || response.headers?.ETag?.replace(/^"|"$/g, '');
+      if (!detail || !revision) throw new Error('Không đọc được revision hiện tại. Hãy làm mới danh sách.');
+      if (!['CANDIDATE', 'RECRUITER'].includes(detail.role) || detail.account_status !== 'RESET_REQUIRED') {
+        setUsers((current) => current.map((user) => user.id === item.id ? detail : user));
+        throw new Error('Trạng thái tài khoản đã thay đổi. Danh sách đã được làm mới.');
+      }
+      setPendingPasswordReset({ user: detail, revision });
+    } catch (requestError) {
+      setStatusError(requestError.response?.data?.error?.message || requestError.message || 'Không thể tải tài khoản để đặt lại mật khẩu.');
+    } finally {
+      setStatusUpdatingId('');
+    }
+  };
+
+  const confirmPasswordReset = async () => {
+    if (!pendingPasswordReset || statusUpdatingId) return;
+    const { user, revision } = pendingPasswordReset;
+    setStatusUpdatingId(user.id);
+    setStatusError('');
+    try {
+      const response = await api.post(`/v1/admin/users/${encodeURIComponent(user.id)}/password-reset`, {}, { headers: { 'If-Match': `"${revision}"` } });
+      const result = response.data?.data;
+      if (!result?.temporaryPassword || !result?.expiresAt || !result?.user) throw new Error('Phản hồi cấp mã reset không hợp lệ.');
+      setUsers((current) => current.map((item) => item.id === user.id ? result.user : item));
+      setSelectedUser((current) => current?.id === user.id ? result.user : current);
+      setPendingPasswordReset(null);
+      setIssuedResetCredential({ email: result.user.email, temporaryPassword: result.temporaryPassword, expiresAt: result.expiresAt });
+      setResetCredentialCopied(false);
+      await load(cursor);
+    } catch (requestError) {
+      const conflict = requestError.response?.status === 409 || requestError.response?.data?.error?.code === 'REVISION_CONFLICT';
+      setStatusError(conflict
+        ? 'Tài khoản vừa được cập nhật. Không có thay đổi nào bị ghi đè; hãy làm mới rồi thử lại.'
+        : requestError.response?.data?.error?.message || requestError.message || 'Không thể cấp mã reset.');
+      if (conflict) setPendingPasswordReset(null);
+    } finally {
+      setStatusUpdatingId('');
+    }
+  };
+
   const resetFilters = () => { setSearch(''); setRole(''); setStatus(''); };
+  const totalPages = totalCount === null ? null : Math.ceil(totalCount / 20);
+  const currentPage = users.length ? cursorHistory.length + 1 : totalCount === 0 ? 0 : cursorHistory.length + 1;
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-[#F5F7FB] px-4 py-8 text-left sm:px-6 lg:px-8">
@@ -294,6 +380,7 @@ const AdminDashboard = () => {
               <button className="btn-primary" type="button" onClick={() => { setCursorHistory([]); load(); }} disabled={loading}><FaFilter className="mr-2" aria-hidden="true" />Lọc</button>
               <button className="btn-secondary" type="button" onClick={resetFilters} disabled={!search && !role && !status}>Xóa lọc</button>
             </div>
+            <p className="mt-3 text-xs leading-5 text-slate-500">CANDIDATE/RECRUITER ACTIVE có thể khóa; LOCKED có thể mở khóa. Với RESET_REQUIRED, Admin có thể cấp mã reset dùng một lần; chủ tài khoản đặt mật khẩu mới để kích hoạt. ADMIN do operator quản lý.</p>
           </div>
 
           {loading && !stats ? <div role="status" aria-label="Loading accounts" className="space-y-3 p-5 sm:p-6">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-xl bg-slate-100" />)}</div> : users.length === 0 && !loading ? (
@@ -302,14 +389,14 @@ const AdminDashboard = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4 font-semibold">Tài khoản</th><th className="px-5 py-4 font-semibold">Vai trò</th><th className="px-5 py-4 font-semibold">Trạng thái</th><th className="px-5 py-4 font-semibold">Ngày tạo</th><th className="px-5 py-4 text-right font-semibold">Thao tác</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{users.map((item) => <tr key={item.id} className="transition hover:bg-blue-50/40"><td className="px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold uppercase text-blue-700">{(item.email || '?').charAt(0)}</span><div className="min-w-0"><p className="truncate font-semibold text-slate-800">{item.email}</p><p className="mt-0.5 truncate text-xs text-slate-400">{item.id}</p></div></div></td><td className="px-5 py-4"><RoleBadge role={item.role} /></td><td className="px-5 py-4"><StatusBadge status={item.account_status} /></td><td className="whitespace-nowrap px-5 py-4 text-slate-500">{item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '—'}</td><td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-1"><button className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-semibold text-blue-700 transition hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-100" type="button" onClick={() => viewUser(item.id)}><FaEye aria-hidden="true" />Details</button>{["CANDIDATE", "RECRUITER"].includes(item.role) && ["ACTIVE", "LOCKED"].includes(item.account_status) && <button className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-semibold text-rose-700 transition hover:bg-rose-50 focus:outline-none focus:ring-4 focus:ring-rose-100 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={() => beginStatusChange(item)} disabled={Boolean(statusUpdatingId)}>{statusUpdatingId === item.id ? "Updating…" : item.account_status === "ACTIVE" ? "Lock" : "Unlock"}</button>}</div></td></tr>)}</tbody>
+                <tbody className="divide-y divide-slate-100">{users.map((item) => <tr key={item.id} className="transition hover:bg-blue-50/40"><td className="px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold uppercase text-blue-700">{(item.email || '?').charAt(0)}</span><div className="min-w-0"><p className="truncate font-semibold text-slate-800">{item.email}</p><p className="mt-0.5 truncate text-xs text-slate-400">{item.id}</p></div></div></td><td className="px-5 py-4"><RoleBadge role={item.role} /></td><td className="px-5 py-4"><StatusBadge status={item.account_status} /></td><td className="whitespace-nowrap px-5 py-4 text-slate-500">{item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '—'}</td><td className="px-5 py-4"><div className="flex justify-end"><UserActionSelect user={item} onView={viewUser} onStatusChange={beginStatusChange} onPasswordReset={beginPasswordReset} disabled={Boolean(statusUpdatingId)} /></div></td></tr>)}</tbody>
               </table>
             </div>
           )}
 
-          <footer className="flex items-center justify-between border-t border-slate-100 px-5 py-4 sm:px-6">
-            <p className="text-xs text-slate-500">{loading ? 'Đang cập nhật…' : 'Danh sách người dùng'}</p>
-            <div className="flex gap-2"><button className="btn-secondary !rounded-lg !px-3 !py-2" type="button" aria-label="Trang trước" disabled={!cursorHistory.length || loading} onClick={() => { const previous = cursorHistory.at(-1) ?? null; setCursorHistory((history) => history.slice(0, -1)); load(previous); }}><FaChevronLeft aria-hidden="true" /></button><button className="btn-secondary !rounded-lg !px-3 !py-2" type="button" aria-label="Trang tiếp" disabled={!nextCursor || loading} onClick={() => { setCursorHistory((history) => [...history, cursor]); load(nextCursor); }}><FaChevronRight aria-hidden="true" /></button></div>
+          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 sm:px-6">
+            <p className="text-xs text-slate-500" aria-live="polite">{loading ? 'Đang cập nhật…' : `Trang ${cursorHistory.length + 1} · ${users.length} tài khoản trên trang`}</p>
+            <nav className="flex items-center gap-2" aria-label="Phân trang danh sách người dùng"><button className="btn-secondary !rounded-lg !px-3 !py-2" type="button" aria-label="Trang trước" disabled={!cursorHistory.length || loading} onClick={() => { const previous = cursorHistory.at(-1) ?? null; setCursorHistory((history) => history.slice(0, -1)); load(previous); }}><FaChevronLeft aria-hidden="true" /></button><span className="min-w-20 text-center text-sm font-semibold text-slate-700" aria-current="page">{currentPage} / {totalPages ?? '…'}</span><button className="btn-secondary !rounded-lg !px-3 !py-2" type="button" aria-label="Trang tiếp" disabled={!nextCursor || loading} onClick={() => { setCursorHistory((history) => [...history, cursor]); load(nextCursor); }}><FaChevronRight aria-hidden="true" /></button></nav>
           </footer>
         </section>
       </div>
@@ -318,10 +405,11 @@ const AdminDashboard = () => {
         <section role="dialog" aria-modal="true" aria-labelledby="admin-user-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-white/50 bg-white p-6 shadow-2xl sm:p-8">
           <header className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Thông tin tài khoản</p><h2 id="admin-user-title" className="mt-2 break-all text-xl font-bold text-slate-900">{selectedUser.email}</h2><p className="mt-1 text-sm text-slate-500">Chi tiết người dùng trong hệ thống</p></div><button className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" type="button" aria-label="Đóng chi tiết" onClick={() => setSelectedUser(null)}><FaTimes aria-hidden="true" /></button></header>
           <div className="mt-6 grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vai trò</p><div className="mt-2"><RoleBadge role={selectedUser.role} /></div></div><div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</p><div className="mt-2"><StatusBadge status={selectedUser.account_status} /></div></div><div className="rounded-xl bg-slate-50 p-4 sm:col-span-2"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ngày tạo</p><p className="mt-2 font-medium text-slate-800">{selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleString('vi-VN') : '—'}</p></div></div>
+          {["CANDIDATE", "RECRUITER"].includes(selectedUser.role) && selectedUser.account_status === "RESET_REQUIRED" && <button className="mt-5 btn-primary" type="button" disabled={Boolean(statusUpdatingId)} onClick={() => beginPasswordReset(selectedUser)}>Reset mật khẩu</button>}
           {selectedUser.role === 'ADMIN' && <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-900"><FaShieldAlt className="mr-2 inline" aria-hidden="true" />Trạng thái và khôi phục tài khoản Admin do operator quản lý ngoài MVP.</div>}
 
 
-          <footer className="mt-7 flex flex-col-reverse justify-end gap-2 border-t border-slate-100 pt-5 sm:flex-row"><button className="btn-secondary" type="button" onClick={() => setSelectedUser(null)}>Close</button>{["CANDIDATE", "RECRUITER"].includes(selectedUser.role) && ["ACTIVE", "LOCKED"].includes(selectedUser.account_status) && <button className="btn-primary disabled:cursor-not-allowed disabled:opacity-50" type="button" disabled={Boolean(statusUpdatingId)} onClick={() => beginStatusChange(selectedUser)}>{statusUpdatingId === selectedUser.id ? "Updating…" : selectedUser.account_status === "ACTIVE" ? "Lock account" : "Unlock account"}</button>}</footer>
+          <footer className="mt-7 flex flex-col-reverse justify-end gap-2 border-t border-slate-100 pt-5 sm:flex-row"><button className="btn-secondary" type="button" onClick={() => setSelectedUser(null)}>Đóng</button><UserActionSelect user={selectedUser} onView={viewUser} onStatusChange={beginStatusChange} onPasswordReset={beginPasswordReset} disabled={Boolean(statusUpdatingId)} /></footer>
         </section>
       </div>}
       {pendingStatusChange && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" role="presentation">
@@ -332,6 +420,29 @@ const AdminDashboard = () => {
           <footer className="mt-6 flex flex-col-reverse justify-end gap-2 border-t border-slate-100 pt-5 sm:flex-row">
             <button className="btn-secondary" type="button" disabled={Boolean(statusUpdatingId)} onClick={() => setPendingStatusChange(null)}>Cancel</button>
             <button className="btn-primary" type="button" disabled={Boolean(statusUpdatingId)} onClick={confirmStatusChange}>{statusUpdatingId === pendingStatusChange.user.id ? 'Updating…' : pendingStatusChange.nextStatus === 'LOCKED' ? 'Confirm lock' : 'Confirm unlock'}</button>
+          </footer>
+        </section>
+      </div>}
+      {pendingPasswordReset && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" role="presentation">
+        <section role="alertdialog" aria-modal="true" aria-labelledby="password-reset-title" className="w-full max-w-md rounded-2xl border border-white/50 bg-white p-6 shadow-2xl sm:p-8">
+          <h2 id="password-reset-title" className="text-lg font-bold text-slate-900">Cấp mã reset mật khẩu?</h2>
+          <p className="mt-3 break-all text-sm font-semibold text-slate-700">{pendingPasswordReset.user.email}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Mã dùng một lần có hiệu lực 24 giờ. Thao tác này chưa kích hoạt tài khoản; người dùng cần tự đặt mật khẩu mới tại trang reset.</p>
+          {statusError && <p role="alert" className="message-error mt-4">{statusError}</p>}
+          <footer className="mt-6 flex flex-col-reverse justify-end gap-2 border-t border-slate-100 pt-5 sm:flex-row">
+            <button className="btn-secondary" type="button" disabled={Boolean(statusUpdatingId)} onClick={() => setPendingPasswordReset(null)}>Hủy</button>
+            <button className="btn-primary" type="button" disabled={Boolean(statusUpdatingId)} onClick={confirmPasswordReset}>{statusUpdatingId === pendingPasswordReset.user.id ? 'Đang tạo mã…' : 'Tạo mã reset'}</button>
+          </footer>
+        </section>
+      </div>}
+      {issuedResetCredential && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" role="presentation">
+        <section role="dialog" aria-modal="true" aria-labelledby="issued-reset-title" className="w-full max-w-lg rounded-2xl border border-white/50 bg-white p-6 shadow-2xl sm:p-8">
+          <h2 id="issued-reset-title" className="text-lg font-bold text-slate-900">Mã reset dùng một lần</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">Gửi mã này cho chủ tài khoản qua kênh riêng. Mã chỉ hiển thị lần này và hết hạn lúc {new Date(issuedResetCredential.expiresAt).toLocaleString('vi-VN')}.</p>
+          <p className="mt-3 break-all rounded-xl border border-amber-200 bg-amber-50 p-4 font-mono text-sm text-slate-900" aria-label="Mã reset một lần">{issuedResetCredential.temporaryPassword}</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">Người dùng mở <span className="font-semibold">/reset-password</span>, nhập email và mã này, rồi tự chọn mật khẩu mới. Không ghi mã vào báo cáo hoặc gửi vào kênh công khai.</p>
+          <footer className="mt-6 flex justify-end border-t border-slate-100 pt-5">
+            <button className="btn-primary" type="button" onClick={() => setIssuedResetCredential(null)}>Đã lưu mã</button>
           </footer>
         </section>
       </div>}

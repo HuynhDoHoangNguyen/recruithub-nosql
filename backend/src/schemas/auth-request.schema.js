@@ -9,6 +9,15 @@ export const loginRequestSchema = z.object({
   password: passwordInputSchema,
 }).strict();
 
+export const passwordResetRequestSchema = z.object({
+  email: emailSchema,
+  temporary_password: z.string().min(32).max(128),
+  new_password: z.string().min(6).max(128)
+    .refine((value) => /[A-Z]/.test(value) && /\d/.test(value), {
+      message: 'Password must include an uppercase letter and a number.',
+    }),
+}).strict();
+
 export const candidateRegistrationRequestSchema = z.object({
   email: emailSchema,
   password: z.string().min(6).max(128)

@@ -26,6 +26,7 @@ All domain responses use the current provisional envelope `{success:true,data,me
 |---|---|---|---|
 | POST | `/api/v1/auth/register` | Public | Strict Candidate-only registration. The server assigns `CANDIDATE`; the body cannot choose role/status or document IDs. Returns 201 with a safe User DTO; user signs in separately. |
 | POST | `/api/v1/auth/login` | Public | Verifies Argon2id hash and ACTIVE status; returns 200 with in-memory Bearer `accessToken` and safe User DTO. Invalid credentials/status return generic 401. |
+| POST | `/api/v1/auth/reset-password` | Public, one-time credential | Accepts email, Admin-issued temporary credential and a user-chosen password. Credential expires after 24 hours and is consumed once; verifies the linked Candidate/Recruiter document, stores the new Argon2id hash, then activates the account. |
 | GET | `/api/v1/auth/me` | Bearer | Verifies signature/issuer/audience/expiry, reloads User, checks ACTIVE status, and returns the server-current safe User DTO. |
 
 There is no backend logout or refresh endpoint. Frontend logout clears the in-memory token. Any copied access token remains usable until its 15-minute expiry. A future server-side revocation policy requires a separately approved session store and contract.
@@ -35,7 +36,7 @@ There is no backend logout or refresh endpoint. Frontend logout clears the in-me
 - **Password:** Argon2id, 65,536 KiB memory, time cost 3, parallelism 1. The hash is never returned or logged.
 - **Access token:** HS256 JWT, 15-minute expiry; claims include `sub`, `role`, `iss`, `aud`, `iat`, `exp`, and `jti`. Signing key comes from `JWT_ACCESS_SECRET`, is not hardcoded, and must contain at least 32 bytes.
 - **Storage:** frontend memory only; reload clears authentication. No localStorage, cookie, refresh token, CSRF token, or revocation store.
-- **Registration:** public Candidate only. A new User is initially written with `RESET_REQUIRED`; after Candidate creation and schema validation, the new User is activated. Existing `RESET_REQUIRED` accounts are not modified or activated.
+- **Registration/reset:** public Candidate registration remains separate. Existing `RESET_REQUIRED` accounts are never changed by registration or the status endpoint. An Admin may issue a per-account, 24-hour one-time temporary credential to a Candidate/Recruiter in `RESET_REQUIRED`; the credential is Argon2id-hashed in the existing `password_hash` field and the account stays `RESET_REQUIRED`. The credential is returned once to the Admin. The account owner submits it with a self-chosen password at `/reset-password`; only after the backend validates the credential and linked profile does it replace the hash and activate that one account. No bulk activation, shared/default password or Admin password reset is available. The one-time credential is passed to the owner through an operator-controlled channel because email delivery is not implemented.
 - **Candidate fields:** registration collects `full_name`, `candidate_role`, `industry`, `seniority`, and `years_experience`; unprovided required collections remain `[]` with `data_availability` set to `UNAVAILABLE` or `PARTIAL`. Optional fields without values are omitted; no education, skills, or work history is fabricated.
 - **IDs:** User uses `userIdFromEmail()`. For self-registration, Candidate ID is `candidateIdFromUserId(user_id)`, implementing `candidate:<sha256(user_id)>` from the canonical User ID. Imported CMS records retain `candidate:cms:<resume_id>`. These namespaces are distinct and accepted by the existing Candidate schema. Existing Candidate and Application IDs are not changed.
 - **Provenance:** self-registration documents use classification `mixed`. Submitted profile fields use origin `candidate_self_registration`; `profile.experience_months` uses `derived`. Missing optional fields and empty required collections have no field-origin entry; availability is represented by `data_availability`. New writes reject `unavailable` as a document classification; shared stored-document validation accepts it only for historical compatibility, and PATCH preserves it. This decision was authorized by project-owner delegation for Phase B4.2B on 2026-10-24; it does not imply TV2/TV3 or full-group acknowledgement.
@@ -82,6 +83,7 @@ These routes are implemented in source and covered by fake-repository/unit route
 | GET | `/api/v1/admin/users` | ACTIVE ADMIN | Search by normalized email prefix, role/status filter, bounded 1?50 page, filter-bound cursor; hashes/provenance are excluded. |
 | GET | `/api/v1/admin/users/:id` | ACTIVE ADMIN | Safe User DTO and revision ETag. |
 | PATCH | `/api/v1/admin/users/:id/status` | ACTIVE ADMIN | Only Candidate/Recruiter targets are eligible; requires `If-Match`; refuses RESET_REQUIRED changes. Any ADMIN target returns 403 `ADMIN_STATUS_CHANGE_FORBIDDEN`. Admin recovery/status changes are operator-managed outside the MVP. Role is immutable. |
+| POST | `/api/v1/admin/users/:id/password-reset` | ACTIVE ADMIN | Only Candidate/Recruiter RESET_REQUIRED targets are eligible; requires current `If-Match`. Returns a one-time 24-hour temporary credential once; does not activate the account. Never returns the stored password hash. |
 | GET | `/api/v1/admin/stats` | ACTIVE ADMIN | Actual User/Candidate counts and User role/status distributions. No Job/Application/Interview metrics are fabricated. |
 
 ### Candidate profile DTO
@@ -99,7 +101,7 @@ These routes are implemented in source and covered by fake-repository/unit route
 
 ### Admin DTO and status changes
 
-User DTO contains only `id`, `email`, `role`, `account_status`, `created_at`, and `updated_at`. Admin APIs never return `password_hash`, `_rev` in JSON, or provenance. ETag carries the current revision for details/status updates. Existing RESET_REQUIRED seeded users remain unchanged and cannot be activated by this route. No ADMIN bootstrap or public Admin registration exists. Admin status changes and recovery are operator-managed outside the MVP.
+User DTO contains only `id`, `email`, `role`, `account_status`, `created_at`, and `updated_at`. Admin APIs never return `password_hash`, `_rev` in JSON, or provenance. ETag carries the current revision for details/status/reset updates. RESET_REQUIRED accounts cannot be activated through the status route. Only an explicit, per-account reset flow can issue a temporary credential, and the owner must set a new password before activation. No ADMIN bootstrap or public Admin registration exists; Admin recovery remains operator-managed.
 
 ### Authorization utilities
 

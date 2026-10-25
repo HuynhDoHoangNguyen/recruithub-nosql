@@ -3,7 +3,7 @@ import { createAuthRepositories } from '../config/auth-database.config.js';
 export { getAuthDatabaseConfig } from '../config/auth-database.config.js';
 import { CouchDbError, toApiError } from '../services/couchdb.errors.js';
 import { AuthService, AuthServiceError } from '../services/auth.service.js';
-import { candidateRegistrationRequestSchema, loginRequestSchema, recruiterRegistrationRequestSchema } from '../schemas/auth-request.schema.js';
+import { candidateRegistrationRequestSchema, loginRequestSchema, passwordResetRequestSchema, recruiterRegistrationRequestSchema } from '../schemas/auth-request.schema.js';
 import { createAuthenticate } from '../middleware/authenticate.js';
 import { validateBody } from '../middleware/validate-body.js';
 import { errorResponse, successResponse } from '../utils/api-response.js';
@@ -79,6 +79,19 @@ export function createAuthRouter({
     try {
       const result = await serviceProvider().login(req.validatedBody);
       return res.status(200).json(successResponse(result, 'Signed in successfully.'));
+    } catch (error) {
+      return sendAuthError(res, error);
+    }
+  });
+
+  router.post('/reset-password', validateBody(passwordResetRequestSchema), async (req, res) => {
+    try {
+      const result = await serviceProvider().completePasswordReset({
+        email: req.validatedBody.email,
+        temporaryPassword: req.validatedBody.temporary_password,
+        newPassword: req.validatedBody.new_password,
+      });
+      return res.status(200).json(successResponse(result, 'Password reset completed. Sign in with the new password.'));
     } catch (error) {
       return sendAuthError(res, error);
     }

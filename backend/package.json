@@ -7,6 +7,7 @@
     "test": "node --test tests/data/*.test.js tests/foundation/*.test.js tests/recruitment/*.test.js",
     "test:recruitment": "node --test tests/recruitment/*.test.js",
     "db:job-application": "node src/repositories/setup-job-application.js",
+    "db:admin-statistics": "node src/repositories/setup-admin-statistics.js",
     "etl:extract": "python ../scripts/dataset/extract-parquet.py",
     "etl:transform": "node ../scripts/dataset/transform-staged.js",
     "etl:validate": "node ../scripts/dataset/validate-staged.js",

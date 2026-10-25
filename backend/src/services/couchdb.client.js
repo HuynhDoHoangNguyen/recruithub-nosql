@@ -127,19 +127,25 @@ export class CouchDbClient {
       throw new TypeError('CouchDB design and view names are invalid.');
     }
     if (!isObject(options)) throw new TypeError('CouchDB view options must be an object.');
-    const allowed = new Set(['key', 'keys', 'startkey', 'endkey', 'group', 'group_level', 'reduce', 'descending']);
+    const allowed = new Set(['key', 'keys', 'startkey', 'endkey', 'startkey_docid', 'endkey_docid', 'group', 'group_level', 'reduce', 'descending', 'include_docs', 'limit', 'skip']);
     for (const key of Object.keys(options)) {
       if (!allowed.has(key)) throw new TypeError(`Unsupported CouchDB view option: ${key}.`);
     }
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(options)) {
       if (value === undefined) continue;
-      if (['group', 'reduce', 'descending'].includes(key)) {
+      if (['group', 'reduce', 'descending', 'include_docs'].includes(key)) {
         if (typeof value !== 'boolean') throw new TypeError(`${key} must be a boolean.`);
         params.set(key, String(value));
       } else if (key === 'group_level') {
         if (!Number.isInteger(value) || value < 1) throw new TypeError('group_level must be a positive integer.');
         params.set(key, String(value));
+      } else if (key === 'limit' || key === 'skip') {
+        if (!Number.isInteger(value) || value < 0 || (key === 'limit' && value < 1)) throw new TypeError(`${key} must be a valid non-negative integer.`);
+        params.set(key, String(value));
+      } else if (key === 'startkey_docid' || key === 'endkey_docid') {
+        if (typeof value !== 'string' || value.length === 0) throw new TypeError(`${key} must be a non-empty string.`);
+        params.set(key, value);
       } else {
         params.set(key, JSON.stringify(value));
       }
