@@ -2,12 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-/* In your global CSS like index.css or App.css */
-* {
-	scrollbar-width: none; /* Firefox */
-	-ms-overflow-style: none; /* IE/Edge */
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased font-sans;
+  }
 }
 
-body::-webkit-scrollbar {
-	display: none; /* Chrome, Safari, Opera */
+/* Modern ITviec & TopCV styled UI components */
+@layer components {
+  .badge-salary {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80;
+  }
+
+  .badge-hot {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-red-700 bg-red-50 border border-red-200;
+  }
+
+  .badge-tag {
+    @apply inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-800 transition;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition duration-150;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition;
+  }
+
+  .card-portal {
+    @apply bg-white rounded-2xl border border-slate-200/80 shadow-soft hover:shadow-hover hover:border-blue-300 transition-all duration-200;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-800 bg-white outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-sm;
+  }
+}
+
+/* Subtle modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
