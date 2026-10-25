@@ -31,6 +31,7 @@ import {
   RECOMMENDATION_LEVELS,
   resumeAnalysisDocumentSchema,
 } from '../../src/schemas/resume-analysis.schema.js';
+import { normalizeSkill } from '../../src/utils/normalization.utils.js';
 
 test('DATA-03.4A: Skill Scoring Acceptance Tests (50%, SKILL-COV)', async (t) => {
   await t.test('1. Full skill match gives 100', () => {
@@ -80,6 +81,227 @@ test('DATA-03.4A: Skill Scoring Acceptance Tests (50%, SKILL-COV)', async (t) =>
     const required = ['python'];
     const res = calculateSkillScore(required, [], AVAILABILITY_STATES.NONE_DECLARED);
     assert.equal(res.score, 0);
+  });
+});
+
+test('DATA-03.4A: UC20 Skill Matching Comprehensive Verification (GAP-01..06 & UN-02)', async (t) => {
+  const dummyApp = {
+    _id: 'application:pair:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    applied_at: '2026-10-25T10:00:00Z',
+    current_stage: APPLICATION_STAGES.APPLIED,
+  };
+
+  const baseJob = {
+    _id: 'job:cms:J_000001',
+    required_skills: ['python', 'sql'],
+    requirements: {
+      experience: { status: REQUIREMENT_STATUSES.EXPERIENCE.NO_MINIMUM },
+      education: { status: REQUIREMENT_STATUSES.EDUCATION.NO_MINIMUM },
+      project: { status: REQUIREMENT_STATUSES.PROJECT.NO_REQUIREMENT },
+    },
+  };
+
+  const baseCandidate = {
+    _id: 'candidate:cms:R_000001',
+    skills: ['python', 'sql'],
+    profile: { experience_months: 36 },
+    education: [{ degree: 'BACHELOR' }],
+    projects: [],
+    data_availability: {
+      skills: AVAILABILITY_STATES.AVAILABLE,
+      experience: AVAILABILITY_STATES.AVAILABLE,
+      education: AVAILABILITY_STATES.AVAILABLE,
+      projects: AVAILABILITY_STATES.NONE_DECLARED,
+    },
+  };
+
+  await t.test('GAP-01: Empty or whitespace Job required skills produces EMPTY_JOB_REQUIRED_SKILLS and INCOMPLETE', () => {
+    // 1. Empty array
+    const resEmpty = calculateSkillScore([], ['python'], AVAILABILITY_STATES.AVAILABLE);
+    assert.equal(resEmpty.score, null);
+    assert.deepEqual(resEmpty.matched, []);
+    assert.deepEqual(resEmpty.missing, []);
+    assert.equal(resEmpty.missingInput?.code, 'EMPTY_JOB_REQUIRED_SKILLS');
+    assert.equal(resEmpty.missingInput?.component, 'skill');
+    assert.equal(resEmpty.details.formula_id, 'SKILL-COV');
+
+    // 2. Whitespace-only skills array
+    const resWhitespace = calculateSkillScore(['   ', ''], ['python'], AVAILABILITY_STATES.AVAILABLE);
+    assert.equal(resWhitespace.score, null);
+    assert.equal(resWhitespace.missingInput?.code, 'EMPTY_JOB_REQUIRED_SKILLS');
+
+    // 3. Non-array required skills
+    const resNonArray = calculateSkillScore(null, ['python'], AVAILABILITY_STATES.AVAILABLE);
+    assert.equal(resNonArray.score, null);
+    assert.equal(resNonArray.missingInput?.code, 'EMPTY_JOB_REQUIRED_SKILLS');
+
+    // 4. Evaluator integration: empty required skills causes INCOMPLETE analysis with no total_score
+    const jobEmptyReq = { ...baseJob, required_skills: [] };
+    const analysis = evaluateResumeAnalysis({
+      application: dummyApp,
+      candidate: baseCandidate,
+      job: jobEmptyReq,
+      analyzedAt: '2026-10-25T10:00:00Z',
+    });
+    assert.equal(analysis.analysis_status, ANALYSIS_STATUSES.INCOMPLETE);
+    assert.equal(analysis.scores.skill, null);
+    assert.equal(analysis.total_score, undefined);
+    assert.equal(analysis.recommendation, undefined);
+    assert.equal(analysis.missing_inputs.some((m) => m.code === 'EMPTY_JOB_REQUIRED_SKILLS'), true);
+  });
+
+  await t.test('GAP-02: Optional skills do not contribute points and are excluded from matched skills (SC-02)', () => {
+    const jobWithOptional = {
+      ...baseJob,
+      required_skills: ['python', 'sql'],
+      optional_skills: ['docker', 'kubernetes'],
+    };
+
+    // Candidate A: matches all optional skills, 0 required skills
+    const candOptionalOnly = {
+      ...baseCandidate,
+      skills: ['docker', 'kubernetes', 'excel'],
+    };
+
+    const resPure = calculateSkillScore(jobWithOptional.required_skills, candOptionalOnly.skills, AVAILABILITY_STATES.AVAILABLE);
+    assert.equal(resPure.score, 0);
+    assert.deepEqual(resPure.matched, []);
+    assert.deepEqual(resPure.missing, ['python', 'sql']);
+
+    const analysisA = evaluateResumeAnalysis({
+      application: dummyApp,
+      candidate: candOptionalOnly,
+      job: jobWithOptional,
+      analyzedAt: '2026-10-25T10:00:00Z',
+    });
+    assert.equal(analysisA.scores.skill, 0);
+    assert.deepEqual(analysisA.matched_skills, []);
+    assert.deepEqual(analysisA.missing_skills, ['python', 'sql']);
+    assert.equal(analysisA.matched_skills.includes('docker'), false);
+    assert.equal(analysisA.matched_skills.includes('kubernetes'), false);
+
+    // Candidate B: matches 1 required ('python') and 1 optional ('docker')
+    const candMixed = {
+      ...baseCandidate,
+      skills: ['python', 'docker'],
+    };
+    const analysisB = evaluateResumeAnalysis({
+      application: dummyApp,
+      candidate: candMixed,
+      job: jobWithOptional,
+      analyzedAt: '2026-10-25T10:00:00Z',
+    });
+    assert.equal(analysisB.scores.skill, 50); // 1 of 2 required = 50%
+    assert.deepEqual(analysisB.matched_skills, ['python']);
+    assert.deepEqual(analysisB.missing_skills, ['sql']);
+    assert.equal(analysisB.matched_skills.includes('docker'), false);
+  });
+
+  await t.test('GAP-03: Order independence preserves identical score, counts, and sorted canonical matched/missing lists', () => {
+    const req1 = ['docker', 'git', 'python'];
+    const req2 = ['python', 'docker', 'git'];
+    const cand1 = ['sql', 'python', 'docker'];
+    const cand2 = ['docker', 'sql', 'python'];
+
+    const res1 = calculateSkillScore(req1, cand1, AVAILABILITY_STATES.AVAILABLE);
+    const res2 = calculateSkillScore(req2, cand2, AVAILABILITY_STATES.AVAILABLE);
+
+    assert.equal(res1.score, res2.score);
+    assert.equal(res1.score, (100 * 2) / 3);
+    assert.deepEqual(res1.matched, ['docker', 'python']);
+    assert.deepEqual(res2.matched, ['docker', 'python']);
+    assert.deepEqual(res1.missing, ['git']);
+    assert.deepEqual(res2.missing, ['git']);
+    assert.deepEqual(res1.details, res2.details);
+  });
+
+  await t.test('GAP-04: Deduplication of case, whitespace, and alias variants preserves true denominator and score', () => {
+    // 6 raw required entries, but canonical unique are only 3: ['node.js', 'python', 'react']
+    const jobReqDuplicates = ['python', 'Python', '  python  ', 'node.js', 'NodeJS', 'react'];
+    // 4 raw candidate entries, but canonical unique are only 2: ['node.js', 'react']
+    const candDuplicates = ['node', 'Node.js', 'reactjs', 'React'];
+
+    const res = calculateSkillScore(jobReqDuplicates, candDuplicates, AVAILABILITY_STATES.AVAILABLE);
+
+    assert.equal(res.details.required_count, 3, 'Denominator must equal unique canonical count (3), not raw count (6)');
+    assert.equal(res.details.matched_count, 2, 'Numerator must equal unique matched count (2)');
+    assert.deepEqual(res.matched, ['node.js', 'react']);
+    assert.deepEqual(res.missing, ['python']);
+    assert.equal(res.score, (100 * 2) / 3);
+    assert.equal(res.details.unrounded_score, (100 * 2) / 3);
+  });
+
+  await t.test('GAP-05: Candidate skill objects with { name, normalized } match canonical required skills', () => {
+    // Strictly valid { name, normalized } objects derived through normalizeSkill(), fully schema-compliant
+    const candidateSkills = [
+      { name: 'Python 3', normalized: normalizeSkill('Python 3') },
+      { name: 'React.js', normalized: normalizeSkill('React.js') },
+      { name: 'PostgreSQL', normalized: normalizeSkill('PostgreSQL') },
+      { name: 'Go', normalized: normalizeSkill('Go') },
+    ];
+    // Required: 'react', 'postgresql', 'docker'
+    const required = ['react', 'postgresql', 'docker'];
+
+    const res = calculateSkillScore(required, candidateSkills, AVAILABILITY_STATES.AVAILABLE);
+
+    assert.equal(res.details.required_count, 3);
+    assert.equal(res.details.matched_count, 2);
+    assert.deepEqual(res.matched, ['postgresql', 'react']);
+    assert.deepEqual(res.missing, ['docker']);
+    assert.equal(res.score, (100 * 2) / 3);
+  });
+
+  await t.test('GAP-06: SYNTHETIC skill availability follows valid calculation with evidence and flags missing evidence', () => {
+    // 1. SYNTHETIC with evidence -> valid score
+    const resWithEvidence = calculateSkillScore(['python', 'sql'], ['python', 'sql'], AVAILABILITY_STATES.SYNTHETIC);
+    assert.equal(resWithEvidence.score, 100);
+    assert.equal(resWithEvidence.missingInput, undefined);
+
+    // 2. SYNTHETIC with empty evidence -> MISSING_CANDIDATE_SKILL_EVIDENCE
+    const resEmptyEvidence = calculateSkillScore(['python', 'sql'], [], AVAILABILITY_STATES.SYNTHETIC);
+    assert.equal(resEmptyEvidence.score, null);
+    assert.equal(resEmptyEvidence.missingInput?.code, 'MISSING_CANDIDATE_SKILL_EVIDENCE');
+
+    // 3. Evaluator integration with SYNTHETIC availability
+    const candSynthetic = {
+      ...baseCandidate,
+      data_availability: {
+        ...baseCandidate.data_availability,
+        skills: AVAILABILITY_STATES.SYNTHETIC,
+      },
+    };
+    const analysis = evaluateResumeAnalysis({
+      application: dummyApp,
+      candidate: candSynthetic,
+      job: baseJob,
+      analyzedAt: '2026-10-25T10:00:00Z',
+    });
+    assert.equal(analysis.analysis_status, ANALYSIS_STATUSES.COMPLETE);
+    assert.equal(analysis.scores.skill, 100);
+    assert.equal(
+      analysis.component_details.skill.input_context.candidate_availability,
+      AVAILABILITY_STATES.SYNTHETIC,
+    );
+    assert.equal(resumeAnalysisDocumentSchema.safeParse(analysis).success, true);
+  });
+
+  await t.test('UN-02: Diagnostic verification of required_count behavior on failure states', () => {
+    const rawDuplicateJobSkills = ['python', 'Python']; // raw length = 2, canonical unique = 1
+
+    // Case 1: UNAVAILABLE candidate availability
+    const resUnavailable = calculateSkillScore(rawDuplicateJobSkills, ['python'], AVAILABILITY_STATES.UNAVAILABLE);
+    assert.equal(resUnavailable.score, null);
+    assert.equal(resUnavailable.missingInput?.code, 'CANDIDATE_SKILLS_UNAVAILABLE');
+    // Observed behavior: uses raw length (2) rather than canonical unique count (1)
+    assert.equal(resUnavailable.details.required_count, 2, 'Observed diagnostic uses raw length in failure state');
+    const canonicalUniqueCount = new Set(rawDuplicateJobSkills.map((s) => normalizeSkill(s))).size;
+    assert.equal(canonicalUniqueCount, 1, 'Canonical unique count is 1');
+
+    // Case 2: Invalid candidate availability
+    const resInvalid = calculateSkillScore(rawDuplicateJobSkills, ['python'], 'UNKNOWN');
+    assert.equal(resInvalid.score, null);
+    assert.equal(resInvalid.missingInput?.code, 'INVALID_CANDIDATE_SKILLS_AVAILABILITY');
+    assert.equal(resInvalid.details.required_count, 2, 'Observed diagnostic uses raw length in failure state');
   });
 });
 
