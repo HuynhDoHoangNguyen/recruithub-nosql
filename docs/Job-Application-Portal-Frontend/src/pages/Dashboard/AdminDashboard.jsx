@@ -6,15 +6,26 @@ import {
 	FaFileAlt,
 } from "react-icons/fa";
 
-const StatCard = ({ icon: Icon, label, count }) => (
-	<div className="flex items-center p-4 bg-white rounded-xl shadow-md space-x-4 border">
-		<Icon className="text-blue-600 text-2xl" />
-		<div>
-			<p className="text-sm text-gray-500">{label}</p>
-			<p className="text-xl font-bold text-gray-800">{count}</p>
+const StatCard = ({ icon, label, count, color = "blue" }) => {
+	const Icon = icon;
+	const colorMap = {
+		blue: "bg-blue-50 text-blue-600",
+		emerald: "bg-emerald-50 text-emerald-600",
+		purple: "bg-purple-50 text-purple-600",
+	};
+
+	return (
+		<div className="flex items-center p-6 bg-white rounded-3xl shadow-sm border border-slate-200/90 space-x-4">
+			<div className={`h-14 w-14 rounded-2xl ${colorMap[color] || colorMap.blue} flex items-center justify-center text-2xl font-bold shrink-0`}>
+				<Icon />
+			</div>
+			<div>
+				<p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+				<p className="text-3xl font-black text-slate-900 mt-0.5">{count}</p>
+			</div>
 		</div>
-	</div>
-);
+	);
+};
 
 const AdminDashboard = () => {
 	const [users, setUsers] = useState([]);
@@ -46,19 +57,19 @@ const AdminDashboard = () => {
 	}, []);
 
 	const handleDeleteUser = async (id) => {
-		if (!window.confirm("Delete this user?")) return;
+		if (!window.confirm("Bạn có chắc chắn muốn xóa tài khoản người dùng này không?")) return;
 		try {
 			await api.delete(`/admin/users/${id}`);
 			setUsers((prev) => prev.filter((u) => u._id !== id));
 			setStats((prev) => ({ ...prev, totalUsers: prev.totalUsers - 1 }));
 			setSelectedUserId(null);
 		} catch {
-			alert("❌ Failed to delete user.");
+			alert("❌ Xóa tài khoản thất bại.");
 		}
 	};
 
 	const handleDeleteJob = async (id) => {
-		if (!window.confirm("Delete this job?")) return;
+		if (!window.confirm("Bạn có chắc chắn muốn xóa tin tuyển dụng này không?")) return;
 		try {
 			await api.delete(`/admin/jobs/${id}`);
 			const deletedJob = jobs.find((j) => j._id === id);
@@ -71,159 +82,230 @@ const AdminDashboard = () => {
 			}));
 			setSelectedJobId(null);
 		} catch {
-			alert("❌ Failed to delete job.");
+			alert("❌ Xóa tin việc làm thất bại.");
 		}
 	};
 
-	if (loading) return <p className="text-center mt-10 text-blue-600 text-lg">Loading dashboard...</p>;
+	if (loading) {
+		return (
+			<div className="flex justify-center items-center min-h-[60vh] bg-slate-50">
+				<div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+			</div>
+		);
+	}
+
+	const roleBadge = (role) => {
+		switch (role) {
+			case 'admin':
+				return <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-amber-300">Admin</span>;
+			case 'recruiter':
+				return <span className="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-purple-300">Nhà tuyển dụng</span>;
+			default:
+				return <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-300">Ứng viên</span>;
+		}
+	};
 
 	return (
-		<div className="p-6 space-y-10 max-w-screen-xl mx-auto">
-			<h1 className="text-3xl font-bold text-blue-800 mb-6">Admin Dashboard</h1>
-
-			{/* Stats Section */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-				<StatCard icon={FaUsers} label="Total Users" count={stats.totalUsers} />
-				<StatCard icon={FaBriefcase} label="Total Jobs" count={stats.totalJobs} />
-				<StatCard icon={FaFileAlt} label="Applications" count={stats.totalApplications} />
-			</div>
-
-			{/* Users Table */}
-			<div className="bg-white rounded-xl shadow-md p-6 border">
-				<h2 className="text-xl font-semibold text-gray-800 mb-4">All Users</h2>
-				<div className="overflow-x-auto">
-					<table className="min-w-full text-sm text-left">
-						<thead>
-							<tr className="bg-gray-100 text-gray-600 border-b">
-								<th className="p-3">Name</th>
-								<th className="p-3">Email</th>
-								<th className="p-3">Role</th>
-								<th className="p-3 text-center">Actions</th>
-							</tr>
-						</thead>
-						<tbody>
-							{users.map((user) => (
-								<React.Fragment key={user._id}>
-									<tr className="border-b hover:bg-gray-50">
-										<td className="p-3">{user.name}</td>
-										<td className="p-3">{user.email}</td>
-										<td className="p-3 capitalize">{user.role}</td>
-										<td className="p-3 text-center space-x-4">
-											<button
-												onClick={() => {
-													setSelectedUserId((prev) => (prev === user._id ? null : user._id));
-													setSelectedJobId(null); // close job detail
-												}}
-												className="text-blue-600 hover:underline"
-											>
-												View
-											</button>
-											<button
-												onClick={() => handleDeleteUser(user._id)}
-												className="text-red-600 hover:underline"
-											>
-												Delete
-											</button>
-										</td>
-									</tr>
-									{selectedUserId === user._id && (
-										<tr>
-											<td colSpan="4" className="p-4 bg-blue-50 border rounded-md">
-												<h3 className="text-md font-bold mb-2">User Details</h3>
-												<div className="text-sm text-gray-800 grid sm:grid-cols-2 gap-2">
-													<p><strong>Name:</strong> {user.name}</p>
-													<p><strong>Email:</strong> {user.email}</p>
-													<p><strong>Role:</strong> {user.role}</p>
-													<p><strong>Created At:</strong> {new Date(user.createdAt).toLocaleString()}</p>
-													<p><strong>Updated At:</strong> {new Date(user.updatedAt).toLocaleString()}</p>
-
-													{user.skills?.length > 0 && <p><strong>Skills:</strong> {user.skills.join(", ")}</p>}
-													{user.languages?.length > 0 && <p><strong>Languages:</strong> {user.languages.join(", ")}</p>}
-													{user.clubs?.length > 0 && <p><strong>Clubs:</strong> {user.clubs.join(", ")}</p>}
-													{user.education?.length > 0 && <p><strong>Education:</strong> {user.education.map(e => e.institute || "").join(", ")}</p>}
-													{user.internships?.length > 0 && <p><strong>Internships:</strong> {user.internships.map(i => i.company || "").join(", ")}</p>}
-													{user.projects?.length > 0 && <p><strong>Projects:</strong> {user.projects.map(p => p.title || "").join(", ")}</p>}
-													{user.certifications?.length > 0 && <p><strong>Certifications:</strong> {user.certifications.map(c => c.name || "").join(", ")}</p>}
-													{user.awards?.length > 0 && <p><strong>Awards:</strong> {user.awards.join(", ")}</p>}
-												</div>
-												<button onClick={() => setSelectedUserId(null)} className="mt-2 text-blue-700 hover:underline">Close</button>
-											</td>
-										</tr>
-									)}
-
-								</React.Fragment>
-							))}
-						</tbody>
-					</table>
+		<div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8">
+			<div className="max-w-7xl mx-auto space-y-8">
+				<div>
+					<span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
+						Hệ Thống Quản Trị Trung Tâm
+					</span>
+					<h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
+						Admin System Dashboard
+					</h1>
+					<p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+						Quản lý tài khoản người dùng, danh sách việc làm và giám sát dữ liệu toàn sàn JobPortal IT.
+					</p>
 				</div>
-			</div>
 
-			{/* Jobs Table */}
-			<div className="bg-white rounded-xl shadow-md p-6 border">
-				<h2 className="text-xl font-semibold text-gray-800 mb-4">All Jobs</h2>
-				<div className="overflow-x-auto">
-					<table className="min-w-full text-sm text-left">
-						<thead>
-							<tr className="bg-gray-100 text-gray-600 border-b">
-								<th className="p-3">Title</th>
-								<th className="p-3">Company</th>
-								<th className="p-3">Location</th>
-								<th className="p-3">Status</th>
-								<th className="p-3 text-center">Actions</th>
-							</tr>
-						</thead>
-						<tbody>
-							{jobs.map((job) => (
-								<React.Fragment key={job._id}>
-									<tr className="border-b hover:bg-gray-50">
-										<td className="p-3">{job.title}</td>
-										<td className="p-3">{job.company}</td>
-										<td className="p-3">{job.location}</td>
-										<td className="p-3 capitalize">{job.status}</td>
-										<td className="p-3 text-center space-x-4">
-											<button
-												onClick={() => {
-													setSelectedJobId((prev) => (prev === job._id ? null : job._id));
-													setSelectedUserId(null); // close user detail
-												}}
-												className="text-blue-600 hover:underline"
-											>
-												View
-											</button>
-											<button
-												onClick={() => handleDeleteJob(job._id)}
-												className="text-red-600 hover:underline"
-											>
-												Delete
-											</button>
-										</td>
-									</tr>
-									{selectedJobId === job._id && (
-										<tr>
-											<td colSpan="5" className="p-4 bg-blue-50 border rounded-md">
-												<h3 className="text-md font-bold mb-2">Job Details</h3>
-												<div className="text-sm text-gray-800 grid sm:grid-cols-2 gap-2">
-													<p><strong>Title:</strong> {job.title}</p>
-													<p><strong>Company:</strong> {job.company}</p>
-													<p><strong>Description:</strong> {job.description}</p>
-													<p><strong>Location:</strong> {job.location}</p>
-													<p><strong>Salary:</strong> ${job.salary?.toLocaleString()}</p>
-													<p><strong>Status:</strong> {job.status}</p>
-													<p><strong>Job Type:</strong> {job.jobType}</p>
-													<p><strong>Experience Level:</strong> {job.experienceLevel}</p>
-													<p><strong>Tags:</strong> {job.tags?.join(", ")}</p>
-													<p><strong>Skills:</strong> {job.skills?.join(", ")}</p>
-													<p><strong>Created By:</strong> {job.createdBy?.email || "Unknown"}</p>
+				{/* Stats Section */}
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+					<StatCard icon={FaUsers} label="Tổng Số Người Dùng" count={stats.totalUsers} color="blue" />
+					<StatCard icon={FaBriefcase} label="Tổng Việc Làm Đã Đăng" count={stats.totalJobs} color="emerald" />
+					<StatCard icon={FaFileAlt} label="Tổng Đơn Ứng Tuyển" count={stats.totalApplications} color="purple" />
+				</div>
+
+				{/* Users Table */}
+				<div className="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/90 space-y-4">
+					<div className="flex items-center justify-between pb-3 border-b border-slate-100">
+						<div>
+							<h2 className="text-base font-bold text-slate-900">
+								Danh Sách Tài Khoản Người Dùng ({users.length})
+							</h2>
+							<p className="text-xs text-slate-400">Tất cả tài khoản Ứng viên, Doanh nghiệp và Quản trị viên</p>
+						</div>
+					</div>
+
+					<div className="overflow-x-auto">
+						<table className="min-w-full text-xs text-left">
+							<thead>
+								<tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
+									<th className="p-3.5 font-bold">Họ và tên</th>
+									<th className="p-3.5 font-bold">Email</th>
+									<th className="p-3.5 font-bold">Vai trò</th>
+									<th className="p-3.5 font-bold text-center">Thao tác</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y divide-slate-100">
+								{users.map((u) => (
+									<React.Fragment key={u._id}>
+										<tr className="hover:bg-slate-50 transition">
+											<td className="p-3.5 font-bold text-slate-900 flex items-center gap-2.5">
+												<div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+													{u.name?.charAt(0).toUpperCase()}
 												</div>
-												<button onClick={() => setSelectedJobId(null)} className="mt-2 text-blue-700 hover:underline">Close</button>
+												<span>{u.name}</span>
+											</td>
+											<td className="p-3.5 text-slate-600">{u.email}</td>
+											<td className="p-3.5">{roleBadge(u.role)}</td>
+											<td className="p-3.5 text-center space-x-3">
+												<button
+													onClick={() => {
+														setSelectedUserId((prev) => (prev === u._id ? null : u._id));
+														setSelectedJobId(null);
+													}}
+													className="text-blue-600 font-bold hover:underline"
+												>
+													{selectedUserId === u._id ? 'Thu gọn ▲' : 'Chi tiết ▼'}
+												</button>
+												<button
+													onClick={() => handleDeleteUser(u._id)}
+													className="text-red-600 font-bold hover:underline"
+												>
+													Xóa
+												</button>
 											</td>
 										</tr>
-									)}
+										{selectedUserId === u._id && (
+											<tr>
+												<td colSpan="4" className="p-5 bg-blue-50/70 border-b border-blue-100">
+													<div className="bg-white p-4 rounded-2xl border border-blue-200/80 shadow-sm space-y-3">
+														<div className="flex items-center justify-between pb-2 border-b border-slate-100">
+															<h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+																Chi Tiết Tài Khoản: {u.name}
+															</h4>
+															<button onClick={() => setSelectedUserId(null)} className="text-xs text-slate-400 hover:text-slate-700">Đóng ✕</button>
+														</div>
+														<div className="grid sm:grid-cols-2 gap-3 text-xs text-slate-700">
+															<p><strong>Email:</strong> {u.email}</p>
+															<p><strong>Vai trò:</strong> {u.role}</p>
+															<p><strong>Địa điểm:</strong> {u.location || 'N/A'}</p>
+															<p><strong>Số điện thoại:</strong> {u.phone || 'N/A'}</p>
+															{u.skills?.length > 0 && (
+																<p className="sm:col-span-2">
+																	<strong>Kỹ năng:</strong> {u.skills.join(", ")}
+																</p>
+															)}
+															{u.bio && (
+																<p className="sm:col-span-2">
+																	<strong>Giới thiệu:</strong> {u.bio}
+																</p>
+															)}
+														</div>
+													</div>
+												</td>
+											</tr>
+										)}
+									</React.Fragment>
+								))}
+							</tbody>
+						</table>
+					</div>
+				</div>
 
-								</React.Fragment>
-							))}
-						</tbody>
-					</table>
+				{/* Jobs Table */}
+				<div className="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/90 space-y-4">
+					<div className="flex items-center justify-between pb-3 border-b border-slate-100">
+						<div>
+							<h2 className="text-base font-bold text-slate-900">
+								Danh Sách Việc Làm Toàn Sàn ({jobs.length})
+							</h2>
+							<p className="text-xs text-slate-400">Giám sát và kiểm duyệt các tin tuyển dụng IT</p>
+						</div>
+					</div>
+
+					<div className="overflow-x-auto">
+						<table className="min-w-full text-xs text-left">
+							<thead>
+								<tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
+									<th className="p-3.5 font-bold">Vị trí tuyển dụng</th>
+									<th className="p-3.5 font-bold">Doanh nghiệp</th>
+									<th className="p-3.5 font-bold">Địa điểm</th>
+									<th className="p-3.5 font-bold">Mức lương</th>
+									<th className="p-3.5 font-bold">Trạng thái</th>
+									<th className="p-3.5 font-bold text-center">Thao tác</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y divide-slate-100">
+								{jobs.map((job) => (
+									<React.Fragment key={job._id}>
+										<tr className="hover:bg-slate-50 transition">
+											<td className="p-3.5 font-bold text-slate-900">{job.title}</td>
+											<td className="p-3.5 text-slate-600">{job.company}</td>
+											<td className="p-3.5 text-slate-600">{job.city || job.location}</td>
+											<td className="p-3.5 font-bold text-emerald-700">
+												{job.salaryFormatted || `$${job.salary?.toLocaleString()}`}
+											</td>
+											<td className="p-3.5">
+												<span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+													job.status === 'open'
+														? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+														: 'bg-slate-100 text-slate-600 border-slate-200'
+												}`}>
+													{job.status === 'open' ? 'Đang mở' : 'Đã đóng'}
+												</span>
+											</td>
+											<td className="p-3.5 text-center space-x-3">
+												<button
+													onClick={() => {
+														setSelectedJobId((prev) => (prev === job._id ? null : job._id));
+														setSelectedUserId(null);
+													}}
+													className="text-blue-600 font-bold hover:underline"
+												>
+													{selectedJobId === job._id ? 'Thu gọn ▲' : 'Xem ▼'}
+												</button>
+												<button
+													onClick={() => handleDeleteJob(job._id)}
+													className="text-red-600 font-bold hover:underline"
+												>
+													Xóa
+												</button>
+											</td>
+										</tr>
+										{selectedJobId === job._id && (
+											<tr>
+												<td colSpan="6" className="p-5 bg-blue-50/70 border-b border-blue-100">
+													<div className="bg-white p-4 rounded-2xl border border-blue-200/80 shadow-sm space-y-3">
+														<div className="flex items-center justify-between pb-2 border-b border-slate-100">
+															<h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+																Chi Tiết Việc Làm: {job.title}
+															</h4>
+															<button onClick={() => setSelectedJobId(null)} className="text-xs text-slate-400 hover:text-slate-700">Đóng ✕</button>
+														</div>
+														<div className="grid sm:grid-cols-2 gap-3 text-xs text-slate-700">
+															<p><strong>Công ty:</strong> {job.company}</p>
+															<p><strong>Địa điểm:</strong> {job.location}</p>
+															<p><strong>Hình thức:</strong> {job.workMode || job.jobType}</p>
+															<p><strong>Cấp bậc:</strong> {job.experienceLevel || 'Senior'}</p>
+															<p className="sm:col-span-2"><strong>Mô tả:</strong> {job.description}</p>
+															{job.tags?.length > 0 && (
+																<p className="sm:col-span-2">
+																	<strong>Kỹ năng:</strong> {job.tags.join(", ")}
+																</p>
+															)}
+														</div>
+													</div>
+												</td>
+											</tr>
+										)}
+									</React.Fragment>
+								))}
+							</tbody>
+						</table>
+					</div>
 				</div>
 			</div>
 		</div>

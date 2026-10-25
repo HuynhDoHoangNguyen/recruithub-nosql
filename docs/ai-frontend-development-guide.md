@@ -2,6 +2,49 @@
 
 Tài liệu này là chỉ dẫn làm việc bắt buộc dành cho AI Coding Agent khi xây dựng và mở rộng mã nguồn giao diện trong thư mục `frontend/` của dự án **RecruiHub NoSQL**. Đọc toàn bộ tài liệu này trước khi tạo hoặc chỉnh sửa bất kỳ component nào.
 
+> **BẮT BUỘC — TEMPLATE UI HIỆN HÀNH:** Mọi task tạo hoặc sửa UI phải đọc tài liệu này **và mã nguồn template hiện có** tại [`Job-Application-Portal-Frontend/`](./Job-Application-Portal-Frontend/) trước khi viết code. Không được chỉ đọc tên file, dựa vào trí nhớ của phiên trước hoặc tự thiết kế một phong cách khác. Template là chuẩn trực quan bắt buộc về bố cục, màu sắc, typography, khoảng cách và tương tác; schema/API/quy tắc nghiệp vụ vẫn tuân theo `AGENTS.md`. Chưa có bằng chứng đọc và đối chiếu template thì chưa được bắt đầu triển khai UI.
+
+## 0. Cổng kiểm tra bắt buộc trước khi làm UI
+
+### 0.1. Các file phải đọc
+
+Đường dẫn trong bảng tính từ `docs/Job-Application-Portal-Frontend/`:
+
+| Phạm vi | File bắt buộc đọc | Nội dung cần đối chiếu |
+| --- | --- | --- |
+| Mọi task UI | `package.json`, `tailwind.config.js`, `src/index.css`, `src/App.css`, `index.html` | Phiên bản thư viện, font được nạp, màu, shadow và class dùng chung |
+| Khung ứng dụng và điều hướng | `src/App.jsx`, `src/components/Navbar.jsx`, `src/routes/AppRoutes.jsx` | Navbar, container, bố cục chung, menu mobile, vị trí toast |
+| Đăng nhập, đăng ký, phân quyền | `src/pages/Login.jsx`, `src/pages/Register.jsx`, `src/context/AuthContext.jsx`, `src/components/ProtectedRoute.jsx` | Bố cục form và trạng thái giao diện; đối chiếu riêng hợp đồng auth thật |
+| Trang chủ | `src/pages/Landing.jsx` | Hero, tìm kiếm, các section và CTA |
+| Danh sách, chi tiết, tạo tin | `src/pages/Jobs/JobList.jsx`, `src/pages/Jobs/JobDetails.jsx`, `src/pages/Jobs/CreateJob.jsx` | Bộ lọc, job card, thông tin chi tiết và form |
+| Dashboard ứng viên, hồ sơ | `src/pages/Dashboard/JobSeekerDashboard.jsx`, `src/pages/Profile.jsx` | Thẻ tổng quan, danh sách ứng tuyển và form hồ sơ |
+| Dashboard nhà tuyển dụng | `src/pages/Dashboard/RecruiterDashboard.jsx` | Thống kê và quản lý tin tuyển dụng |
+| Dashboard quản trị | `src/pages/Dashboard/AdminDashboard.jsx` | Stat card, bảng và vùng chi tiết quản trị |
+
+Mỗi task phải đọc nhóm file dùng chung và nhóm màn hình liên quan; theo tiếp các import/component/style được màn hình đó sử dụng. Với màn hình chưa có mẫu trực tiếp (phỏng vấn, ranking, audit/logs), đọc dashboard gần nhất với vai trò tương ứng và tái sử dụng ngôn ngữ thiết kế của nó.
+
+### 0.2. Bằng chứng đọc phải có trong Mini Plan
+
+Trước khi sửa UI, AI phải trình bày:
+
+1. **Đã đọc:** Liệt kê đường dẫn file template thực sự đã mở và nhận xét cụ thể về bố cục/class của từng nhóm liên quan.
+2. **Đối chiếu:** Nêu màn hình/component production sẽ dựa trên file mẫu nào, phần giữ lại và phần điều chỉnh theo nghiệp vụ RecruiHub.
+3. **Phạm vi:** Liệt kê file production dự kiến tạo/sửa, API thật sử dụng, bốn trạng thái UI và kế hoạch kiểm tra responsive.
+4. **Sai khác:** Ghi rõ khác biệt giữa template và schema/API/nghiệp vụ; không sao chép endpoint, role, dữ liệu mock hoặc hành vi trái hợp đồng thật.
+
+Tuân thủ bước duyệt Mini Plan trong `AGENTS.md` khi chưa được duyệt trước. Nếu thiếu hoặc không đọc được file mẫu, báo chính xác file bị thiếu và phần bị chặn; không tự nhận đã đối chiếu. Khi template được cập nhật, đọc lại các file liên quan ở task tiếp theo.
+
+### 0.3. Checklist nghiệm thu UI theo mẫu
+
+- [ ] Có danh sách file template đã đọc và mapping sang file production.
+- [ ] Bố cục, font, màu, card, nút, input, badge và khoảng cách bám mẫu hiện hành.
+- [ ] Đã đối chiếu giao diện ở mobile, tablet và desktop; ghi kích thước thực tế đã kiểm tra.
+- [ ] Có Loading / Empty / Error / Success và kiểm tra tương tác liên quan.
+- [ ] Các sai khác có lý do nghiệp vụ/kỹ thuật rõ ràng; thay đổi phong cách ngoài yêu cầu cần được người dùng duyệt.
+- [ ] Ghi kết quả thật của lint/build và bằng chứng xem giao diện nếu có; không nhận đã kiểm tra trực quan khi chỉ đọc code.
+
+**Giới hạn thực thi:** Tài liệu Markdown không tự cưỡng chế công cụ đọc file. `AGENTS.md` đã yêu cầu đọc hướng dẫn này trước task; cổng kiểm tra và bằng chứng ở trên là điều kiện để review/nghiệm thu công việc UI.
+
 ---
 
 ## 1. Mục tiêu và Ba phân vùng giao diện
@@ -37,7 +80,7 @@ Xây dựng ứng dụng Single Page Application (SPA) trên nền **React 19 + 
 
 - **Chỉ viết mã nguồn chạy thật trong thư mục `frontend/`**.
 - **Thư mục tham khảo `docs/Job-Application-Portal-Frontend/`**:
-  - Đây là mẫu giao diện gốc được giữ nguyên làm tài liệu tham khảo về bố cục, styling Tailwind, icons và cấu trúc component.
+  - Đây là mẫu giao diện hiện hành, bắt buộc đọc và bám theo về bố cục, styling Tailwind, icons và cấu trúc component theo mục 0.
   - Tuyệt đối **không chỉnh sửa trực tiếp** và **không import runtime** từ bên trong `docs/Job-Application-Portal-Frontend/`.
   - Khi cần một component từ template, hãy sao chép phần logic cần thiết sang `frontend/src/components/` hoặc `frontend/src/features/`, đổi tên và điều chỉnh dữ liệu cho khớp với API của RecruiHub.
 - **Không chỉnh sửa `backend/`** trừ khi yêu cầu làm việc đang giao thuộc một task Vertical Slice hoàn chỉnh được chỉ định rõ.
@@ -55,6 +98,8 @@ Khi có điểm chưa rõ hoặc bất đồng giữa các tài liệu, tuân th
 4. **Kiến trúc hệ thống**: `ARCHITECTURE.md`.
 5. **Template giao diện tham khảo**: `docs/Job-Application-Portal-Frontend/` (tham khảo phong cách trực quan, màu sắc và layout).
 
+Thứ tự trên không cho phép bỏ qua template khi làm UI. Với dữ liệu/nghiệp vụ, áp dụng đầy đủ thứ tự nguồn sự thật trong `AGENTS.md` (gồm CouchDB thực tế và Zod schemas); với cách thể hiện trực quan, phải bám template hiện hành. Nếu mockup và template khác bố cục, ghi rõ khác biệt trong Mini Plan, giữ đầy đủ chức năng nghiệp vụ và xin quyết định khi không thể dung hòa.
+
 > Tuyệt đối không tự suy diễn các trường dữ liệu hoặc endpoint mới chỉ từ tên biến của template tham khảo. Template gốc sử dụng backend khác với CouchDB NoSQL của RecruiHub.
 
 ---
@@ -62,6 +107,7 @@ Khi có điểm chưa rõ hoặc bất đồng giữa các tài liệu, tuân th
 ## 4. Quy tắc làm việc bắt buộc cho AI Agent
 
 Trước mỗi phần việc trên Frontend, AI bắt buộc phải:
+0. Hoàn tất cổng kiểm tra ở mục 0: đọc file style/khung ứng dụng và màn hình template liên quan, báo bằng chứng cùng mapping trong Mini Plan.
 1. Đọc component hoặc trang hiện có trong `frontend/src/`.
 2. Đối chiếu màn hình tương ứng trong [docs/recruithub-screen-mockups.md](file:///docs/recruithub-screen-mockups.md).
 3. Đọc Use Case và Business Rules liên quan.
@@ -170,6 +216,25 @@ Mỗi màn hình hiển thị dữ liệu phải xử lý trọn vẹn 4 trạng
 ## 7. Quy chuẩn thiết kế UI & Màu sắc nghiệp vụ
 
 Hệ thống sử dụng bảng màu Tailwind chuẩn mang lại cảm giác hiện đại, chuyên nghiệp cho một nền tảng ATS:
+
+### 7.1. Quy chuẩn lấy từ template hiện hành
+
+Đọc lại `tailwind.config.js` và `src/index.css` của template để xác minh các giá trị trước khi triển khai; các quy chuẩn đang có gồm:
+
+- **Font:** `Plus Jakarta Sans`, fallback `Inter`, `system-ui`, `sans-serif`; kiểm tra cách nạp font trong `index.html`.
+- **Nền và chữ:** `bg-slate-50`, `text-slate-800`, `antialiased`; card nền trắng, viền slate nhẹ.
+- **Navbar:** sticky, nền `bg-white/95`, blur nhẹ; container `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8`; menu co gọn trên mobile.
+- **Nút chính `.btn-primary`:** gradient blue → indigo, `rounded-xl`, chữ semibold, shadow và trạng thái hover/active. Nút phụ `.btn-secondary`: nền trắng, viền slate.
+- **Card `.card-portal`:** `rounded-2xl`, `border-slate-200/80`, `shadow-soft`, hover `shadow-hover`; stat card dashboard có thể dùng `rounded-3xl` theo trang mẫu tương ứng.
+- **Input `.input-field`:** `rounded-xl`, padding `px-4 py-3`, focus viền blue và ring nhẹ.
+- **Badge:** `.badge-salary` xanh emerald, `.badge-hot` đỏ, `.badge-tag` slate. Chỉ hiển thị nhãn nghiệp vụ khi có dữ liệu thật hỗ trợ.
+- **Token mở rộng:** `brand.green`, `brand.red`, `brand.dark`, `brand.blue` và shadow `soft`, `hover`, `card`. Khi mang class sang production phải chuyển cả token/style phụ thuộc trong phạm vi được duyệt, tương thích phiên bản Tailwind của production.
+
+Không tự đổi font, palette, độ bo góc hoặc layout tổng thể ngoài yêu cầu. Có thể chuẩn hóa icon theo Lucide của dự án và đổi thương hiệu `JobPortal` thành `RecruiHub` trong production, đồng thời giữ kích thước và cách bố trí của mẫu.
+
+Không sao chép `TestToolbar`, `mockAdapter`, `mockData`, auth demo hoặc API của template vào luồng production. Template có thể dùng role `admin`/`recruiter`/`job-seeker` và dependency version khác stack dự án; phải ánh xạ theo schema/API và package thực tế, không đổi hợp đồng chỉ để khớp template.
+
+### 7.2. Màu sắc nghiệp vụ
 
 - **Màu chủ đạo (Primary)**: `indigo-600` / `blue-600` (Nút bấm chính, liên kết, header nổi bật).
 - **Màu nền (Background)**: `bg-slate-50` cho trang tổng thể, `bg-white` cho thẻ card nội dung.
