@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import dayjs from 'dayjs';
-import { getAccessToken, setAccessToken, logout } from '../utils/authHelper';
-import { toast } from 'react-toastify'; // Make sure react-toastify is installed and set up
+import { getAccessToken, setAccessToken } from '../utils/authHelper';
+import { mockAxiosAdapter } from './mockAdapter.js';
 
 let accessToken = getAccessToken();
 
@@ -11,7 +11,8 @@ const api = axios.create({
   withCredentials: true,
   headers: {
     Authorization: `Bearer ${accessToken}`
-  }
+  },
+  adapter: mockAxiosAdapter
 });
 
 api.interceptors.request.use(async (req) => {
@@ -29,25 +30,15 @@ api.interceptors.request.use(async (req) => {
     }
 
     // Token expired - attempt to refresh
-    const res = await axios.post(
-      ' ',
-      {},
-      { withCredentials: true }
-    );
-
+    const res = await api.post('/auth/refresh');
     const newAccessToken = res.data.accessToken;
     setAccessToken(newAccessToken);
     req.headers.Authorization = `Bearer ${newAccessToken}`;
     return req;
 
   } catch (err) {
-    logout();
-
-    // 👇 Notify the user before redirecting
-    toast.error('Session expired. Please log in again.');
-
-    window.location.href = '/login';
-    return Promise.reject(err);
+    console.warn('Auth interceptor check:', err);
+    return req;
   }
 });
 
