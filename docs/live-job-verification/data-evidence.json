@@ -1,0 +1,93 @@
+{
+  "before": {
+    "database": "recruitment_db",
+    "doc_count": 10,
+    "totalJobs": 0,
+    "statuses": {},
+    "openWithPublishedAt": 0,
+    "openWithoutPublishedAt": 0,
+    "openPastDeadline": 0,
+    "actualSelectorFirstPage": 0
+  },
+  "after": {
+    "database": "recruitment_db",
+    "doc_count": 25761,
+    "totalJobs": 2500,
+    "statuses": {
+      "DRAFT": 2300,
+      "OPEN": 200
+    },
+    "openWithPublishedAt": 0,
+    "openWithoutPublishedAt": 200,
+    "openPastDeadline": 0,
+    "oldSelectorCount": 0,
+    "newSelectorReturned": 200,
+    "uniqueIds": 200,
+    "pages": [
+      50,
+      50,
+      50,
+      50,
+      0
+    ],
+    "index": "public_jobs_created_v2",
+    "execution_stats": {
+      "total_keys_examined": 51,
+      "total_docs_examined": 51,
+      "total_quorum_docs_examined": 0,
+      "results_returned": 50,
+      "execution_time_ms": 1503.912
+    }
+  },
+  "source": {
+    "releaseId": "release:DATA-03.4B:7fdd3b34c4636367",
+    "applied": true,
+    "files": [
+      {
+        "name": "users.jsonl",
+        "records": 10150,
+        "sha256": "3ADA393936E71CDFF15B0750C190C86B9CF6796669FB8579E2E787200412F649"
+      },
+      {
+        "name": "candidates.jsonl",
+        "records": 10000,
+        "sha256": "D87224E3DDF48B30B93739AD38D8FA097BA4ACC1074017448E3BBDC83706794F"
+      },
+      {
+        "name": "companies.jsonl",
+        "records": 50,
+        "sha256": "4236513CF36090FB28A6537F8D7B74EEC72673662557B6939BC63723A932049D"
+      },
+      {
+        "name": "departments.jsonl",
+        "records": 150,
+        "sha256": "33E0B9FB6AC2C98C770B76E69A91F055F335EA6E9C4996470560D6EE0821BF96"
+      },
+      {
+        "name": "recruiters.jsonl",
+        "records": 150,
+        "sha256": "9E9CB48735909A98CF3EFA4123D7C41BA42E162E5E1BE47005196608A7E7202B"
+      },
+      {
+        "name": "jobs.jsonl",
+        "records": 2500,
+        "sha256": "5815C52ED2470BDC22397605BC9FDC92F2663F3D5205D91578FBB4D1738BBA3B"
+      },
+      {
+        "name": "applications.jsonl",
+        "records": 1200,
+        "sha256": "CAD7BF093D28A96CC5A754246D89D29768032258965DB50D32473931D4C8E495"
+      },
+      {
+        "name": "interviews.jsonl",
+        "records": 350,
+        "sha256": "C3B6ACA01E1D920CCC455F03CCD73216917E7B19E55D8577B35DDD1B80F9CE32"
+      },
+      {
+        "name": "resume_analyses.jsonl",
+        "records": 1200,
+        "sha256": "6C4A4F292D22017F90B59C68527E0B81F5BA760DC5B006AD8A81D7C3DF6EE277"
+      }
+    ]
+  }
+}

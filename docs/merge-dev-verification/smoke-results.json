@@ -1,0 +1,48 @@
+{
+  "checkedAt": "2026-10-24T18:25:44.878Z",
+  "origin": "http://localhost:5173",
+  "mocked": false,
+  "checks": [
+    {
+      "route": "/",
+      "rendered": true
+    },
+    {
+      "route": "/jobs",
+      "rendered": true
+    },
+    {
+      "route": "/login",
+      "rendered": true
+    },
+    {
+      "route": "/register",
+      "rendered": true
+    },
+    {
+      "mobileNavigation": true,
+      "noOverflow": true
+    }
+  ],
+  "runtimeErrors": [],
+  "api": [
+    {
+      "path": "/api/health",
+      "status": 200
+    },
+    {
+      "path": "/api/health/database",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/jobs?limit=1",
+      "status": 503,
+      "code": "AUTH_DATABASE_CONFIGURATION_ERROR"
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401,
+      "code": "AUTHENTICATION_FAILED"
+    }
+  ]
+}

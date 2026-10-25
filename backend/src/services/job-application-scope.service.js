@@ -1,3 +1,4 @@
+import { JOB_LOCATIONS, WORK_MODES } from '../constants/job-catalog.constants.js';
 import { ApiError } from '../middleware/job-application.middleware.js';
 import { candidateDocumentSchema } from '../schemas/candidate.schema.js';
 import { jobDocumentSchema } from '../schemas/job.schema.js';
@@ -54,12 +55,13 @@ export async function ownedJob(repo, user, id) {
   return { job, recruiter };
 }
 export function candidateDto(candidate) {
-  return Object.fromEntries(['_id', 'profile', 'skills', 'education', 'experience_summary', 'experience', 'projects', 'data_availability']
+  return Object.fromEntries(['_id', 'profile', 'skills', 'education', 'experience_summary', 'experience', 'projects', 'data_availability', 'resume_file', 'avatar', 'languages']
     .filter(key => candidate[key] !== undefined).map(key => [key, candidate[key]]));
 }
 export function publicJobDto(job) {
-  return Object.fromEntries(['_id', 'title', 'seniority', 'industry', 'description', 'responsibilities', 'requirements', 'required_skills',
-    'optional_skills', 'status', 'deadline', 'published_at', 'created_at', 'updated_at'].filter(key => job[key] !== undefined).map(key => [key, job[key]]));
+  return { location_label: JOB_LOCATIONS.find(option => option.value === job.location)?.label,
+    work_mode_label: WORK_MODES.find(option => option.value === job.work_mode)?.label, ...Object.fromEntries(['_id', 'title', 'seniority', 'industry', 'description', 'responsibilities', 'requirements', 'required_skills',
+    'optional_skills', 'location', 'work_mode', 'employment_type', 'salary', 'status', 'deadline', 'published_at', 'created_at', 'updated_at'].filter(key => job[key] !== undefined).map(key => [key, job[key]])) };
 }
 export const runtimeProvenance = fields => ({ classification: 'derived', generated: false,
   transform_version: 'job-application-v1', field_origins: Object.fromEntries(fields.map(field => [field, 'user_input'])) });

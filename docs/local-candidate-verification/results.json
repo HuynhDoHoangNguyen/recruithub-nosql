@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-10-25T06:20:21.949Z",
+  "origin": "http://localhost:5173",
+  "mocked": false,
+  "candidateEmail": "candidate.test@example.invalid",
+  "database": "recruithub_auth_local_test",
+  "checks": [
+    "Real Candidate login → own dashboard without Recruiter privileges",
+    "Candidate profile API and page load",
+    "Browse live job → submit CV and cover letter through real Apply API",
+    "Reload → sign in again → submitted CV and stage persist",
+    "Real Recruiter opens applicants and reads the same persisted CV"
+  ],
+  "runtimeErrors": [],
+  "createdTestJob": true,
+  "testJobId": "job:5205e34a-26f0-4b5e-9087-deb1e83fa8cd",
+  "testJobTitle": "Tin thử ứng tuyển Candidate 1792909223877",
+  "catalogUniqueJobs": 201,
+  "historicalDatabaseUnchanged": true
+}

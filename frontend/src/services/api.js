@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getAccessToken } from '../utils/authHelper';
 
-const DEFAULT_API_ROOT = 'http://127.0.0.1:5000/api';
+const DEFAULT_API_ROOT = '/api';
 
 /** Keep the Axios base at /api because API modules append /v1 themselves. */
 export function normalizeApiBaseUrl(value) {

@@ -1,0 +1,58 @@
+{
+  "mode": "Browser integration with isolated memory repository and signed test JWT; no production login or CouchDB writes",
+  "publicLive": [
+    {
+      "path": "/api/health",
+      "status": 200
+    },
+    {
+      "path": "/api/health/database",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/jobs",
+      "status": 200
+    }
+  ],
+  "screenshots": [
+    "app-landing-desktop.png",
+    "reference-landing-desktop.png",
+    "app-login-desktop.png",
+    "reference-login-desktop.png",
+    "app-register-desktop.png",
+    "reference-register-desktop.png",
+    "app-jobs-desktop.png",
+    "reference-jobs-desktop.png",
+    "reference-recruiter-desktop.png",
+    "reference-create-desktop.png",
+    "reference-candidate-desktop.png",
+    "reference-job-detail-desktop.png",
+    "reference-profile-desktop.png",
+    "reference-admin-desktop.png",
+    "app-jobs-network-error.png",
+    "app-login-mobile.png",
+    "app-jobs-mobile.png",
+    "app-jobs-tablet.png",
+    "app-recruiter-desktop.png",
+    "app-create-desktop.png",
+    "app-apply-modal-desktop.png",
+    "app-job-detail-desktop.png",
+    "app-candidate-mobile.png",
+    "app-candidate-desktop.png",
+    "app-applicant-modal-desktop.png",
+    "app-applicants-desktop.png",
+    "app-applicants-mobile.png",
+    "app-profile-unavailable.png",
+    "app-admin-unavailable.png"
+  ],
+  "checks": [
+    "Network error preserves filters/navigation; Retry restores API data",
+    "Mobile menu opens, navigates and closes",
+    "Recruiter navigation → create DRAFT → edit → publish OPEN",
+    "Candidate apply text CV + cover letter → reload → tracker; native dialog focus stays inside",
+    "Recruiter reads persisted CV → SCREENING → INTERVIEW; stale second tab gets 409 and reloads",
+    "Escape closes native modal and returns focus to triggering button",
+    "Withdraw from INTERVIEW preserves history and prevents lifetime duplicate after terminal",
+    "No browser runtime errors in tested application routes"
+  ]
+}

@@ -2,13 +2,14 @@
  * DATA-03.3A Application Business Document Schema
  * 
  * Defines Zod validation schema for the Application document:
- * - Deterministic lifetime Candidate–Job pair ID: application:pair:<sha256(candidate_id + "\n" + job_id)>
- * - Single pipeline state: current_stage
+ * - Deterministic Candidate–Job pair ID: application:pair:<sha256(candidate_id + "\n" + job_id)>
+ * - Top-level current attempt, with immutable terminal snapshots in previous_attempts
  * - Ordered append-only stage_history enforcing the approved 12 transitions
  * - Strict rejection of legacy fields (status, match_score) and unknown fields
  */
 
 import { z } from 'zod';
+import { assetReferenceSchema } from './upload.schema.js';
 import {
   APPLICATION_STAGES,
   DOCUMENT_TYPES,
@@ -68,8 +69,22 @@ export const stageEventSchema = z
  * Application Business Document Schema
  */
 export const submissionSchema = z.object({
+  resume_file: assetReferenceSchema.optional(),
   resume_text: z.string().trim().min(1).max(50000).optional(),
   cover_letter: z.string().trim().min(1).max(10000).optional(),
+}).strict();
+
+// Historical documents without attempt fields represent attempt 1. A terminal
+// history remains immutable within its attempt; reapplying starts a new history.
+export const previousAttemptSchema = z.object({
+  attempt_number: z.number().int().positive(),
+  request_id: z.string().uuid().optional(),
+  current_stage: z.literal('WITHDRAWN'),
+  stage_history: z.array(stageEventSchema).min(1),
+  applied_at: isoDateTimeSchema,
+  updated_at: isoDateTimeSchema,
+  submission: submissionSchema.optional(),
+  recruiter_note: z.string().trim().min(1).optional(),
 }).strict();
 
 export const applicationDocumentSchema = z
@@ -101,10 +116,26 @@ export const applicationDocumentSchema = z
     updated_at: isoDateTimeSchema,
     recruiter_note: z.string().trim().min(1).optional(),
     submission: submissionSchema.optional(),
+    attempt_number: z.number().int().positive().optional(),
+    request_id: z.string().uuid().optional(),
+    previous_attempts: z.array(previousAttemptSchema).optional(),
     provenance: provenanceSchema,
   })
   .strict()
   .superRefine((app, ctx) => {
+    const previous = app.previous_attempts || [];
+    if ((app.attempt_number || 1) !== previous.length + 1) {
+      ctx.addIssue({ code: 'custom', path: ['attempt_number'], message: 'Attempt sequence must be contiguous.' });
+    }
+    const keys = [app.request_id, ...previous.map(attempt => attempt.request_id)].filter(Boolean);
+    if (new Set(keys).size !== keys.length) ctx.addIssue({ code: 'custom', path: ['request_id'], message: 'Request IDs must be unique across attempts.' });
+    previous.forEach((attempt, index) => {
+      const check = validateStageHistory(attempt.stage_history, attempt.applied_at, attempt.current_stage, attempt.updated_at);
+      const next = previous[index + 1] || app;
+      if (attempt.attempt_number !== index + 1 || !check.valid || Date.parse(attempt.updated_at) >= Date.parse(next.applied_at)) {
+        ctx.addIssue({ code: 'custom', path: ['previous_attempts', index], message: 'Invalid archived attempt sequence or history.' });
+      }
+    });
     // 1. Validate _id derivation from candidate_id and job_id
     if (app.candidate_id && app.job_id) {
       let expectedId;

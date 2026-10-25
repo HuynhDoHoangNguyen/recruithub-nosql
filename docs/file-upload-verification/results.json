@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-10-25T10:16:50.620Z",
+  "origin": "http://localhost:5173",
+  "mocked": false,
+  "checks": [
+    "Real Candidate profile: invalid extension and exact 5 MiB rejected; PDF and PNG uploaded, saved, reloaded; downloaded PDF has identical SHA-256; real JPEG/WEBP uploads accepted",
+    "Real file-only application: DOCX submitted, withdrawn, reapplied using saved PDF; each attempt preserves its own file; anonymous CV download blocked",
+    "Authorized Recruiter loads Candidate avatar and downloads both current and archived CV files; SHA-256 and original Unicode-safe filenames match",
+    "Company logo selected from disk, persisted as CouchDB attachment and displayed publicly on Job card; mobile Candidate form has no horizontal overflow"
+  ],
+  "runtime_errors": [],
+  "job_id": "job:a67307c1-c22b-4d25-bc54-aecbbb903317",
+  "application_id": "application:pair:676c60d1d785ff13cd715486b119ea3448d01c645a15a8f3ae4ff18f34549747",
+  "historical_database_unchanged": true,
+  "profile_and_company_file_choices_restored": true
+}

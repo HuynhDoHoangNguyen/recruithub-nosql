@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-10-25T11:34:46.989Z",
+  "mocked": false,
+  "checks": [
+    "PDF with BOM/preamble and >1KB trailing padding uploads successfully; fake PDF is rejected; PDF preview opens without triggering download",
+    "Five profile tabs, explicit view/edit, avatar button physically below image; contact/languages/CV/avatar persist without changing career collections",
+    "Real Recruiter opens PDF and archived DOCX in browser; optional download retains SHA-256; lazy Candidate dashboard expands CV/history on demand",
+    "Mobile Candidate profile at 390px has no horizontal overflow"
+  ],
+  "runtime_errors": [],
+  "job_id": "job:798004da-f59b-4af4-b095-6c61106c8693",
+  "application_id": "application:pair:b21558a322e9397e65c69ef28ccaf79211deb99057d4c1eb48696f5d6cedb353",
+  "primary_before": {
+    "doc_count": 25761,
+    "update_seq": "25762-g1AAAACReJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyMpiTGBiMZuYCxdjTEi1MzYzM0LXhMCiRIakeYQIn2ASjRMs0CzMTdPVZAN_3K2g"
+  },
+  "primary_after": {
+    "doc_count": 25761,
+    "update_seq": "25762-g1AAAACReJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyMpiTGBiMZuYCxdjTEi1MzYzM0LXhMCiRIakeYQIn2ASjRMs0CzMTdPVZAN_3K2g"
+  },
+  "primary_unchanged": true
+}

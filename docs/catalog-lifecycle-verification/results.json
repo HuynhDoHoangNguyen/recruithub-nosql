@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-10-25T07:55:36.523Z",
+  "origin": "http://localhost:5173",
+  "mocked": false,
+  "checks": [
+    "Real login; canonical fields persisted; global AND filters",
+    "Apply → withdraw → closed blocks reapply → invalid reopen blocked → valid reopen preserves Application",
+    "Two simultaneous reapply requests: 201/409; response-loss replay creates no extra attempt, even after withdrawal",
+    "Candidate UI: apply → APPLIED → confirmed withdraw → reapply with new CV; three archived attempts visible; reload and real login preserve state",
+    "Recruiter UI: close/reopen modal; visible Duyệt hồ sơ → SCREENING; Từ chối + reason → REJECTED",
+    "Recruiter form creates DRAFT with VN-HN/HYBRID, edit restores options and persists VN-SG/REMOTE to CouchDB",
+    "Home keyboard skill/location → Jobs; combined radio/checkbox/dropdown filters, reload, reset and back",
+    "Real historical Job remains valid with Chưa cập nhật; desktop/mobile RecruiHub, no horizontal overflow"
+  ],
+  "runtime_errors": [],
+  "query_plan": {
+    "unfiltered_index": "public_jobs_created_v2",
+    "filtered": "_all_docs job prefix, bounded 100-document batches, all matches evaluated"
+  },
+  "job_id": "job:fefa36c8-f356-407a-8731-6f33458de97d",
+  "job_title": "Kiểm chứng RecruiHub 1792914937155",
+  "form_draft_job_id": "job:42bc405a-f7db-4e24-8ab3-19ec8ac9ea1e",
+  "historical_database_unchanged": true,
+  "primary_doc_count": 25761
+}

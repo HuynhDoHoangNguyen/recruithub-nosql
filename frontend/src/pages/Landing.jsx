@@ -1,188 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { isPublicJobsMockMode, listPublicJobs } from '../services/publicJobsApi';
-import jobSearchImage from '../assets/jobSearch.png';
+import { useCallback } from 'react';
+import HomeHero from '../features/jobs/components/HomeHero';
+import { ArrowRight, BriefcaseBusiness, FileText, Search, Sparkles, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { jobApi } from '../api/jobApplicationApi';
+import { Resource } from '../features/applications/components/ApplicationUI';
+import PublicJobCard from '../features/jobs/components/PublicJobCard';
+import { useApiResource } from '../features/applications/useApiResource';
 
-const Landing = () => {
-	const [query, setQuery] = useState('');
-	const [latestJobs, setLatestJobs] = useState([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState('');
-	const navigate = useNavigate();
-
-	useEffect(() => {
-		let active = true;
-		listPublicJobs({ pageSize: 3, sort: 'newest' })
-			.then((result) => { if (active) setLatestJobs(result.jobs); })
-			.catch((requestError) => { if (active) setError(requestError.message || 'Could not load public jobs.'); })
-			.finally(() => { if (active) setLoading(false); });
-		return () => { active = false; };
-	}, []);
-
-	const handleSearch = () => {
-		if (query.trim()) navigate(`/jobs?q=${encodeURIComponent(query)}`);
-	};
-
-	return (
-		<div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
-			{/* Hero Section */}
-			<section className="relative overflow-hidden">
-				{/* Background Pattern */}
-				<div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-blue-800/5"></div>
-				<div className="absolute top-0 right-0 w-96 h-96 bg-blue-100 rounded-full -translate-y-48 translate-x-48 opacity-20"></div>
-				<div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-200 rounded-full translate-y-40 -translate-x-40 opacity-20"></div>
-				
-				<div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
-					<div className="grid lg:grid-cols-2 gap-12 items-center">
-						{/* Left Content */}
-						<div className="text-center lg:text-left space-y-8 animate-fade-in">
-							<div className="space-y-6">
-								<h1 className="text-5xl lg:text-7xl font-bold text-gray-900 leading-tight">Find Your<span className="block bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Dream Job</span></h1>
-								<p className="text-xl text-gray-600 max-w-2xl">Connect with opportunities that match your skills and aspirations.</p>
-							</div>
-							<form className="flex flex-col sm:flex-row gap-3" onSubmit={(event) => { event.preventDefault(); handleSearch(); }}>
-								<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search jobs by title, company, or skill" className="input-field flex-1" aria-label="Search public jobs" />
-								<button className="btn-primary" type="submit">Search Jobs</button>
-							</form>
-							<div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"><Link to="/register" className="btn-primary text-lg px-8 py-4">Get Started Free</Link><Link to="/login" className="btn-secondary text-lg px-8 py-4">Sign In</Link></div>
-						</div>
-						{/* Right Image */}
-						<div className="flex justify-center lg:justify-end">
-							<div className="relative">
-								<div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded-3xl transform rotate-6 opacity-20"></div>
-								<img
-									src={jobSearchImage}
-									alt="Job search illustration"
-									className="relative w-full max-w-lg rounded-3xl shadow-2xl animate-fade-in"
-								/>
-							</div>
-						</div>
-					</div>
-				</div>
-			</section>
-
-			{/* Latest public jobs */}
-			<section className="py-16 bg-white">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-					{isPublicJobsMockMode && <p className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Development fixture preview. TV2 public jobs API integration is pending.</p>}
-					{error && <p role="alert" className="message-error mb-5">{error}</p>}
-					<div className="text-center mb-10"><h2 className="text-4xl font-bold text-gray-900 mb-3">Latest Opportunities</h2><p className="text-lg text-gray-600">Only open job fixtures appear in this development preview.</p></div>
-					{loading ? <p role="status" className="py-10 text-center text-blue-700">Loading jobs...</p> : latestJobs.length === 0 ? <p className="py-10 text-center text-gray-500">No public jobs are available.</p> : <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{latestJobs.map((job) => <Link key={job.id} to={'/jobs/' + encodeURIComponent(job.id)} className="card card-hover p-6"><span className="text-xs font-semibold text-green-700">OPEN</span><h3 className="mt-2 text-xl font-semibold text-gray-900">{job.title}</h3><p className="mt-1 text-gray-600">{job.company.name} ? {job.industry}</p><p className="mt-3 line-clamp-2 text-sm text-gray-700">{job.description}</p><p className="mt-3 text-xs text-gray-500">{job.seniority} ? {new Date(job.createdAt).toLocaleDateString('vi-VN')}</p></Link>)}</div>}
-					<div className="mt-8 text-center"><Link to="/jobs" className="btn-secondary">View all jobs</Link></div>
-				</div>
-			</section>
-
-			{/* Features */}
-			<section className="py-20 bg-gradient-to-br from-blue-50 to-white">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-					<div className="text-center mb-16">
-						<h2 className="text-4xl font-bold text-gray-900 mb-4">
-							Why Choose JobPortal?
-						</h2>
-						<p className="text-xl text-gray-600 max-w-3xl mx-auto">
-							We provide the tools and platform you need to succeed in your career journey
-						</p>
-					</div>
-
-					<div className="grid gap-8 md:grid-cols-3">
-						{[
-							{ 
-								title: 'For Job Seekers', 
-								text: 'Discover top job opportunities, apply effortlessly, and track your progress in real time.',
-								icon: '👤'
-							},
-							{ 
-								title: 'For Recruiters', 
-								text: 'Post jobs, filter candidates, and streamline your hiring process with ease.',
-								icon: '🏢'
-							},
-							{ 
-								title: 'Smart Dashboards', 
-								text: 'Get a personalized dashboard whether you are an applicant, recruiter, or admin.',
-								icon: '📊'
-							}
-						].map(({ title, text, icon }) => (
-							<div key={title} className="card p-8 text-center group">
-								<div className="text-4xl mb-4">{icon}</div>
-								<h3 className="text-2xl font-semibold text-gray-900 mb-4 group-hover:text-blue-600 transition-colors">
-									{title}
-								</h3>
-								<p className="text-gray-600 leading-relaxed">{text}</p>
-							</div>
-						))}
-					</div>
-				</div>
-			</section>
-
-			{/* Footer */}
-			<footer className="bg-gray-900 text-white py-16">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-					<div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-						{/* Company Info */}
-						<div className="md:col-span-2">
-							<div className="flex items-center mb-6">
-								<div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg">
-									<span className="text-white font-bold text-lg">J</span>
-								</div>
-								<span className="ml-3 text-2xl font-bold">JobPortal</span>
-							</div>
-							<p className="text-gray-400 mb-6 max-w-md">
-								Connecting talented professionals with amazing opportunities. Your career journey starts here.
-							</p>
-							<div className="flex space-x-4">
-								{['facebook', 'twitter', 'linkedin', 'instagram'].map((social) => (
-									<a
-										key={social}
-										href="#"
-										className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-blue-600 transition-colors"
-									>
-										<span className="sr-only">{social}</span>
-										<svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-											<path fillRule="evenodd" d="M20 10C20 4.477 15.523 0 10 0S0 4.477 0 10c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V10h2.54V7.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V10h2.773l-.443 2.89h-2.33v6.988C16.343 19.128 20 14.991 20 10z" clipRule="evenodd" />
-										</svg>
-									</a>
-								))}
-							</div>
-						</div>
-
-						{/* Quick Links */}
-						<div>
-							<h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-							<ul className="space-y-2">
-								{['About Us', 'Careers', 'Help Center', 'Contact'].map((link) => (
-									<li key={link}>
-										<Link to="#" className="text-gray-400 hover:text-white transition-colors">
-											{link}
-										</Link>
-									</li>
-								))}
-							</ul>
-						</div>
-
-						{/* Legal */}
-						<div>
-							<h3 className="text-lg font-semibold mb-4">Legal</h3>
-							<ul className="space-y-2">
-								{['Privacy Policy', 'Terms of Service', 'Cookie Policy', 'GDPR'].map((link) => (
-									<li key={link}>
-										<Link to="#" className="text-gray-400 hover:text-white transition-colors">
-											{link}
-										</Link>
-									</li>
-								))}
-							</ul>
-						</div>
-					</div>
-
-					<div className="border-t border-gray-800 mt-12 pt-8 text-center">
-						<p className="text-gray-400">
-							© 2024 JobPortal. All rights reserved.
-						</p>
-					</div>
-				</div>
-			</footer>
-		</div>
-	);
-};
-
-export default Landing;
+export default function Landing() {
+  const jobs = useApiResource(useCallback(() => jobApi.publicList({ limit: 6 }), []));
+  return <main className="min-h-screen bg-slate-50">
+    <HomeHero resource={jobs} />
+    <section id="featured-jobs" aria-labelledby="featured-heading" className="rh-featured-jobs mx-auto max-w-7xl scroll-mt-24 px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-5"><div><span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-600 shadow-sm"><Sparkles className="h-3 w-3" aria-hidden="true" />Cơ hội để bứt phá</span><h2 id="featured-heading" className="mt-4 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Việc Làm IT Tiêu Biểu<span className="text-blue-600">.</span></h2><p className="mt-2 text-sm text-slate-500">Một công việc phù hợp có thể mở ra cả hành trình mới.</p></div><Link to="/jobs" className="btn-secondary text-sm">Xem tất cả<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></div>
+      <Resource resource={jobs} empty={!jobs.data?.items.length} emptyMessage="Chưa có tin tuyển dụng đang mở."><div className="grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3">{jobs.data?.items.map(job => <PublicJobCard compact key={job._id} job={job} />)}</div></Resource>
+    </section>
+    <section className="border-y border-slate-200/70 bg-white py-12 sm:py-16"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="mx-auto max-w-2xl text-center"><span className="text-xs font-bold uppercase tracking-widest text-indigo-600">Sẵn sàng cho bước tiếp theo</span><h2 className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Tại Sao Lập Trình Viên Chọn RecruiHub?</h2><p className="mt-3 text-sm leading-6 text-slate-500">Tập trung vào cơ hội. RecruiHub giúp bạn kết nối từng bước trên hành trình tìm việc.</p></div><div className="mt-9 grid gap-5 sm:grid-cols-3">{[[Search, '01', 'Tìm đúng hướng đi', 'Khám phá công việc theo kỹ năng, địa điểm và hình thức làm việc phù hợp với bạn.', 'bg-blue-50 text-blue-600'], [FileText, '02', 'Hồ sơ luôn sẵn sàng', 'Hoàn thiện hồ sơ, đính kèm CV từ máy tính và chọn CV khi ứng tuyển.', 'bg-indigo-50 text-indigo-600'], [TrendingUp, '03', 'Chủ động từng bước', 'Xem trạng thái, lịch sử ứng tuyển và quản lý các hồ sơ đã gửi trong bảng điều khiển.', 'bg-emerald-50 text-emerald-600']].map(([Icon, step, title, text, color]) => <article key={step} className="group rounded-3xl border border-slate-200 bg-slate-50/60 p-6 transition hover:-translate-y-1 hover:border-blue-200 hover:bg-white hover:shadow-lg hover:shadow-blue-900/5"><div className="flex items-center justify-between"><span className={`rounded-2xl p-3 ${color}`}><Icon className="h-6 w-6" aria-hidden="true" /></span><span className="text-3xl font-extrabold text-slate-200">{step}</span></div><h3 className="mt-5 text-base font-bold text-slate-900">{title}</h3><p className="mt-2 text-sm leading-7 text-slate-500">{text}</p></article>)}</div></div></section>
+    <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8"><div className="relative overflow-hidden rounded-3xl border border-blue-500 bg-gradient-to-br from-blue-700 via-indigo-700 to-indigo-900 p-7 text-white shadow-xl shadow-indigo-900/10 sm:p-10"><div aria-hidden="true" className="absolute -right-12 -top-24 h-72 w-72 rounded-full border-[40px] border-white/5" /><div className="relative flex flex-wrap items-center justify-between gap-6"><div className="max-w-xl"><p className="mb-3 flex items-center gap-2 text-xs font-semibold text-blue-200"><BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />Dành cho nhà tuyển dụng</p><h2 className="text-2xl font-extrabold leading-snug tracking-tight sm:text-3xl">Đội ngũ xuất sắc bắt đầu<br className="hidden sm:block" /> từ một kết nối đúng.</h2><p className="mt-3 text-sm leading-6 text-blue-200">Giới thiệu cơ hội của doanh nghiệp và quản lý ứng viên trong cùng một bảng điều khiển.</p></div><Link to="/recruiter/jobs/create" className="inline-flex items-center gap-3 rounded-xl border border-white bg-white px-6 py-3.5 text-sm font-bold text-indigo-700 shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-50">Đăng Tin Tuyển Dụng<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></div></div></section>
+  </main>;
+}

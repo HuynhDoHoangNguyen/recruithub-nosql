@@ -1,6 +1,6 @@
 # TV1 UC06 — Job Search, Filter & Pagination
 
-**Ngày:** 2026-10-24  
+**Ngày:** 2026-10-24
 **Phạm vi:** Public Job Listing (`GET /api/v1/jobs`) và frontend `/jobs`. Chỉ truy vấn dữ liệu Job; không sửa Job creation, update, lifecycle, schema, data, index hay TV2 workflows.
 
 ## Kết quả dữ liệu đã xác minh

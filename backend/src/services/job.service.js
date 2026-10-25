@@ -1,12 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { JOB_LOCATIONS, WORK_MODES, SENIORITIES, EMPLOYMENT_TYPES } from '../constants/job-catalog.constants.js';
 import { jobDocumentSchema } from '../schemas/job.schema.js';
 import { companyDocumentSchema } from '../schemas/company.schema.js';
 import { ApiError } from '../middleware/job-application.middleware.js';
 import { descendingSort, ownedJob, parseStored, publicJobDto, recruiterScope, requireDocument, runtimeProvenance } from './job-application-scope.service.js';
 import { normalizeSkill } from '../utils/normalization.utils.js';
+import { companyLogoUrl } from '../schemas/upload.schema.js';
 
 const publicFilterKey = query => createHash('sha256').update(JSON.stringify({
-  q: query.q.toLocaleLowerCase(), industry: query.industry.toLocaleLowerCase(), seniority: query.seniority || '', skills: query.skills,
+  q: query.q.toLocaleLowerCase(), industry: query.industry.toLocaleLowerCase(), seniority: query.seniority || '', skills: query.skills, location: query.location || '', work_mode: query.work_mode || '',
 })).digest('hex');
 const encodePublicCursor = (id, filterKey) => Buffer.from(JSON.stringify({ version: 1, id, filterKey })).toString('base64url');
 
@@ -22,9 +24,11 @@ function decodePublicCursor(bookmark, filterKey) {
 }
 
 function matchesPublicFilters(job, query) {
-  if (job.status !== 'OPEN') return false;
+  if (job.status !== 'OPEN' || job.deleted_at) return false;
   if (query.industry && job.industry.toLocaleLowerCase() !== query.industry.toLocaleLowerCase()) return false;
   if (query.seniority && job.seniority !== query.seniority) return false;
+  if (query.location && job.location !== query.location) return false;
+  if (query.work_mode && job.work_mode !== query.work_mode) return false;
   const skills = [...(job.required_skills || []), ...(job.optional_skills || [])].map(normalizeSkill);
   if (query.skills.some(skill => !skills.includes(skill))) return false;
   const term = query.q.toLocaleLowerCase();
@@ -48,6 +52,14 @@ export function validateWrite(schema, value, { allowLegacyUnavailable = false } 
 
 export class JobService {
   constructor(repository, now = () => new Date()) { this.repo = repository; this.now = now; }
+  async context(user) {
+    const recruiter = await recruiterScope(this.repo, user);
+    const company = await requireDocument(this.repo, recruiter.company_id, 'company');
+    const department = await requireDocument(this.repo, recruiter.department_id, 'department');
+    return { recruiter_id: recruiter._id, email: user.email,
+      company: { _id: company._id, name: company.name, industry: company.industry },
+      department: { _id: department._id, name: department.name } };
+  }
   checkOpen(job) {
     if (job.status === 'OPEN' && (!job.deadline || !Number.isFinite(Date.parse(job.deadline)) || Date.parse(job.deadline) <= this.now().getTime())) {
       throw new ApiError(400, 'INVALID_DEADLINE', 'Hạn nộp hồ sơ phải sau thời điểm hiện tại.', [{ field: 'deadline', message: 'Chọn hạn nộp trong tương lai.' }]);
@@ -67,16 +79,20 @@ export class JobService {
   async list(user, query) {
     const recruiter = await recruiterScope(this.repo, user);
     const fields = ['type', 'recruiter_id', ...(query.status ? ['status'] : []), 'updated_at'];
-    return this.repo.find({ type: 'job', recruiter_id: recruiter._id, ...(query.status ? { status: query.status } : {}) },
+    const page = await this.repo.find({ type: 'job', recruiter_id: recruiter._id, deleted_at: { $exists: false }, ...(query.status ? { status: query.status } : {}) },
       { ...query, index: query.status ? 'recruiter_jobs_status' : 'recruiter_jobs', sort: descendingSort(fields) });
+    const company = await requireDocument(this.repo, recruiter.company_id, 'company');
+    return { ...page, items: page.items.map(job => ({ ...job, location_label: JOB_LOCATIONS.find(option => option.value === job.location)?.label,
+      work_mode_label: WORK_MODES.find(option => option.value === job.work_mode)?.label, company_name: company.name, company_logo_url: companyLogoUrl(company) })) };
   }
   async detail(user, id) { return (await ownedJob(this.repo, user, id)).job; }
   async stats(user) { return this.repo.stats((await recruiterScope(this.repo, user))._id); }
   async update(user, id, payload, statusOnly = false) {
     const { job } = await ownedJob(this.repo, user, id);
+    if (job.deleted_at) throw new ApiError(409, 'JOB_DELETED', 'Tin đã xóa không thể sửa hoặc mở lại.');
     if (job._rev !== payload.expected_rev) throw new ApiError(409, 'CONFLICT', 'Tin tuyển dụng đã thay đổi. Vui lòng tải lại.');
-    if (job.status === 'CLOSED') throw new ApiError(409, 'JOB_CLOSED', 'Tin đã đóng không thể sửa hoặc mở lại.');
-    if (statusOnly && !((job.status === 'DRAFT' && ['OPEN', 'CLOSED'].includes(payload.status)) || (job.status === 'OPEN' && payload.status === 'CLOSED'))) {
+    if (job.status === 'CLOSED' && !(statusOnly && payload.status === 'OPEN')) throw new ApiError(409, 'JOB_CLOSED', 'Tin đã đóng chỉ được mở lại bằng hành động mở tin.');
+    if (statusOnly && !((job.status === 'DRAFT' && ['OPEN', 'CLOSED'].includes(payload.status)) || (job.status === 'OPEN' && payload.status === 'CLOSED') || (job.status === 'CLOSED' && payload.status === 'OPEN'))) {
       throw new ApiError(400, 'INVALID_JOB_STATUS', 'Thay đổi trạng thái tin không hợp lệ.');
     }
     const { expected_rev, ...changes } = payload;
@@ -98,7 +114,40 @@ export class JobService {
       throw error;
     }
   }
+  async remove(user, id, payload) {
+    const { job } = await ownedJob(this.repo, user, id);
+    if (job.deleted_at) return { _id: id, _rev: job._rev, deleted: true };
+    if (job._rev !== payload.expected_rev) throw new ApiError(409, 'CONFLICT', 'Tin đã thay đổi. Vui lòng tải lại trước khi xóa.');
+    const timestamp = new Date(Math.max(this.now().getTime(), Date.parse(job.updated_at) + 1)).toISOString();
+    const options = { allowLegacyUnavailable: job.provenance?.classification === 'unavailable' };
+    const document = validateWrite(jobDocumentSchema, { ...job, status: 'CLOSED', deleted_at: timestamp, updated_at: timestamp }, options);
+    const saved = await this.repo.put(document, options);
+    return { _id: saved._id, _rev: saved._rev, deleted: true };
+  }
   async publicList(query) {
+    query = { q: '', industry: '', skills: [], limit: 20, ...query };
+    const enrich = async items => {
+      const companies = new Map(await Promise.all([...new Set(items.map(job => job.company_id))].map(async id => [id, await this.repo.get(id)])));
+      return items.map(job => ({ ...publicJobDto(job),
+        ...(companies.get(job.company_id)?.type === 'company' ? { company_name: companies.get(job.company_id).name, company_logo_url: companyLogoUrl(companies.get(job.company_id)) } : {}) }));
+    };
+    // Preserve the accepted newest-first listing, including historical jobs
+    // without published_at. Filtered searches retain dev's literal search/cursor.
+    if (!query.q && !query.industry && !query.seniority && !query.location && !query.work_mode && !query.skills.length) {
+      const filterKey = publicFilterKey(query);
+      let bookmark;
+      if (query.bookmark) {
+        try {
+          const cursor = JSON.parse(Buffer.from(query.bookmark, 'base64url').toString('utf8'));
+          if (cursor.version !== 1 || cursor.filterKey !== filterKey || typeof cursor.bookmark !== 'string' || !cursor.bookmark) throw new Error();
+          bookmark = cursor.bookmark;
+        } catch { throw new ApiError(400, 'INVALID_BOOKMARK', 'Con trỏ trang không hợp lệ hoặc không khớp bộ lọc.'); }
+      }
+      const page = await this.repo.find({ type: 'job', status: 'OPEN', created_at: { $gte: '' }, _id: { $gte: '' } },
+        { ...query, bookmark, index: 'public_jobs_created_v2', sort: descendingSort(['type', 'status', 'created_at', '_id']) });
+      return { ...page, bookmark: page.has_more ? Buffer.from(JSON.stringify({ version: 1, bookmark: page.bookmark, filterKey })).toString('base64url') : undefined,
+        items: await enrich(page.items) };
+    }
     if (typeof this.repo.scanPublicJobs !== 'function') throw new ApiError(503, 'PUBLIC_SEARCH_UNAVAILABLE', 'Kho việc làm chưa hỗ trợ tìm kiếm theo hợp đồng.');
     const filterKey = publicFilterKey(query);
     let afterId = decodePublicCursor(query.bookmark, filterKey);
@@ -117,13 +166,29 @@ export class JobService {
     const hasMore = items.length > query.limit;
     const pageItems = items.slice(0, query.limit);
     return {
-      items: pageItems.map(publicJobDto),
+      items: await enrich(pageItems),
       has_more: hasMore,
       ...(hasMore && pageItems.length ? { bookmark: encodePublicCursor(pageItems.at(-1)._id, filterKey) } : {}),
     };
   }
+  async metadata() {
+    const skills = new Set(); const industries = new Set();
+    let afterId;
+    while (true) {
+      const batch = await this.repo.scanPublicJobs({ afterId, limit: 100 });
+      for (const job of batch) if (job.status === 'OPEN' && !job.deleted_at) {
+        if (job.industry) industries.add(job.industry);
+        for (const skill of [...(job.required_skills || []), ...(job.optional_skills || [])]) skills.add(normalizeSkill(skill));
+      }
+      if (batch.length < 100) break;
+      afterId = batch.at(-1)._id;
+    }
+    return { locations: JOB_LOCATIONS, work_modes: WORK_MODES, employment_types: EMPLOYMENT_TYPES, seniorities: SENIORITIES,
+      skills: [...skills].sort(), industries: [...industries].sort(), skills_operator: 'AND' };
+  }
   async publicDetail(id) {
     const job = parseStored(jobDocumentSchema, await requireDocument(this.repo, id, 'job'));
+
     if (job.status !== 'OPEN') throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy tin tuyển dụng công khai.');
 
     let companyDocument = null;

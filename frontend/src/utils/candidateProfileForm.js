@@ -1,5 +1,5 @@
-const PROFILE_FIELDS = ['full_name', 'role', 'industry', 'seniority', 'years_experience', 'summary'];
-const COLLECTION_FIELDS = ['skills', 'education', 'experience', 'projects'];
+export const PROFILE_FIELDS = ['full_name', 'role', 'industry', 'seniority', 'years_experience', 'summary', 'phone', 'location'];
+export const COLLECTION_FIELDS = ['skills', 'education', 'experience', 'projects', 'languages'];
 
 const equalJson = (left, right) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 
@@ -45,6 +45,11 @@ export function candidateProfilePatch(profile, baseline) {
   for (const field of COLLECTION_FIELDS) {
     if (!equalJson(profile[field] || [], baseline[field] || [])) patch[field] = profile[field] || [];
   }
+  let filesChanged = false;
+  for (const [field, input] of [['resume_file', 'resume_file_id'], ['avatar', 'avatar_asset_id']]) {
+    if ((profile[field]?.asset_id || null) !== (baseline[field]?.asset_id || null)) { patch[input] = profile[field]?.asset_id || null; filesChanged = true; }
+  }
+  if (filesChanged && Object.keys(patch.profile).every(key => equalJson(profile.profile[key], baseline.profile[key])) && !COLLECTION_FIELDS.some(key => key in patch)) delete patch.profile;
   return patch;
 }
 

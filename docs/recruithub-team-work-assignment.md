@@ -110,8 +110,7 @@ Mọi endpoint đều trả về JSON với cấu trúc chuẩn:
 
 - **Use Cases phụ trách:**
   - `UC01`: Đăng ký tài khoản (`CANDIDATE`, `RECRUITER`).
-  - `UC02`: Đăng nhập / Đăng xuất, cấp phát JWT token.
-  - `UC03`: Quản lý hồ sơ cá nhân ứng viên (kỹ năng, kinh nghiệm, học vấn).
+  - `UC02`: Đăng nhập / Đăng xuất, cấp phát JWT Quản lý hồ sơ cá nhân ứng viên (kỹ năng, kinh nghiệm, học vấn).
   - `UC05` & `UC06`: Xem và lọc danh sách tin tuyển dụng công khai (Lọc theo kỹ năng, địa điểm, mức lương, phân trang).
   - `UC07`: Xem chi tiết tin tuyển dụng (`/jobs/:id`).
   - `UC23` & `UC24`: Quản lý người dùng, khóa/mở khóa tài khoản (Admin).
