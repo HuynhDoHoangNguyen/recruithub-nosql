@@ -20,6 +20,11 @@ describe('role-aware post-login navigation', () => {
     expect(postLoginPath('CANDIDATE', '/recruiter/profile')).toBe('/user/dashboard');
   });
 
+  it('returns a candidate to a valid public Job detail after login', () => {
+    expect(postLoginPath('CANDIDATE', '/jobs/job%3Acms%3AJ_000001?apply=1'))
+      .toBe('/jobs/job%3Acms%3AJ_000001?apply=1');
+  });
+
   it.each([
     ['CANDIDATE', '/admin/dashboard'],
     ['RECRUITER', '/profile'],
@@ -27,6 +32,7 @@ describe('role-aware post-login navigation', () => {
     ['ADMIN', '//evil.invalid/path'],
     ['CANDIDATE', 'https://evil.invalid/path'],
     ['CANDIDATE', '/\\evil.invalid/path'],
+    ['CANDIDATE', '/jobs/not-a-job-id'],
   ])('rejects forbidden or external destination %s %s', (role, destination) => {
     expect(postLoginPath(role, destination)).toBe(dashboardPathForRole(role));
   });

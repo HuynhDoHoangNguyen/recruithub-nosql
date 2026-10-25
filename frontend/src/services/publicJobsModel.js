@@ -9,6 +9,7 @@ export function normalizeJob(job) {
     location_label: job.location_label, work_mode_label: job.work_mode_label, location: job.location, work_mode: job.work_mode, requirements: job.requirements,
     description: job.description,
     responsibilities: job.responsibilities || [],
+    requirements: job.requirements || {},
     requiredSkills: job.requiredSkills || job.required_skills || [],
     optionalSkills: job.optionalSkills || job.optional_skills || [],
     deadline: job.deadline || null,

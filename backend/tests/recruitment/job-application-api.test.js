@@ -99,6 +99,36 @@ test('Public Job search is literal, OPEN-only, filterable, and uses stable curso
   assert.equal(f.repo.writes.length, 1);
 });
 
+test('Public Job detail exposes only OPEN jobs and returns a safe optional Company DTO', async t => {
+  const f = await startFixture(t);
+  const publicDetail = await f.request('GET', `/jobs/${encodeURIComponent(f.job._id)}`, undefined, null);
+  assert.equal(publicDetail.status, 200);
+  assert.equal(publicDetail.body.data.status, 'OPEN');
+  assert.deepEqual(publicDetail.body.data.company, { name: f.company.name, industry: f.company.industry });
+  for (const field of ['_rev', 'provenance', 'company_id', 'department_id', 'recruiter_id']) {
+    assert.equal(Object.hasOwn(publicDetail.body.data, field), false);
+  }
+  for (const field of ['_id', '_rev', 'provenance', 'created_at', 'updated_at']) {
+    assert.equal(Object.hasOwn(publicDetail.body.data.company, field), false);
+  }
+
+  const closed = { ...structuredClone(f.job), _id: 'job:closed', status: 'CLOSED' };
+  const draft = { ...structuredClone(f.job), _id: 'job:draft', status: 'DRAFT', deadline: undefined, published_at: undefined };
+  f.repo.docs.set(closed._id, { ...closed, _rev: '1-fixture' });
+  f.repo.docs.set(draft._id, { ...draft, _rev: '1-fixture' });
+  assert.equal((await f.request('GET', '/jobs/job:closed', undefined, null)).status, 404);
+  assert.equal((await f.request('GET', '/jobs/job:draft', undefined, null)).status, 404);
+  assert.equal((await f.request('GET', '/jobs/job:missing', undefined, null)).status, 404);
+  assert.equal((await f.request('GET', '/jobs/not-a-job-id', undefined, null)).status, 400);
+
+  f.repo.docs.get(f.job._id).company_id = 'company:missing';
+  const withoutCompany = await f.request('GET', `/jobs/${encodeURIComponent(f.job._id)}`, undefined, null);
+  assert.equal(withoutCompany.status, 200);
+  assert.equal(withoutCompany.body.data.company, null);
+  assert.equal(Object.hasOwn(withoutCompany.body.data, 'company_name'), false);
+  assert.equal(f.repo.writes.length, 0);
+});
+
 test('Locked Recruiter and Recruiter with incomplete organization references cannot use Job management', async t => {
   const f = await startFixture(t);
   f.repo.docs.get(f.users.recruiter._id).account_status = 'LOCKED';
@@ -301,14 +331,14 @@ test('Scoring hook failure preserves accepted application and reports pending re
   assert.ok(await f.repo.get(response.body.data._id));
 });
 
-test('Closing a job preserves existing applications, prevents new candidates and hides unpublished drafts', async t => {
+test('Closing a job preserves applications and hides closed Jobs from the public detail API', async t => {
   const f = await startFixture(t); const app = (await apply(f)).body.data;
   const job = await f.repo.get(f.job._id);
   const closed = await f.request('PATCH', `/jobs/${job._id}/status`, { status: 'CLOSED', expected_rev: job._rev }, 'recruiter');
   assert.equal(closed.status, 200); assert.deepEqual((await f.repo.get(app._id)).stage_history.length, 1);
   assert.equal((await f.request('POST', '/applications', { job_id: job._id, submission }, 'otherCandidate')).status, 400);
   assert.equal((await f.request('GET', `/applications/${app._id}`)).status, 200);
-  assert.equal((await f.request('GET', `/jobs/${job._id}`, undefined, null)).status, 200);
+  assert.equal((await f.request('GET', `/jobs/${job._id}`, undefined, null)).status, 404);
   const draft = await f.request('POST', '/jobs', { ...jobInput, status: 'DRAFT', deadline: undefined }, 'recruiter');
   assert.equal(draft.status, 201);
   assert.equal((await f.request('GET', `/jobs/${draft.body.data._id}`, undefined, null)).status, 404);

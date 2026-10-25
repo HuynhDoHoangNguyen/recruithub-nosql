@@ -4,8 +4,12 @@ export const removeAccessToken = () => localStorage.removeItem('accessToken');
 
 export const logout = () => {
   removeAccessToken();
-  fetch('https://job-application-portal-wrao.onrender.com/api/auth/logout', {
-    method: 'POST',
-    credentials: 'include',
-  });
+  try {
+    fetch('https://job-application-portal-wrao.onrender.com/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(() => {});
+  } catch {
+    // Ignore offline errors during testing
+  }
 };
