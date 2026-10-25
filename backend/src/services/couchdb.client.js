@@ -121,6 +121,36 @@ export class CouchDbClient {
     );
   }
 
+  async queryView(designName, viewName, options = {}) {
+    const validName = /^[a-z][a-z0-9_-]*$/;
+    if (!validName.test(designName) || !validName.test(viewName)) {
+      throw new TypeError('CouchDB design and view names are invalid.');
+    }
+    if (!isObject(options)) throw new TypeError('CouchDB view options must be an object.');
+    const allowed = new Set(['key', 'keys', 'startkey', 'endkey', 'group', 'group_level', 'reduce', 'descending']);
+    for (const key of Object.keys(options)) {
+      if (!allowed.has(key)) throw new TypeError(`Unsupported CouchDB view option: ${key}.`);
+    }
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(options)) {
+      if (value === undefined) continue;
+      if (['group', 'reduce', 'descending'].includes(key)) {
+        if (typeof value !== 'boolean') throw new TypeError(`${key} must be a boolean.`);
+        params.set(key, String(value));
+      } else if (key === 'group_level') {
+        if (!Number.isInteger(value) || value < 1) throw new TypeError('group_level must be a positive integer.');
+        params.set(key, String(value));
+      } else {
+        params.set(key, JSON.stringify(value));
+      }
+    }
+    const suffix = params.size ? `?${params}` : '';
+    return this.#request(
+      `/${encodePathSegment(this.config.database)}/_design/${encodePathSegment(designName)}/_view/${encodePathSegment(viewName)}${suffix}`,
+      { operation: 'query-view', databaseRequest: false },
+    );
+  }
+
   async listDocumentsByIdPrefix(prefix, { afterId, limit = 250 } = {}) {
     if (typeof prefix !== 'string' || !/^[a-z][a-z0-9_-]*:$/.test(prefix)) {
       throw new TypeError('Document ID prefix is invalid.');

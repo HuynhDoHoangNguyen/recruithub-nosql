@@ -1,6 +1,6 @@
 # Báo cáo tổng hợp TV1 — Toàn bộ hồ sơ giai đoạn
 
-Ngày cập nhật: 2026-10-24. Tài liệu này gom nguyên văn 16 báo cáo TV1 trước đây và bổ sung các báo cáo Phase C.1C, Auth UI/Recruiter Registration ở cuối. Các trạng thái trong phụ lục là trạng thái lịch sử tại thời điểm từng báo cáo; trạng thái tích hợp hiện tại là merge commit `260cf4a` trên `feature/identity-candidate-portal`. Nhánh `dev` hiện vẫn ở parent `91f8346`. Full backend suite chưa PASS; các subset test không thay thế kết quả full suite.
+Ngày cập nhật: 2026-10-25. Đây là bản đọc hợp nhất duy nhất cho hồ sơ TV1; nội dung đầy đủ của các RP UC/Auth và audit ba nhánh được đặt trong cùng tài liệu. Các trạng thái lịch sử giữ nguyên theo thời điểm từng báo cáo; trạng thái tích hợp hiện tại được ghi theo từng phần. Full backend suite chưa PASS; các subset test không thay thế kết quả full suite.
 
 Báo cáo TV1 + TV2 và hướng dẫn kiểm thử được chuyển sang [báo cáo tổng hợp TV2](../TV2/RP-TV2-consolidated.md#rp-tv1-tv2-merge-test-guide). Contract hiện hành: [TV1 Auth contract](../../shared/TV1_AUTH_MODULE_CONTRACT.md), [CouchDB Foundation guide](../../shared/COUCHDB_FOUNDATION_GUIDE.md).
 
@@ -23,7 +23,13 @@ Báo cáo TV1 + TV2 và hướng dẫn kiểm thử được chuyển sang [báo
 15. [RP-TV1-technical-decision-freeze.md](#rp-tv1-technical-decision-freeze)
 16. [RP-TV1-technical-decision-register.md](#rp-tv1-technical-decision-register)
 17. [RP-TV1-phase-c1c-recruiter-ownership-integration.md](#rp-tv1-phase-c1c-recruiter-ownership-integration)
-18. [RP-TV1-auth-recruiter-registration-login-ui.md](#rp-tv1-auth-recruiter-registration-login-ui)
+18. [Auth & Recruiter Registration](#auth-recruiter-full-report)
+19. [TV1 UC06 — Job Search, Filter & Pagination](#uc06-full-report)
+20. [TV1 UC07 — Job Detail](#uc07-full-report)
+21. [TV1 UC23 — Admin User List](#uc23-full-report)
+22. [TV1 UC24 — Admin Lock/Unlock Users](#uc24-full-report)
+23. [TV1 UC25 — CouchDB MapReduce Statistics](#uc25-full-report)
+24. [Kiểm toán công việc TV1 trên ba nhánh](#three-branch-audit)
 
 
 <a id="rp-tv1-couchdb-client-repository"></a>
@@ -2360,7 +2366,7 @@ TV1 ghi nhận quy tắc trên là đề xuất tích hợp dựa theo source TV
 
 ## RecruiHub NoSQL — TV1 Auth & Recruiter Registration UI/UX
 
-_Source: RP-TV1-auth-recruiter-registration-login-ui.md. Báo cáo gốc được lưu riêng; phần dưới tóm lược vòng đời chức năng và kết quả kiểm tra._
+_Bản tóm lược; toàn văn báo cáo Auth & Recruiter Registration được gộp ở phụ lục phía dưới._
 
 **Ngày:** 2026-10-24
 **Phạm vi:** UI đăng ký/đăng nhập, lựa chọn Candidate/Recruiter và tổng quan đường đi tới khu vực Recruiter/Job.
@@ -2413,7 +2419,7 @@ TV1/TV2 cần thống nhất cách Job/Application đọc Company/Department t�
 
 ### Báo cáo gốc và files chính
 
-Báo cáo đầy đủ: [RP-TV1-auth-recruiter-registration-login-ui.md](RP-TV1-auth-recruiter-registration-login-ui.md). Files UI chính: `frontend/src/components/auth/AuthLayout.jsx`, `frontend/src/pages/Login.jsx`, `frontend/src/pages/Register.jsx`, `frontend/src/components/auth/RecruiterRegistrationFields.jsx`, `frontend/src/utils/recruiterRegistration.js` và hai test file Auth liên quan.
+Báo cáo đầy đủ: [RP-TV1-auth-recruiter-registration-login-ui.md](#auth-recruiter-full-report). Files UI chính: `frontend/src/components/auth/AuthLayout.jsx`, `frontend/src/pages/Login.jsx`, `frontend/src/pages/Register.jsx`, `frontend/src/components/auth/RecruiterRegistrationFields.jsx`, `frontend/src/utils/recruiterRegistration.js` và hai test file Auth liên quan.
 
 ---
 
@@ -2421,10 +2427,820 @@ Báo cáo đầy đủ: [RP-TV1-auth-recruiter-registration-login-ui.md](RP-TV1-
 
 Đã triển khai tìm kiếm và lọc Public Job ở Backend + Frontend. Xác minh schema và mẫu CouchDB: skills là mảng; không có location/salary; chỉ có `_all_docs`, không tạo index. Backend dùng ID range `job:` theo lô, trả cursor ổn định theo `_id`; UI theo bố cục search phía trên, filter sidebar desktop/mobile, URL restore, debounce, reset, loading/empty/error/retry. Bộ lọc location/salary không hiển thị như tính năng khả dụng; không trả count tổng giả. `recruitment_db` chỉ được đọc và giữ 25.750 documents.
 
-Chi tiết fields, API, query strategy, giới hạn, tests và hướng dẫn tự kiểm thử: [RP-TV1-UC06-job-search-filter-pagination.md](RP-TV1-UC06-job-search-filter-pagination.md).
+Chi tiết fields, API, query strategy, giới hạn, tests và hướng dẫn tự kiểm thử: [RP-TV1-UC06-job-search-filter-pagination.md](#uc06-full-report).
 
 ---
 
 ### Cập nhật UI template (2026-10-25)
 
-Tinh chỉnh `/jobs` theo ảnh tham khảo: sidebar tìm kiếm bên trái, panel kết quả bên phải, Job cards ngang có metadata/icon/skill chips, màu và khoảng cách thống nhất, phân trang cursor ở cuối panel; tablet/mobile giữ search dễ truy cập và bộ lọc dạng panel. Không thêm location/salary filters, relevance sort hoặc tổng count giả vì schema/API hiện chưa hỗ trợ. Frontend production build PASS; báo cáo chi tiết và giới hạn: [RP-TV1-UC06-job-search-filter-pagination.md](RP-TV1-UC06-job-search-filter-pagination.md).
+Tinh chỉnh `/jobs` theo ảnh tham khảo: sidebar tìm kiếm bên trái, panel kết quả bên phải, Job cards ngang có metadata/icon/skill chips, màu và khoảng cách thống nhất, phân trang cursor ở cuối panel; tablet/mobile giữ search dễ truy cập và bộ lọc dạng panel. Không thêm location/salary filters, relevance sort hoặc tổng count giả vì schema/API hiện chưa hỗ trợ. Frontend production build PASS; báo cáo chi tiết và giới hạn: [RP-TV1-UC06-job-search-filter-pagination.md](#uc06-full-report).
+
+---
+
+<a id="rp-tv1-uc23-admin-user-list"></a>
+
+## TV1 / UC23 — Admin User List
+
+Trạng thái UC23: **PASS** theo báo cáo [RP-TV1-UC23-admin-user-list.md](#uc23-full-report). Màn hình danh sách chỉ đọc có tìm kiếm email debounce, lọc vai trò/trạng thái, cursor pagination, xem chi tiết và trạng thái loading/empty/error. Endpoint giới hạn ADMIN và trả safe DTO. Không triển khai UC24/UC25. Backend tests 9/9, frontend test 3/3, build PASS; lint 0 lỗi và 2 cảnh báo cũ. Không truy vấn/ghi CouchDB. Browser E2E chưa chạy; full backend suite có các lỗi data/release và không được chạy lại.
+
+## TV1 / UC24 — Admin Lock/Unlock Users
+
+Trạng thái UC24: **PASS kiểm thử tập trung** theo [RP-TV1-UC24-lock-unlock-users.md](#uc24-full-report). Tích hợp PATCH status đã tồn tại với UI confirmation, ETag/If-Match, loading, success/error, cập nhật danh sách/chi tiết; không hiện action cho ADMIN/RESET_REQUIRED. Backend 21/21, frontend 9/9, build PASS, lint 0 lỗi và 2 cảnh báo cũ. Không kết nối/ghi CouchDB; không chạy full suite. JWT 15 phút không bị revoke/blacklist; token cũ chưa hết hạn có thể dùng lại sau unlock. Browser E2E còn lại.
+
+## TV1 / UC25 - CouchDB MapReduce Statistics
+
+UC25 implements Admin statistics through CouchDB MapReduce Views: User counts by role/status, total Users/Candidates, and Jobs by status. The backend makes read-only view queries and reuses TV2's composite-key Job view from source. The dashboard labels the MapReduce source and provides KPI cards, charts, loading/error states, and retry; missing views never trigger a document scan or fabricated counts. Test, lint, and build results are in [RP-TV1-UC25-mapreduce-statistics.md](#uc25-full-report). `recruitment_db` currently has no Design Documents or UC25 view. As a demo-only integration check, `_design/tv1_admin_statistics` was installed on `recruithub_auth_demo`; Admin login and `/api/v1/admin/stats` returned HTTP 200 with MapReduce aggregates. Demo document count changed from 47 to 48 for the design document only. Current-source backend/UI verification runs at `http://127.0.0.1:5007` / `http://127.0.0.1:5181` with process-scoped demo DB configuration; older processes were left untouched. `recruitment_db` remained at 25,750 documents and received no writes. Production requires separately approved view installation.
+
+Cross-branch implementation, test, data-source and Git provenance audit is included in full in [the three-branch audit section](#three-branch-audit). It found UC23–UC25 changes uncommitted on `feature/admin-management`; `feature/tv1-admin-management` was not present among local/remote refs.
+
+
+---
+
+# Ph? l?c: To?n v?n c?c b?o c?o Use Case TV1
+
+C?c b?o c?o UC ri?ng d??i ??y ???c ch?p nguy?n v?n ?? b?n t?ng h?p c? th? ??c ??c l?p. File ngu?n ri?ng v?n ???c gi? nguy?n. UC07 ???c l?y t? commit `5107bd2` c?a `feature/job-listing-and-detail-pages`, do file n?y ch?a c? trong working tree c?a nh?nh hi?n t?i.
+
+
+---
+
+<a id="uc06-full-report"></a>
+
+<!-- Source: docs/reports/TV1/RP-TV1-UC06-job-search-filter-pagination.md -->
+
+# TV1 UC06 — Job Search, Filter & Pagination
+
+**Ngày:** 2026-10-24
+**Phạm vi:** Public Job Listing (`GET /api/v1/jobs`) và frontend `/jobs`. Chỉ truy vấn dữ liệu Job; không sửa Job creation, update, lifecycle, schema, data, index hay TV2 workflows.
+
+## Kết quả dữ liệu đã xác minh
+
+- `jobDocumentSchema` cho phép `required_skills` và `optional_skills` dưới dạng mảng chuỗi.
+- Job có `title`, `industry`, `description`, `responsibilities`, `seniority`, `status`, `deadline` và các timestamp.
+- Không có `location` hoặc salary field trong schema strict; CouchDB sample được đọc cũng không có hai trường này. UI vì vậy không tạo filter giả cho địa điểm/lương.
+- Request chỉ đọc CouchDB cho thấy `recruitment_db` có 25.750 documents; các mẫu OPEN có skills dạng array. Chỉ mục CouchDB hiện có là `_all_docs`; không có `public_jobs` Mango index. Không tạo index/view và không ghi database.
+
+## Query strategy và giới hạn
+
+Backend dùng built-in `_all_docs` ID range từ `job:` tới `job:\ufff0`, `include_docs=true`, tối đa 100 rows mỗi request. ID range giới hạn việc đọc vào không gian ID Job; service tiếp tục kiểm tra `type === "job"`, chỉ giữ tin `OPEN`, lọc và trả tối đa page size. Cursor opaque Base64URL chứa ID cuối trang và hash filter, nên trang tiếp theo giữ bộ lọc và không trùng/skip do timestamp giống nhau.
+
+Thứ tự là `_id` tăng dần, ổn định khi nhiều tin có cùng timestamp. Không sắp xếp “mới nhất” vì chưa có index phù hợp và không tạo index khi chưa được duyệt. Bộ lọc hiếm kết quả có thể phải duyệt hết dải Job hiện tại (2.500 Job trong dataset), nhưng không tải 25.750 documents hoặc toàn bộ kết quả sang frontend. Đây là fallback tương thích; cần đánh giá lại khi Job collection tăng đáng kể.
+
+Không trả tổng số kết quả vì không tính count chính xác trong truy vấn phân trang. Giao diện chỉ báo số mục trên trang hiện tại.
+
+## API hiện hành
+
+`GET /api/v1/jobs?q=&skills=&industry=&seniority=&limit=&bookmark=`
+
+- `q`: tối đa 120 ký tự; tìm literal, không chạy regex, trên title, industry, description, responsibilities và required/optional skills.
+- `skills`: danh sách tối đa 8 kỹ năng, cách nhau bởi dấu phẩy; so khớp chuẩn hóa chính xác, tất cả kỹ năng phải khớp.
+- `industry`: so khớp chính xác, không phân biệt hoa/thường.
+- `seniority`: `JUNIOR`, `MID`, `SENIOR`.
+- `limit`: mặc định 12, giới hạn 1–50.
+- `bookmark`: cursor được ràng buộc với bộ lọc; cursor sai hoặc dùng lại với filter khác trả 400.
+- Kết quả: `{items, has_more, bookmark?}`; chỉ DTO Job công khai, không bao gồm document nội bộ.
+- Query params không thuộc allowlist, gồm `location`/`salary`, bị Zod strict validation từ chối.
+
+Search và các filter được kết hợp theo AND; trong nhóm skills, mỗi skill phải có trong `required_skills` hoặc `optional_skills`.
+
+## Giao diện
+
+- Dùng bố cục tham khảo Recruitment SaaS: thanh tìm kiếm lớn phía trên, sidebar filter bên trái trên desktop, danh sách card bên phải.
+- Mobile giữ thanh tìm kiếm ở đầu trang; filter mở/đóng bằng nút, không chiếm toàn màn hình.
+- Skills nhập một hoặc nhiều giá trị bằng dấu phẩy; ngành nghề là giá trị text vì không có API facet/danh mục được duyệt; cấp độ dùng enum schema.
+- Không hiển thị bộ lọc hoặc ghi chú địa điểm/lương vì schema và dữ liệu hiện không hỗ trợ hai trường này.
+- Search debounce 350 ms, điều kiện lọc đồng bộ URL; refresh khôi phục điều kiện. Đổi filter về trang đầu, reset xóa mọi điều kiện. AbortController và request sequence bỏ response cũ.
+- Có loading skeleton, empty state, error/retry và phân trang cursor. Không hiển thị count tổng giả.
+
+## Kiểm thử và xác nhận
+
+- Backend `node --test tests/recruitment/*.test.js`: **PASS 45/45**. Bao gồm search literal/rỗng, special characters, filters đơn/kết hợp, OPEN-only, cursor, sort ổn định, invalid query và UC05 listing/detail regression.
+- Frontend `npm.cmd test`: **PASS 61 Vitest + 7 Node tests** (chạy lại sau khi hoàn tất chỉnh sửa).
+- Frontend `npm.cmd run lint`: **PASS**, 0 errors; 2 cảnh báo `React` import cũ tại `App.jsx` và `Landing.jsx`.
+- Frontend `npm.cmd run build`: **PASS**.
+- Live read-only smoke gọi cùng `JobService.publicList()` trên `recruitment_db`: trả đúng 3 tin OPEN đầu tiên, cursor có trang kế tiếp; `doc_count` vẫn 25.750.
+- Không chạy full backend `npm test`: suite bao gồm legacy data/release tests dùng shared scratch artifacts; task chỉ cần suite Recruitment cô lập. Không có test nào ghi CouchDB.
+
+## Hướng dẫn tự kiểm thử UI
+
+1. Mở `/jobs`; nhập từ khóa như `analyst` hoặc `python` và quan sát kết quả sau khoảng 350 ms.
+2. Nhập `SQL, Python` vào Kỹ năng để yêu cầu tin có đủ cả hai; kết hợp ngành nghề và cấp độ.
+3. Dùng “Trang sau”, đổi cấp độ hoặc reset; trang phải trở lại 1 và không giữ cursor cũ.
+4. Refresh với query string đang có để xác nhận các điều kiện được khôi phục.
+5. Thử từ khóa không khớp để xem empty state; tắt API để xem error/retry.
+
+**Trạng thái:** UC06 search/filter/pagination được triển khai. Location/salary filter và newest-first sort chưa hỗ trợ do thiếu trường/index đã duyệt; không thay đổi schema hoặc database để bổ sung chúng.
+
+## Cập nhật UI theo template — 2026-10-25
+
+Sau phần triển khai UC06, tinh chỉnh lại `/jobs` theo ảnh template do người dùng cung cấp:
+
+- Desktop dùng khung nội dung tối đa 1200px, sidebar 260px bên trái và vùng kết quả bên phải; header trang giữ eyebrow, tiêu đề và mô tả.
+- Sidebar tìm kiếm là card riêng gồm từ khóa, kỹ năng, ngành nghề và cấp độ; ô tìm kiếm vẫn hiện phía trên trên tablet/mobile, bộ lọc mở/đóng bằng nút.
+- Vùng kết quả được gom vào một panel trắng có viền mảnh và shadow nhẹ. Bên trong có tiêu đề/count theo trang, danh sách Job cards nằm ngang, metadata có icon, skill chips và phân trang ở cuối panel.
+- Đồng bộ tông màu, radius, spacing và focus ring theo design tokens trong prompt. Loại bỏ hẳn ghi chú địa điểm/lương khỏi sidebar; chỉ giữ các control được schema/API hỗ trợ.
+- Location, salary và sort relevance vẫn không được dựng thành control hoạt động: Job schema/API hiện không hỗ trợ. Count chỉ mô tả số kết quả của trang hiện tại; pagination tiếp tục dùng cursor Previous/Next, không giả lập tổng trang.
+
+### Xác minh follow-up
+
+- Frontend `npm.cmd run build`: **PASS**.
+- `git diff --check` cho `JobList.jsx`: **PASS**; Git chỉ phát advisory LF-to-CRLF.
+- Không chạy lại test suite hoặc browser E2E cho thay đổi trình bày này. Các test UC06 ban đầu được ghi ở phần kiểm thử phía trên.
+- File giao diện: `frontend/src/pages/Jobs/JobList.jsx`.
+
+
+---
+
+<a id="uc23-full-report"></a>
+
+<!-- Source: docs/reports/TV1/RP-TV1-UC23-admin-user-list.md -->
+
+# RecruiHub NoSQL — TV1 / UC23: Admin User List
+
+- **Ngày:** 2026-10-25 (Asia/Saigon)
+- **Nhánh:** `feature/job-listing-and-detail-pages`
+- **Trạng thái:** **PASS cho UC23** — danh sách tài khoản Admin, lọc/tìm kiếm/phân trang và chi tiết chỉ đọc đã được triển khai, có kiểm thử tập trung.
+
+## Phạm vi
+
+Hoàn thiện màn hình Admin User List trên API Auth/Admin hiện có. UC23 bao gồm truy vấn danh sách, giới hạn quyền ADMIN, DTO an toàn, tìm kiếm/lọc/phân trang, trạng thái tải/rỗng/lỗi và xem chi tiết. Không đưa thao tác cập nhật trạng thái vào UI. UC24 (khóa/mở khóa) và UC25 (thống kê MapReduce) không thuộc phần triển khai này.
+
+## Thay đổi
+
+- Backend `GET /api/v1/admin/users` tiếp tục dùng middleware xác thực và `requireRole('ADMIN')`. Query strict chỉ nhận `limit` (1–50, mặc định 20), `cursor`, `search` (email prefix, tối đa 100 ký tự), role và trạng thái enum hợp lệ. Service chỉ trả DTO allowlist, không để lộ password hash, revision hay provenance.
+- Quét `_all_docs` theo ID User có thứ tự ổn định và trang đọc tối đa 250 tài liệu. Mỗi request giới hạn 5.000 User documents được quét; cursor giữ bộ lọc, page size và vị trí tiếp tục để UI lấy trang kế tiếp mà không bỏ qua kết quả. Cursor từ bộ lọc/page size khác bị từ chối.
+- Dashboard đồng bộ `search`, `role`, `status` với query string; debounce tìm kiếm 300 ms; gửi bộ lọc qua API; hỗ trợ cursor next/previous, refresh, retry, trạng thái loading/empty/error và xem chi tiết.
+- Loại bỏ nút gọi PATCH đổi trạng thái khỏi giao diện UC23. Các API status đã tồn tại không được mở rộng hay dùng bởi trang này; không thay đổi quyền/schema/dữ liệu.
+
+## Kiểm thử và xác minh
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Backend `node --test tests/auth-foundation/admin-user.service.test.js tests/auth-foundation/domain-routes.test.js` | **PASS 9/9** |
+| Frontend `vitest run tests/admin-user-list.test.jsx` | **PASS 3/3** |
+| Frontend production build | **PASS** |
+| Frontend lint | **PASS**, 0 lỗi; 2 cảnh báo React import không dùng tại `App.jsx` và `Landing.jsx` |
+| CouchDB | Không kết nối hoặc ghi; không tạo index/schema/document |
+| `recruitment_db` | Không truy vấn, giữ nguyên điều kiện read-only |
+| Browser E2E | Chưa chạy; kiểm thử UI dùng jsdom/Vitest |
+
+Full backend command bị chạy ngoài dự kiến khi thử lọc qua script `npm test`; suite data/release cũ báo các lỗi checksum/path đã được ghi nhận trước đây. Không chạy lại. Sau đó `git status` cho thấy không có thay đổi trong data/release; không có truy vấn hoặc ghi CouchDB trong lượt này.
+
+## Giới hạn
+
+Quét được giới hạn 5.000 User mỗi request để tránh một yêu cầu duy nhất đi qua toàn bộ danh sách. Với lọc hiếm hoặc không có kết quả, người dùng có thể cần chuyển tiếp qua cursor thêm trang; response không cam kết tổng số khớp chính xác. Tìm kiếm hỗ trợ prefix email đã chuẩn hóa, không phải full-text. Chưa xác minh bằng trình duyệt thật.
+
+## Files
+
+- Sửa `backend/src/services/admin-user.service.js` và kiểm thử service/routes.
+- Sửa `frontend/src/pages/Dashboard/AdminDashboard.jsx`; thêm `frontend/tests/admin-user-list.test.jsx`.
+- Tạo báo cáo này và bổ sung mục vào báo cáo tổng hợp TV1.
+- Không stage, commit, push, switch branch, reset hay stash.
+
+
+---
+
+<a id="uc24-full-report"></a>
+
+<!-- Source: docs/reports/TV1/RP-TV1-UC24-lock-unlock-users.md -->
+
+# RecruiHub NoSQL — TV1 / UC24: Admin Lock/Unlock Users
+
+- **Ngày:** 2026-10-25 (Asia/Saigon)
+- **Nhánh:** `feature/tv1-admin-management`, tạo từ `018a0d5`
+- **Trạng thái:** **PASS kiểm thử tập trung**; chưa browser E2E hoặc live CouchDB E2E.
+
+## Phạm vi và contract hiện có
+
+Rà soát source cho thấy API status đã tồn tại tại `PATCH /api/v1/admin/users/:id/status` (đường dẫn có `:id` giữa `users/` và `/status`). Router áp dụng middleware xác thực rồi `requireRole('ADMIN')` cho toàn bộ route Admin. Request body strict chỉ nhận `account_status: ACTIVE | LOCKED`.
+
+Service đọc User hiện tại, chỉ cho phép target `CANDIDATE` hoặc `RECRUITER`, yêu cầu revision qua `If-Match`, từ chối `RESET_REQUIRED`, và map target ADMIN thành 403 `ADMIN_STATUS_CHANGE_FORBIDDEN`. Thiếu revision trả 428 `PRECONDITION_REQUIRED`; revision cũ hoặc CouchDB conflict trả 409 `REVISION_CONFLICT`; User không tồn tại trả 404; body/ID sai trả 400 `VALIDATION_ERROR`. Không có mutation retry. Bổ sung check để cùng trạng thái không được gửi như một transition mới (`409 INVALID_STATUS_TRANSITION`).
+
+## Thay đổi UC24
+
+- Admin User List hiển thị Lock cho Candidate/Recruiter ACTIVE và Unlock cho Candidate/Recruiter LOCKED. Không hiện các action cho ADMIN hoặc RESET_REQUIRED.
+- Hành động tải chi tiết User để lấy ETag hiện hành, rồi mở confirmation dialog. PATCH chỉ được gửi sau khi xác nhận và kèm `If-Match`.
+- Có loading riêng theo User và vô hiệu hóa action trong lúc đang xử lý; hiển thị success/error feedback.
+- Khi nhận 409, không tự tải revision mới để ghi lại và không retry; thông báo rõ dữ liệu đã thay đổi và cung cấp nút refresh.
+- Thành công cập nhật row, stats, và detail đang mở. Các control dùng Tailwind/design tokens hiện có và xếp lại theo viewport nhỏ.
+- `AuthService.authenticate()` reload User và từ chối account không ACTIVE, nên JWT đã phát trước đó bị 401 ở protected request khi tài khoản bị khóa.
+- JWT vẫn giữ TTL 15 phút. Không thêm refresh, blacklist hay token version. Nếu mở khóa trước khi JWT cũ hết hạn, token đó có thể dùng lại.
+
+## Kiểm thử và xác minh
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Backend Auth/Admin routes/services: `node --test tests/auth-foundation/admin-user.service.test.js tests/auth-foundation/domain-routes.test.js tests/auth-foundation/auth-mvp.test.js` | **PASS 21/21** |
+| Frontend: `vitest run tests/admin-user-list.test.jsx` | **PASS 9/9** |
+| Frontend `npm.cmd run lint` | **PASS**, 0 lỗi, 2 cảnh báo cũ ở `App.jsx` và `Landing.jsx` |
+| Frontend `npm.cmd run build` | **PASS** |
+| `recruitment_db` / CouchDB | Không kết nối hoặc ghi; không seed, migration, index hay design document |
+| Browser E2E | Chưa chạy; UI được kiểm tra bằng Vitest/jsdom |
+| Full backend data/release suite | Không chạy |
+
+Backend tests xác nhận ADMIN route protection, guest 401, role không đủ quyền 403, ACTIVE↔LOCKED, target ADMIN, RESET_REQUIRED, thiếu If-Match, stale revision, 404, invalid body/status, ETag mới, conflict không retry, và JWT behavior khi lock/unlock. Frontend tests bao gồm hiển thị action theo role/status, cancel không gửi PATCH, If-Match, success state/list/detail, 409 và refresh prompt, loading/disable chống gửi trùng.
+
+## Git preservation
+
+Nhánh mới được tạo và checkout sau khi xác nhận branch nguồn `feature/admin-management`, HEAD `018a0d5`, UC23 có năm file modified và hai file untracked, không có staged diff. Sau checkout, status, hash diff tracked và hash hai file untracked khớp trước/sau. Nhánh `feature/job-listing-and-detail-pages` vẫn ở `5107bd2`; không chuyển hay sửa nhánh đó. Không commit, push, merge, cherry-pick, reset hoặc stash.
+
+UC23 thay đổi được giữ trong working tree trên nhánh Admin mới cùng với UC24. Không có CouchDB access trong công việc này.
+
+## Files thay đổi
+
+- `backend/src/services/admin-user.service.js`
+- `backend/tests/auth-foundation/admin-user.service.test.js`
+- `backend/tests/auth-foundation/domain-routes.test.js`
+- `backend/tests/auth-foundation/auth-mvp.test.js`
+- `frontend/src/pages/Dashboard/AdminDashboard.jsx`
+- `frontend/tests/admin-user-list.test.jsx`
+- `docs/reports/TV1/RP-TV1-UC24-lock-unlock-users.md`
+- `docs/reports/TV1/RP-TV1-consolidated.md`
+
+## Kiểm thử thủ công còn lại
+
+- Dùng Admin trên môi trường test cô lập, khóa một Candidate và xác nhận request protected bằng JWT đã cấp nhận 401.
+- Mở khóa trước khi access token đó hết 15 phút và xác nhận token có thể hoạt động lại; sau expiry phải bị 401.
+- Thử cập nhật song song bằng hai màn hình để xác nhận request thứ hai nhận 409 và UI yêu cầu refresh, không tự retry.
+- Xác nhận dialog, focus/keyboard interaction, responsive layout, success/error feedback và detail refresh trong browser thật.
+
+Không dùng `recruitment_db` cho các bước manual/live; cần một auth test database cô lập đã được cho phép.
+
+
+---
+
+<a id="uc25-full-report"></a>
+
+<!-- Source: docs/reports/TV1/RP-TV1-UC25-mapreduce-statistics.md -->
+
+# RecruiHub NoSQL — TV1 / UC25: CouchDB MapReduce Statistics
+
+**Ngày:** 2026-10-25
+**Branch:** `feature/tv1-admin-management`
+**Trạng thái:** PARTIAL — source, isolated tests và UI tích hợp; dữ liệu runtime thật chưa có đủ Design Documents.
+
+## 1. Mục tiêu
+
+Thay cách đếm User/Candidate bằng việc tải documents lên backend bằng CouchDB MapReduce Views. Cung cấp Admin-only endpoint tổng hợp cho Users, Candidates và Jobs; hiển thị dashboard từ response đó, không dùng số giả khi query thất bại.
+
+## 2. Schema và nguồn dữ liệu
+
+- `user`: `type`, `role` (`CANDIDATE`, `RECRUITER`, `ADMIN`), `account_status` (`ACTIVE`, `LOCKED`, `RESET_REQUIRED`).
+- `candidate`: discriminator `type=candidate`.
+- `job`: discriminator `type=job`, trạng thái `DRAFT`, `OPEN`, `CLOSED`, cùng `recruiter_id`.
+- Không suy diễn số Application, Interview, salary hoặc các trường ngoài schema/phạm vi UC25.
+- User/Candidate views truy vấn DB được cấu hình bởi `AUTH_COUCHDB_DATABASE`; Job view dùng `COUCHDB_DATABASE` như repository TV2.
+
+## 3. Thiết kế MapReduce
+
+Source design document `ADMIN_USER_STATISTICS_DESIGN` (`_design/tv1_admin_statistics`) nằm trong `backend/src/repositories/admin-statistics.repository.js`. Chỉ định nghĩa trong repository; code không tự cài hoặc cập nhật design document.
+
+| View | Map emission | Reduce / query |
+|---|---|---|
+| `user_count_by_role` | `emit(doc.role, 1)` khi `type=user` và có role | `_count`, query `group=true` |
+| `user_count_by_status` | `emit(doc.account_status, 1)` khi `type=user` và có account_status | `_count`, query `group=true` |
+| `user_total` | `emit(null, 1)` khi `type=user` | `_count`, không group |
+| `candidate_total` | `emit(null, 1)` khi `type=candidate` | `_count`, không group |
+| `jobs_by_recruiter` (TV2) | `[doc.recruiter_id, doc.status] → 1` khi `type=job` | View hiện hữu trong source TV2, `_count`; query `group_level=2`, rồi cộng theo status trong backend |
+
+Các view do TV1 thêm chỉ emit trường cần thống kê; CouchDB trả aggregate rows, không trả raw documents. Composite key Job được tái sử dụng từ `job_application`; không tạo view trùng. Repository xác thực keys/statuses và giá trị count trước khi lập DTO.
+
+Ví dụ kết quả CouchDB theo nhóm:
+
+```json
+{"rows":[{"key":"CANDIDATE","value":2},{"key":"RECRUITER","value":1}]}
+```
+
+Với Job `group_level=2`, ví dụ `{"key":["recruiter:one","OPEN"],"value":2}`; backend gộp recruiter thành `jobs.statuses.OPEN`.
+
+## 4. API contract
+
+`GET /api/v1/admin/stats` — yêu cầu Bearer access token hợp lệ, User `ACTIVE`, role `ADMIN` (middleware router hiện hành).
+
+```json
+{
+  "success": true,
+  "message": "Account statistics loaded.",
+  "data": {
+    "source": "couchdb_mapreduce",
+    "totalUsers": 3,
+    "totalCandidates": 1,
+    "roles": {"CANDIDATE": 2, "RECRUITER": 1, "ADMIN": 0},
+    "statuses": {"ACTIVE": 2, "LOCKED": 1, "RESET_REQUIRED": 0},
+    "jobs": {"total": 8, "statuses": {"DRAFT": 4, "OPEN": 3, "CLOSED": 1}}
+  }
+}
+```
+
+Số trên chỉ minh họa shape từ fixture kiểm thử, không phải số liệu database. Response chỉ gồm aggregate DTO. Thiếu view/design document trả 503 `STATISTICS_VIEW_NOT_INSTALLED`; DB unavailable giữ CouchDB error mapping hiện hành (thường 503, timeout 504); hàng aggregate sai trả 503 `STATISTICS_QUERY_FAILED`. Không có fallback scan hoặc dữ liệu giả.
+
+## 5. Giao diện
+
+Admin Dashboard có KPI tổng User, Candidate, Active, Locked và Job; biểu đồ role, trạng thái User, trạng thái Job; ghi nguồn `CouchDB MapReduce`. Loading và retry riêng cho thống kê. Khi thống kê lỗi, dashboard vẫn hiển thị danh sách User nhưng xóa số liệu cũ/không hiển thị biểu đồ và cung cấp nút thử lại. Layout biểu đồ co giãn từ một cột mobile tới ba cột desktop; tiếp tục dùng Tailwind/design tokens đang có. UC23/UC24 controls không đổi.
+
+## 6. Kiểm thử và xác minh an toàn
+
+- Backend UC25-targeted: `node --test tests/auth-foundation/admin-statistics.repository.test.js tests/auth-foundation/domain-routes.test.js tests/auth-foundation/admin-user.service.test.js tests/auth-foundation/auth-mvp.test.js tests/foundation/couchdb.client.test.js` — **PASS 31/31**. Kiểm tra map emissions theo schema, `_count`, group/group_level, gộp composite Job rows, missing view, database/network error, row không hợp lệ, ADMIN/guest/role access và giữ UC23/UC24 regression.
+- Route test xác nhận Admin được truy cập, guest 401, role khác 403; Foundation test xác nhận `queryView()` chỉ gửi GET và hỗ trợ group parameters.
+- Frontend `vitest run tests/admin-user-list.test.jsx` — **PASS 10/10**, gồm response KPI/Job chart/source và API error/retry không để lộ thống kê giả.
+- Frontend `npm.cmd run lint` — **PASS**, 0 errors, 2 warnings cũ ở `App.jsx` và `Landing.jsx`.
+- Frontend `npm.cmd run build` — **PASS**; bundler báo chunk JS lớn hơn 500 kB.
+- Mở rộng auth/Foundation regression `node --test tests/auth-foundation/*.test.js tests/foundation/*.test.js` — **FAIL 64/71**. Bảy failure đều ở `recruiter-registration.test.js` (feature flag/organization fixture và luồng Recruiter), ngoài UC25; UC25-targeted suite nêu trên vẫn PASS.
+- `git diff --check` — **PASS**, chỉ còn advisory LF/CRLF của Git.
+- Các tests dùng fake CouchDB clients hoặc API mocks; không gửi lệnh ghi CouchDB.
+- Không chạy full backend data/release suite theo yêu cầu.
+
+## 7. Trạng thái Design Documents và giới hạn runtime
+
+Read-only inventory confirmed `recruitment_db` has no Design Documents. The isolated `recruithub_auth_demo` already had `_design/job_application`; following the request to try UC25 on the demo database, `_design/tv1_admin_statistics` was installed there only. The endpoint checks database metadata before querying views to distinguish a missing database from a missing view. Live API verification against the demo returned HTTP 200 after Admin login: 16 Users, 10 Candidates, roles CANDIDATE=10/RECRUITER=4/ADMIN=2, statuses ACTIVE=16/LOCKED=0/RESET_REQUIRED=0, and 3 Jobs (CLOSED=3). Demo doc_count moved 47 to 48 solely for this design document. `recruitment_db` remains at 25,750 documents and still has no TV1 statistics view; no request wrote there. No index, seed, or migration was performed.
+
+Runtime follow-up: the pre-existing UI at port 5180 called backend port 5006, whose stats response lacked the `source` field required by the current UI. Those processes were left untouched. Started the current backend source on port 5007 with both DB variables scoped to `recruithub_auth_demo`, and Vite on port 5181 with API base `http://127.0.0.1:5007/api`. Admin login and `/api/v1/admin/stats` returned 200 with `source=couchdb_mapreduce`; the frontend route and transformed API module returned 200 and point to port 5007. This confirms runtime/API wiring, not browser visual E2E.
+
+## 8. Cài đặt và kiểm tra trên DB cô lập
+
+1. Tạo/định danh các database kiểm thử cô lập theo quy trình được phê duyệt; cấu hình `AUTH_COUCHDB_DATABASE` riêng và `COUCHDB_DATABASE` riêng, không đặt `recruitment_db` trong test config.
+2. Trên auth test DB, cài design document từ export `ADMIN_USER_STATISTICS_DESIGN`; trên Job test DB dùng design doc `recruitmentDesign` của TV2. Cài đặt phải là bước setup riêng, có quyền ghi và không dùng credentials/URL của môi trường thật.
+3. Chèn fixture User/Candidate/Job vào test DB, query endpoint bằng Admin principal, đối chiếu kết quả group với fixture.
+4. Có thể chạy unit tests hiện có mà không cần CouchDB; integration test ghi chỉ được chạy trong test DB cô lập.
+5. Production deployment cần phê duyệt riêng để cài hai design documents vào đúng DB, sau đó kiểm tra view read-only và rollback plan. UC25 không tự triển khai production views.
+
+## 9. Files thay đổi trong UC25
+
+- `backend/src/services/couchdb.client.js` — read-only `queryView()`.
+- `backend/src/repositories/admin-statistics.repository.js` — view definition và MapReduce DTO.
+- `backend/src/config/auth-database.config.js` — expose client cho repository thống kê.
+- `backend/src/routes/admin-user.routes.js` — nối `/stats` tới aggregate repository.
+- `backend/src/services/admin-user.service.js` — bỏ scan/đếm toàn documents khỏi User service.
+- `backend/tests/auth-foundation/admin-statistics.repository.test.js`.
+- `backend/tests/auth-foundation/domain-routes.test.js`.
+- `backend/tests/auth-foundation/admin-user.service.test.js` — bỏ test cũ cho full-document stats.
+- `backend/tests/foundation/couchdb.client.test.js`.
+- `frontend/src/pages/Dashboard/AdminDashboard.jsx`.
+- `frontend/tests/admin-user-list.test.jsx`.
+- `docs/reports/TV1/RP-TV1-consolidated.md`.
+- `docs/reports/TV1/RP-TV1-UC25-mapreduce-statistics.md`.
+
+## 10. Nghiệm thu
+
+**PARTIAL.** UC25 targeted tests 31/31, frontend tests 10/10, lint và build đạt. Regression auth/Foundation rộng hơn có 7 lỗi Recruiter-registration không thuộc UC25. Source giữ `recruitment_db` strictly read-only và không tự cài view. Runtime statistics chỉ hoạt động sau khi các design documents được cài có phê duyệt trên database mục tiêu.
+
+
+---
+
+<a id="uc07-full-report"></a>
+
+<!-- Source: feature/job-listing-and-detail-pages:docs/reports/TV1/RP-TV1-UC07-job-detail.md -->
+
+# TV1 UC07 — Job Detail
+
+**Ngày:** 2026-10-25
+**Phạm vi:** Trang công khai `/jobs/:id`, endpoint `GET /api/v1/jobs/:id` và bàn giao luồng Apply hiện có. Không thay đổi schema, Job lifecycle, dữ liệu, index, database hoặc workflow Job/Application của TV2.
+
+## 1. Khám phá schema và dữ liệu
+
+Đọc `jobDocumentSchema`, `companyDocumentSchema`, API Job/Application hiện hành và CouchDB `recruitment_db` bằng các request GET. Quét dải ID `job:` theo các batch có giới hạn, không tải các document ngoài tập Job. Không thực hiện lệnh ghi.
+
+### Job field matrix
+
+| Field | Kiểu / bắt buộc | Public | Hiển thị / xử lý |
+|---|---|---|---|
+| `_id` | string, required; dạng `job:cms:J_######` hoặc `job:<id>` | Có trong DTO detail | Dùng làm định danh route; không cần phô raw ID trên UI. |
+| `type` | literal `job`, required | Không | Chỉ xác thực document. |
+| `title` | string không rỗng, required | Có | Tiêu đề trang. |
+| `industry` | string không rỗng, required | Có | Header và tóm tắt. |
+| `description` | string không rỗng, required | Có | Nội dung xuống dòng; React escape mặc định. |
+| `responsibilities` | mảng string, required | Có | Mục trách nhiệm; ẩn section khi rỗng. |
+| `required_skills` | mảng string, required, tối thiểu một phần tử | Có | Chip kỹ năng bắt buộc. |
+| `optional_skills` | mảng string, required; có thể rỗng | Có | Chip ưu tiên; ẩn section khi rỗng. |
+| `seniority` | enum `JUNIOR`, `MID`, `SENIOR`, required | Có | Cấp độ ở header và summary. |
+| `status` | enum `DRAFT`, `OPEN`, `CLOSED`, required | Chỉ tin `OPEN` | API ẩn `DRAFT`/`CLOSED` bằng 404. |
+| `deadline` | ISO datetime, optional theo schema; bắt buộc với Job `OPEN` | Có | Hiển thị hạn nộp; CTA tắt nếu đã hết hạn. |
+| `requirements` | object required; `general[]`, `experience`, `education`, `project` | Có | Yêu cầu chung và chuyên môn; trạng thái `UNAVAILABLE` được ẩn. |
+| `created_at`, `updated_at` | ISO datetime, required | DTO công khai hiện có | Giữ tương thích; không dùng làm hạn nộp. |
+| `published_at` | ISO datetime, optional | DTO công khai hiện có | Không cần trình bày trên trang. |
+| `source_job_id` | string, optional | Không | Không nằm trong public DTO. |
+| `company_id`, `department_id`, `recruiter_id` | string reference, required | Không | Company được resolve server-side; IDs không trả ra. |
+| `_rev` | CouchDB revision, optional | Không | Bị loại khỏi DTO. |
+| `provenance` | object required | Không | Bị loại khỏi DTO. |
+
+`experience`, `education`, `project` có status riêng; giá trị điều kiện chỉ xuất hiện khi status là `REQUIRED`. UI không dựng địa điểm, lương, phúc lợi, loại hình công việc, hình thức làm việc, số lượng tuyển hoặc thông tin liên hệ Recruiter vì không có trường tương ứng trong Job schema.
+
+### Kết quả đọc CouchDB
+
+- `recruitment_db`: `doc_count=25.750`; dải Job có 2.500 documents. Tất cả Job trong dải xác thực thành công bằng strict Job schema.
+- Status tại thời điểm kiểm tra: `OPEN=200`, `DRAFT=2.300`, `CLOSED=0`.
+- Cả 2.500 Job có Company reference resolve được; OPEN Job đều có deadline.
+- Company schema có `name`, `industry`, `website?`, `address?`; mẫu đọc có website hợp lệ, address không hiện diện. Company address không được xem là Job location.
+- Không cần đọc Department cho detail công khai. Một Company GET theo lần mở detail; danh sách UC06 không lookup Company theo từng Job.
+- Không sửa/ghi `recruitment_db`, tạo index hoặc thay đổi dữ liệu.
+
+## 2. Company relationship
+
+Job trỏ tới Company bằng `company_id`. Endpoint đọc Company theo ID, xác thực type, `_id` khớp reference và strict `companyDocumentSchema`, sau đó chỉ trả `{name, industry, website?}`. Website chỉ được đưa ra khi URL dùng HTTP/HTTPS. `address` không đưa ra DTO công khai để tránh bị hiểu nhầm là Job location. Nếu reference thiếu hoặc Company không hợp lệ, detail vẫn trả Job với `company: null`; lỗi hạ tầng khác vẫn được trả lỗi.
+
+Department không cần thiết cho thông tin công khai trang detail. Job cards UC06 tiếp tục không gọi Company API theo từng card.
+
+## 3. Quy tắc public và API
+
+- Tái sử dụng `GET /api/v1/jobs/:id`; không tạo Apply endpoint mới.
+- API chỉ trả Job có `status === OPEN`. `DRAFT`, `CLOSED` và ID không tồn tại trả `404 NOT_FOUND`; params sai định dạng trả `400 VALIDATION_ERROR`.
+- Job document không hợp lệ trả `409 INVALID_STORED_DOCUMENT`; Company thiếu/invalid được biểu diễn `company: null`.
+- Public Job DTO giữ allowlist hiện hữu và bổ sung `company` an toàn cùng `company_name` tương thích ngược. Không trả `_rev`, provenance, recruiter/department/company IDs hay raw Company document.
+- Detail vẫn xem được Job `OPEN` đã qua deadline; UI hiển thị “Đã hết hạn” và disable Apply. Không sửa lifecycle/status trong DB.
+
+## 4. Giao diện chi tiết
+
+- Breadcrumb, header title/company/status và metadata ngành nghề/cấp độ/deadline.
+- Desktop tối đa 1200px, hai cột: nội dung chính và sidebar summary/company/apply; mobile một cột, không sticky CTA che nội dung.
+- Nội dung gồm mô tả, trách nhiệm, yêu cầu chung, kỹ năng bắt buộc/ưu tiên và yêu cầu chuyên môn có dữ liệu.
+- Sidebar có summary, hạn nộp, Apply CTA và Company info nếu API có. Không render section rỗng; không thêm salary/location giả.
+- Loading skeleton, lỗi kết nối có retry, trạng thái 404/unavailable, Company thiếu và tin fixture dev có thông báo rõ.
+- Nội dung Job là text React escaped, không dùng `dangerouslySetInnerHTML`. Website chỉ nhận HTTP/HTTPS và mở tab an toàn.
+
+## 5. Application handoff
+
+- Guest xem Job OPEN; CTA Login truyền intended path hiện tại qua router state. Sau login, helper chỉ cho Candidate trở lại Job detail ID hợp lệ, từ chối external/open redirect và role khác.
+- Candidate dùng `applicationApi.mine`, `ApplyModal`, `applicationApi.apply`, timeline và withdraw hiện hữu. Không nhân đôi API hoặc giả lập thành công.
+- Recruiter/Admin không có CTA Apply. CTA Candidate bị disable khi deadline đã qua.
+- Chế độ fixture development thông báo đây là dữ liệu minh họa và không gửi Apply.
+
+## 6. Files
+
+- Cập nhật `backend/src/services/job.service.js`: chỉ công khai OPEN, resolve Company an toàn, tạo DTO allowlist.
+- Cập nhật `backend/tests/recruitment/job-application-api.test.js`: OPEN detail, CLOSED/DRAFT/missing/invalid IDs, missing Company và regression khi đóng Job.
+- Thiết kế lại `frontend/src/pages/Jobs/JobDetails.jsx` theo template hai cột, responsive, safe text và trạng thái Apply.
+- Cập nhật `frontend/src/services/publicJobsModel.js` để giữ `requirements` khi chuẩn hóa fixture/API Job.
+- Cập nhật `frontend/src/utils/authNavigation.js`: chỉ Candidate được trở về Job detail hợp lệ sau login.
+- Thêm `frontend/tests/public-jobs/job-details.test.jsx`; cập nhật điều hướng đăng nhập và các selector UC06 cũ để khớp UI `/jobs` đã tinh chỉnh.
+
+## 7. Kiểm thử
+
+- Backend `node --test tests/recruitment/*.test.js`: **PASS 46/46**.
+- Frontend `npm.cmd test`: **PASS 70/70 Vitest + 7/7 Node tests**.
+- Frontend `npm.cmd run lint`: **PASS**, 0 lỗi; 2 cảnh báo React import cũ tại `App.jsx` và `Landing.jsx`.
+- Frontend `npm.cmd run build`: **PASS**; bundler có cảnh báo chunk JS lớn hơn 500 kB.
+- `git diff --check`: **PASS**, chỉ advisory LF→CRLF.
+- Backend API tests dùng fixture in-memory; Frontend tests dùng mock API. Không có test ghi CouchDB.
+- Không chạy browser E2E; người dùng tự mở `/jobs/:id` để đánh giá giao diện.
+
+## 8. Hướng dẫn tự kiểm thử
+
+1. Chạy API và frontend theo cấu hình development hiện có, mở `/jobs` rồi chọn một tin đang mở.
+2. Kiểm tra Company, ngành nghề/cấp độ, mô tả nhiều dòng, trách nhiệm và kỹ năng; mục thiếu dữ liệu phải được ẩn.
+3. Mở trực tiếp ID không tồn tại hoặc Job `DRAFT`/`CLOSED`: trang báo tin không khả dụng, không lộ nội dung nội bộ.
+4. Khi chưa đăng nhập, chọn “Đăng nhập để ứng tuyển”; sau login Candidate quay lại đúng Job detail. Recruiter/Admin không được nộp.
+5. Kiểm tra Apply Modal và hồ sơ đã nộp bằng luồng Application hiện có; tin quá deadline không cho mở Apply.
+
+**Trạng thái:** UC07 Job Detail triển khai trên endpoint hiện có. Không thay schema/dataset/index; `recruitment_db` chỉ đọc. Lương, địa điểm và benefits phụ thuộc thay đổi hợp đồng/schema riêng do TV2 sở hữu.
+
+
+---
+
+<a id="auth-recruiter-full-report"></a>
+
+## Auth and Recruiter Registration UI ? full report
+
+<!-- Source: docs/reports/TV1/RP-TV1-auth-recruiter-registration-login-ui.md -->
+
+**Ngày:** 2026-10-24
+**Phạm vi:** UI đăng ký/đăng nhập, lựa chọn Candidate/Recruiter và tổng quan đường đi tới khu vực Recruiter/Job.
+**Trạng thái:** UI Auth hoàn tất; Recruiter signup được kiểm tra qua API trên DB demo; Job management còn vướng cách phân chia database.
+
+### Tổng quan nhanh
+
+UI Login/Register được làm mới theo bố cục Auth trong `docs/Job-Application-Portal-Frontend`, nhưng giữ React routes, AuthContext, API client và nghiệp vụ RecruiHub. Register hiển thị hai role cards. Recruiter card luôn có mặt; khi `VITE_RECRUITER_REGISTRATION_ENABLED` tắt, card bị khóa và nêu trạng thái. Khi bật, form cho phép tìm Company có sẵn, chọn Department của Company đó và gửi đăng ký.
+
+Không thêm Company, Department hoặc Job trong form đăng ký. Job được tạo sau khi đăng nhập trong khu vực Recruiter.
+
+### Vòng đời đăng ký và đăng nhập
+
+1. **Mở Register và chọn loại tài khoản.** Candidate tiếp tục dùng các trường, validation và API Candidate hiện có. Recruiter chỉ chọn được khi feature flag UI bật.
+2. **Điền thông tin Recruiter.** Nhập email/mật khẩu, tìm Company từ hai ký tự, chọn kết quả có sẵn và chọn Department được tải theo Company. Khi đổi Company, Department cũ bị xóa. Không tìm thấy Company/Department thì form hướng dẫn liên hệ quản trị viên và không gửi đăng ký.
+3. **Gửi đăng ký Recruiter.** Frontend chỉ gửi `email`, `password`, `company_id`, `department_id`. Backend tải lại Company/Department, xác minh tồn tại và quan hệ Company–Department, sau đó tạo User role `RECRUITER` cùng Recruiter document. User chỉ được kích hoạt sau khi tạo liên kết thành công. Không tạo/ghi Company hoặc Department.
+4. **Xử lý lỗi ghi một phần.** User và Recruiter là hai document writes, không phải transaction CouchDB. Nếu ghi hoặc kích hoạt thất bại, API trả lỗi `REGISTRATION_INCOMPLETE` kèm mã tham chiếu; không tự retry hoặc xóa bù.
+5. **Đăng nhập.** Người dùng gửi email/mật khẩu. Backend xác thực User hiện hành, kiểm tra trạng thái và Recruiter relationship khi áp dụng, rồi trả access token và User DTO an toàn. Frontend giữ token trong memory, gọi `/auth/me` để xác minh và điều hướng theo role server trả về.
+6. **Đi tới khu vực Recruiter.** Role `RECRUITER` được điều hướng vào Recruiter dashboard; Candidate và Admin đi tới khu vực tương ứng. Role guard phía frontend phục vụ điều hướng, quyền thực tế vẫn do backend xác minh.
+7. **Tạo Job sau đăng ký.** TV2 Job API lấy Recruiter/Company/Department scope từ dữ liệu phía server. Form đăng ký không nhận Job title, mô tả, kỹ năng hoặc hạn tuyển.
+
+### Thay đổi UI
+
+- Dùng chung `AuthLayout` cho Login/Register: logo, heading/subtitle, card, giới hạn chiều rộng và nền sáng.
+- Dùng role cards có selected/focus/disabled states, icon và nội dung mô tả; radio inputs hỗ trợ bàn phím.
+- Chuẩn hóa input cao 48px, label, focus ring, nút submit và error/loading states.
+- Thêm nút hiện/ẩn mật khẩu cho Login, Candidate Register và Recruiter Register.
+- Recruiter Company autocomplete hỗ trợ loading/results/empty/error; có thể chọn gợi ý bằng Arrow Up/Down, Enter hoặc chuột. Department chỉ mở sau khi chọn Company và tải xong.
+- Không thay đổi AuthContext, JWT lifecycle, API contract, route protection, role redirect, Candidate payload hoặc Recruiter backend contract.
+
+### Kiểm thử và kết quả
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Frontend Vitest | **PASS 55/55** |
+| Frontend Node tests | **PASS 4/4** |
+| Frontend production build | **PASS** |
+| Frontend lint | **PASS**, 0 lỗi; 2 cảnh báo React import cũ tại `App.jsx` và `Landing.jsx` |
+| `git diff --check` | **PASS**, chỉ có cảnh báo chuẩn LF→CRLF |
+| Browser visual/responsive review | Chưa xác minh do môi trường không có browser khả dụng |
+
+API flow Recruiter đăng ký → duplicate registration → đăng nhập → `/auth/me` đã được chạy trên `recruithub_auth_demo`. Đăng ký thành công, email trùng trả 409, đăng nhập và `/auth/me` xác nhận role `RECRUITER`. Department không thuộc Company đã chọn bị từ chối 400 `ORGANIZATION_NOT_SUPPORTED` trước khi ghi.
+
+Các thao tác ghi E2E chỉ dùng database demo cô lập: số document tăng từ 41 lên 43. `recruitment_db` giữ nguyên 25.750 documents. Không lưu thông tin đăng nhập test trong report.
+
+### Điểm tích hợp Job còn mở
+
+Trong layout hiện tại, Company/Department được tra cứu từ `COUCHDB_DATABASE`, còn User/Recruiter được lưu trong `AUTH_COUCHDB_DATABASE`. TV2 Job/Application scope đang tải Recruiter, Company và Department từ cùng database. Vì vậy API `GET /api/v1/recruiter/jobs` với Recruiter mới trả 404 `NOT_FOUND`: Company/Department được chọn không có trong auth database. Chưa thể xem toàn bộ vòng đời Job sau signup là đã tích hợp thành công.
+
+TV1/TV2 cần thống nhất cách Job/Application đọc Company/Department từ directory database hoặc chọn cấu hình database tích hợp phù hợp. Không copy/ghi tổ chức vào `recruitment_db` để né khác biệt. Feature flags mặc định vẫn `false`; lượt E2E dùng cờ bật theo process riêng.
+
+### File chính
+
+- `frontend/src/components/auth/AuthLayout.jsx`
+- `frontend/src/pages/Login.jsx`
+- `frontend/src/pages/Register.jsx`
+- `frontend/src/components/auth/RecruiterRegistrationFields.jsx`
+- `frontend/src/utils/recruiterRegistration.js`
+- `frontend/tests/auth/auth-ui.test.jsx`
+- `frontend/tests/auth/recruiter-registration-preview.test.jsx`
+
+Chi tiết phối hợp scope Recruiter/Job nằm trong [TV1–TV2 Recruiter Scope Contract Draft](../../shared/TV1_TV2_RECRUITER_SCOPE_CONTRACT_DRAFT.md) và báo cáo tổng hợp [TV2](../TV2/RP-TV2-consolidated.md).
+
+---
+
+<a id="three-branch-audit"></a>
+
+## Three-branch implementation audit
+
+**Source report date:** 2026-10-25 (Asia/Saigon). The audit content below is embedded here so this consolidated file is the single reading copy. The separate generated audit copy is removed after this merge.
+
+**Audit date:** 2026-10-25 (Asia/Saigon)
+**Repository:** `BaoCao/recruithub-nosql`
+**Audit mode:** read-only source, Git, and test review; no branch switching or CouchDB writes.
+**Active branch at audit:** `feature/admin-management` at `018a0d5b4b48a13e0d506a2710239e29ff2d3cf8`.
+
+### 1. Executive summary
+
+The requested branch set does not exist as described: `feature/admin-management` and `feature/job-listing-and-detail-pages` exist locally and remotely, but `feature/tv1-admin-management` has no local or remote ref. UC23–UC25 work is present in the active `feature/admin-management` working tree as a mixture of staged additions and unstaged modifications, not as commits. The audit found no untracked files at the time of inspection. The audit introduced no application-code or Git-staging changes; its content and cross-reference are included in this consolidated report.
+
+The checked-in implementation has real Express/CouchDB paths for auth, profile, public jobs, applications and admin operations. Tests largely use fake repositories, fixtures, or API mocks. Prior report evidence records API persistence and MapReduce verification on the isolated `recruithub_auth_demo`; it does not establish browser E2E or production DB readiness. `recruitment_db` remains strict read-only and has no UC25 design document according to the read-only inventory recorded in the UC25 report.
+
+Current targeted checks: Admin/MapReduce backend **31/31 PASS**, Admin dashboard UI **10/10 PASS**, recruitment backend **45/45 PASS**, frontend lint **0 errors / 2 existing warnings**, production build **PASS**. The broader auth/Foundation suite is **64/71 PASS** with seven Recruiter-registration failures. Full Vitest is **67/71 PASS**, with four Job List UI failures caused by test selectors expecting a search label no longer present in the rendered component. Browser E2E was not performed.
+
+**Readiness:** UC01–UC03 and UC05–UC07 are implemented to varying degrees; UI/runtime acceptance remains incomplete. UC23–UC25 have targeted implementation and tests in the current uncommitted worktree. None can be described as fully end-to-end accepted on the production database. UC25 has the strongest direct demo evidence, but production remains blocked on separately approved design-document deployment.
+
+### 2. Scope, method, and evidence limits
+
+Reviewed Git refs and history, active-tree source, schemas, routes, services, repositories, frontend API adapters/components, test scripts and fixtures, prior TV1 reports, and branch diffs. Alternate branch code was inspected with Git object reads; no checkout or worktree was created. Runtime DB state was not re-probed during this audit. Statements about previous demo API/DB runs are identified as **reported prior evidence**, not new audit-session execution.
+
+Backend `npm test` was not run: its script includes data/release tests with shared scratch paths and known side effects. Targeted tests below use fake repositories, in-memory Express servers, or fixtures and do not write CouchDB. `recruitment_db` was not accessed or modified in this audit.
+
+### 3. Git branches and integration state
+
+| Requested branch | Ref state | Commit / merge base | Relationship to `dev` | Audit conclusion |
+|---|---|---|---|---|
+| `feature/admin-management` | Local + `origin` | HEAD `018a0d5`; merge base with `dev` is `018a0d5` | `dev` is one commit ahead (`a0af4d9`); this branch is ancestor of `dev` | UC23–UC25 implementation currently in mixed staged/unstaged worktree; no UC23–UC25 source commit exists at branch HEAD. |
+| `feature/job-listing-and-detail-pages` | Local + `origin` | HEAD `5107bd2`; merge base with `dev` is `018a0d5` | One branch-only commit and one `dev`-only commit (`1 1` divergence) | Job page refinements and UC07 report are in the branch commit; this work is not integrated into `dev` at the audited refs. Backend JobService work is TV2-owned. |
+| `feature/tv1-admin-management` | **Not found** locally or remotely | No HEAD / merge base | Not applicable | Cannot attribute any committed work or run its branch tests. Current Admin work is on `feature/admin-management` working tree. |
+| `dev` baseline | Local + `origin` | `a0af4d9` | One commit beyond `feature/admin-management` | Used as comparison baseline; no ref changes made. |
+
+Relevant history includes `179f892` (TV1 identity/profile/admin dashboard), `a5abd6e` (Auth, Candidate Profile and Recruiter registration), `480b12d` (public job search/filtering), merge `018a0d5` (public portal), and `5107bd2` (Job listing/detail refinements). The Admin worktree changes have no commit hash and must not be reported as committed/integrated.
+
+#### Active worktree state before and after audit
+
+Staged additions: `admin-statistics.repository.js`, its repository test, UC23/UC24/UC25 reports, and `frontend/tests/admin-user-list.test.jsx`.
+
+Unstaged modifications: auth DB config, Admin routes/service, CouchDB client, Admin/Auth/Foundation tests, consolidated report, and `AdminDashboard.jsx`.
+
+There were no untracked files. The branch remained `feature/admin-management`; the audit did not stage, commit, switch, stash, reset, or clean. `git diff --check` passed (Git may print standard LF/CRLF advisory notices).
+
+### 4. Work history by phase
+
+| Phase | Branch / commit evidence | Work and ownership | Evidence / remaining issue |
+|---|---|---|---|
+| Identity, Candidate Profile and Admin foundation | `179f892`; `a5abd6e`; merged through identity/public portal history | TV1 Auth, Candidate registration/profile, safe DTOs, RBAC and initial Admin surfaces | `backend/src/routes/auth.routes.js`, `candidate-profile.routes.js`, `admin-user.routes.js`; no full browser acceptance. Recruiter registration remains separately feature-gated and has current test failures. |
+| Public Job portal | `480b12d` merged by `018a0d5` | TV1 frontend portal and API adapter; TV2 supplies Job API/service | `frontend/src/services/publicJobsApi.js`, `frontend/src/pages/Jobs/JobList.jsx`; dev defaults to clearly labelled fixtures unless API mode is selected. |
+| Listing/detail refinement | `5107bd2`, branch-only vs `dev` | TV1 UI and tests; TV2 JobService changes are dependencies, not TV1 output | `frontend/src/pages/Jobs/JobDetails.jsx`, `JobList.jsx`, `RP-TV1-UC07-job-detail.md`; UI test selector mismatch observed on current tree; closed-job detail access needs review. |
+| Admin management | Active branch `feature/admin-management`; UC23–UC25 additions currently staged/unstaged | UC23 user list/detail, UC24 account lock/unlock, UC25 statistics | Reports/tests exist in staged area; source changes are uncommitted. No `feature/tv1-admin-management` ref exists. |
+| Test/build and demo checks | Reported in UC23–UC25 reports; tests rerun in this audit | Targeted tests and prior isolated demo checks | No browser E2E. UC25 demo was previously live-verified; production view installation is pending approval. |
+
+No start/end dates were inferred from commit order. Git author/commit times are not treated as proof of project phase dates.
+
+### 5. TV1 use-case summary
+
+| UC | Main branch / related branch | Work and implementation | Data classification | Tests / completion | Remaining work |
+|---|---|---|---|---|---|
+| UC01 — Candidate/Recruiter Registration | `feature/identity-candidate-portal` history; current admin worktree; related historical reports | Candidate register route and service write User then Candidate; Recruiter registration route exists behind `PUBLIC_RECRUITER_REGISTRATION_ENABLED`, disabled by default. | Candidate flow: prior isolated demo DB API persistence reported; unit tests use fakes. Recruiter: mocked tests currently fail; live status unknown. | Candidate registration tests pass within Auth subsets; Recruiter route/service suite has 7 failures in broad suite (one route and six service tests). **PARTIAL**. | Fix Recruiter setup/fixture behavior or disable/remove unsupported path; confirm policy and browser form; retain isolated DB test evidence. |
+| UC02 — Login, Logout, JWT, RBAC | Identity branch history; current source | Argon2id password hash, HS256 Bearer JWT (15 min), server reloads ACTIVE User and checks role; frontend holds token in memory. Logout clears local memory only; no server revocation endpoint. | Prior demo login/me API verified on isolated `recruithub_auth_demo`; tests use fake repos. No production live evidence. | Auth subset includes a failure in Recruiter-enabled route; Candidate login/auth tests pass. **IMPLEMENTED-TESTED**, partial lifecycle. | Browser login/logout and reload checks; decide/reconcile session policy; no token revocation until expiry. |
+| UC03 — Candidate Profile | Identity branch history | `GET/PATCH /api/v1/candidate/profile/me`; Candidate role; ownership from verified principal; allowlisted Zod patch; ETag/`If-Match`; CouchDB `_rev`. | Prior isolated demo profile GET/PATCH and stale revision were reported. Tests use fake repository. Production DB not verified. | Profile tests pass in targeted suites. **IMPLEMENTED-TESTED**. | Browser/responsive and stale ETag UX; confirm Mango index/query plan (`type,user_id`) before scale. |
+| UC05 — Public Job Listing | `feature/public-job-portal` merged by `018a0d5`; refined in job branch | Public `GET /api/v1/jobs`; frontend adapter calls TV2 API in production/API mode; default development mode uses labelled Job fixtures. | Dev UI is **FIXTURE** by default; production/API mode is real backend integration but live DB use not verified in this audit. | Recruitment tests cover list APIs; model tests cover fixtures. **IMPLEMENTED-TESTED**, no browser/live DB verification. | Ensure local dev uses API mode when real data is intended; verify API mode and error/empty UI in browser. |
+| UC06 — Job Search, Filter, Pagination | Public portal + `feature/job-listing-and-detail-pages` | Query filters are search, skills, industry, seniority; OPEN-only result set; stable cursor, abortable request, URL state and debounce. Backend is TV2-owned. No location/salary filters. | Fixture mode in dev; API mode delegates to TV2. Unit/model data is fixtures. | Backend recruitment tests **45/45 PASS**; frontend full Vitest has 4 Job List failures due stale expected label. **PARTIAL / IMPLEMENTED-TESTED**. | Align test selectors with current mobile/desktop labels; rerun branch-specific tests; browser mobile/tablet/desktop acceptance. |
+| UC07 — Job Detail | `feature/job-listing-and-detail-pages` at `5107bd2` | UI loads public detail via API adapter in API mode; fixture lookup in dev; shows loading/error/retry and apply/navigation affordances as implemented. Backend detail comes from TV2. | Fixture/dev and API modes as UC05. No live job DB verification. | Job detail UI test passed in the targeted Vitest invocation; API detail is covered by recruitment tests. **PARTIAL**. | Review public API behavior: current TV2 `publicDetail()` rejects DRAFT but appears to allow CLOSED; frontend filters non-OPEN after response. Enforce OPEN-only in backend detail. Verify Apply ownership with TV2 and browser. |
+| UC23 — Admin User List | `feature/admin-management` worktree (report/test staged) | Admin-only user listing/search/filter/cursor pagination and safe detail DTO. Existing source performs bounded `_all_docs` ID-prefix reads for Users; no statistics scan. | Tests use fake repository/API mocks. No live list read newly performed in this audit. | Admin UI tests pass as part of 10/10. Existing targeted UC23 report states backend/frontend tests pass; browser E2E absent. **IMPLEMENTED-TESTED**, uncommitted current changes. | Commit/integrate reviewed work; test against isolated DB and browser; plan index/query behavior as dataset grows. |
+| UC24 — Admin Lock/Unlock Users | `feature/admin-management` worktree (report/test staged) | Admin-only `PATCH /users/:id/status`; only ACTIVE↔LOCKED, requires `If-Match`; RESET_REQUIRED protected; Admin targets are operator-managed; no blind retry. | Tests use fake services and in-memory HTTP. Prior reports state no CouchDB writes for UC24. | Backend status tests pass in 31-test targeted set; dashboard tests 10/10. **IMPLEMENTED-TESTED**, not live DB verified. | Confirm UI behavior in browser; live write test only on approved isolated DB. Access JWT can become usable again after unlock while its 15-minute expiry remains valid. |
+| UC25 — CouchDB MapReduce Statistics | `feature/admin-management` worktree (source/test/report staged or modified) | Admin-only stats API uses CouchDB view queries; emits role/status/User/Candidate aggregates and reuses TV2 `job_application/jobs_by_recruiter` composite view. No scan fallback. | **Prior live demo verified** on `recruithub_auth_demo`; `recruitment_db` has no design doc/view and was not written. Unit tests use fakes. | Backend targeted **31/31 PASS**, UI **10/10 PASS**. **IMPLEMENTED-TESTED / PARTIAL production**. | Approve/deploy design docs to target DBs; verify TV2 view exists in Job DB; production remains unready until then. |
+
+Completion terms are defined in the audit prompt. No use case is marked COMPLETE-VERIFIED because browser and/or production-equivalent end-to-end acceptance is missing. UC25 has isolated demo API evidence but not production readiness.
+
+### 6. Detailed technical review
+
+#### UC01–UC03: Identity and Candidate Profile
+
+- Auth routes: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`; optional `POST /register/recruiter` is controlled by an environment flag. No server logout/revocation route was found.
+- Candidate registration does not accept role/status/ID from client. Service validates the payload and creates deterministic User and Candidate docs in two CouchDB writes; a failure can leave a RESET_REQUIRED staged User for operator reconciliation.
+- User lookup is deterministic-ID based; Candidate lookup uses Mango selector `{type:'candidate', user_id}` with a bounded result (`limit:2`). Candidate Profile service maps a safe DTO, checks principal ownership, validates allowlisted changes, and writes with current `_rev`.
+- Auth storage rejects implicit use of `recruitment_db`; Auth uses `AUTH_COUCHDB_DATABASE`. Job code uses `COUCHDB_DATABASE`. Thus an `.env` configuration determines which database a process uses; it does not automatically deploy views or make production/test data interchangeable.
+- JWT is a 15-minute Bearer token held in frontend memory. Logout is client-side token clearing only; refresh/revocation is not implemented.
+
+#### UC05–UC07: Public Job Portal
+
+- `publicJobsApi.js` selects fixtures when `import.meta.env.DEV` and `VITE_PUBLIC_JOBS_MODE !== 'api'`; this is labelled in the UI. Otherwise it requests `GET /api/v1/jobs` and `GET /api/v1/jobs/:id` through the TV2 API adapter.
+- Job list UI supports query-backed search/skills/industry/seniority, status messaging, retry, stable cursor navigation, abortable fetch and responsive filters. The list filters OPEN jobs. There is no schema-backed location/salary field.
+- The actual production Job repository/service belongs to TV2. The UI branch commit must not be credited as TV1 implementation of Job persistence or Job management.
+- **Branch difference:** `feature/job-listing-and-detail-pages` at `5107bd2` enforces `job.status !== 'OPEN'` as 404 in `JobService.publicDetail()`. At `feature/admin-management` (`018a0d5`) and `dev` (`a0af4d9`), the service rejects only DRAFT and therefore can return CLOSED Job details. The UI filters non-OPEN results, but the backend on those refs does not enforce the public OPEN-only rule. The fix exists in the job-listing branch but is not integrated into the audited dev/admin refs.
+- **Test finding:** current full Vitest failures show tests seeking `Tìm theo vị trí, mô tả, ngành nghề hoặc kỹ năng`, while rendered mobile label is `Tìm theo vị trí, mô tả hoặc kỹ năng`. Desktop copy is also different. This is a test/UI accessibility contract mismatch, not proof that search requests themselves are broken; the four affected tests stop at label lookup.
+
+#### UC23–UC25: Admin Management
+
+- Admin router applies authentication and `requireRole('ADMIN')` before `/users`, `/users/:id`, `/users/:id/status`, and `/stats`. Safe DTOs exclude credential hashes and internal provenance.
+- User listing is read-only and uses a bounded built-in `_all_docs` prefix scan; status update uses revision preconditions and typed errors. It does not use a cross-document last-Admin race guard because Admin accounts cannot be changed through this endpoint.
+- UC25's `_design/tv1_admin_statistics` source defines `_count` views for User role, User account status, total Users and total Candidates. The repository queries them with GET, `group=true` where needed, validates reduce rows, then constructs an aggregate DTO. Job status totals are grouped from TV2's `job_application/jobs_by_recruiter` view with `group_level=2`.
+- The Admin dashboard has no fabricated-count fallback: statistics failure clears data and exposes error/retry. The values in test fixtures and report examples are examples only.
+- Prior UC25 report states a MapReduce design document was installed only in isolated `recruithub_auth_demo`; a live Admin login/stats request returned 200 with aggregate counts. `recruitment_db` remained at 25,750 docs, with no statistics view. This audit did not repeat DB calls.
+
+### 7. Runtime/test data classification
+
+| UC | Runtime source | Test source | Live DB evidence | Mock/fixture/hardcode assessment |
+|---|---|---|---|---|
+| UC01 | CouchDB Auth DB when configured | Fake repos | Candidate registration on isolated demo previously reported; not production | Test is MOCKED; demo is TEST-DB. No fake KPI/content. |
+| UC02 | CouchDB Auth DB + server JWT | Fake repos/in-memory route server | Login/me previously reported on isolated demo | Runtime path exists; server logout/revocation absent. |
+| UC03 | CouchDB Auth DB | Fake candidate repository | Profile GET/PATCH previously reported on demo | TEST-DB evidence, not production. |
+| UC05 | API mode uses TV2 public Job endpoint; development defaults to fixture mode | `publicJobs` fixtures and fake API | No live Job DB check in this audit | FIXTURE is explicitly labelled for dev; production build uses API path. |
+| UC06 | Same as UC05; real filtering delegated to API mode | Fixture model + fake API | No live Job DB check in this audit | FIXTURE/MOCKED test coverage; no hardcoded production counts. |
+| UC07 | Same API/fixture split as UC05 | UI/API test fixtures | No live Job DB check in this audit | FIXTURE in dev; API path exists. CLOSED detail access concern above. |
+| UC23 | Auth DB User docs via `_all_docs` in runtime | Fake repositories/API mock | Not live-verified in this audit | MOCKED tests; no hardcoded user rows as production data. |
+| UC24 | Auth DB conditional document update | Fake repo/in-memory API | No live status write evidence | MOCKED tests; do not run against `recruitment_db`. |
+| UC25 | Auth DB design views + Job DB TV2 view | Fake view clients | Prior isolated demo API+MapReduce verified; production DB has no view | TEST-DB/live-demo verified; no hardcoded numbers; errors do not fall back to mock. |
+
+“Prior reported” means evidence in the checked-in UC25/runtime reports, not a new database probe in this audit session. `recruitment_db` remained untouched.
+
+### 8. Technology and methods verified in source
+
+| Technology / technique | Use | Evidence | Status / interpretation |
+|---|---|---|---|
+| React + Vite | Auth, profile, Job portal and Admin UI | `frontend/package.json`, `frontend/src` | Implemented; build passes. |
+| Express + Node.js ES modules | API routes and services | `backend/package.json`, `backend/src/app.js` | Implemented; targeted HTTP tests pass. |
+| CouchDB | Documents and view queries | `couchdb.client.js`, repositories | Runtime configured via environment; this audit made no DB mutation. |
+| JWT HS256 + Argon2id + RBAC | Auth and Admin access | `jwt-access-token.js`, `auth.service.js`, `authenticate.js`, `authorize.js` | Implemented; 15-min bearer token; logout is local only. |
+| Tailwind CSS | Responsive UI and design tokens | `frontend/src/index.css`, components/pages | Implemented; visual browser QA absent. |
+| `_all_docs` prefix scan | Admin list and TV2 public Job scan | `admin-user.service.js`, `job-application.repository.js` | Read-only bounded pages; scaling/index review remains. |
+| CouchDB MapReduce `_count` | UC25 aggregate views | `admin-statistics.repository.js` | Read-only GET queries; design docs must be separately installed. |
+| Mango `_find` | Candidate owner lookup and domain queries | CouchDB client/repositories | Query-only POST; index expectations need review. |
+| `_rev`, ETag, `If-Match` | Profile/Admin mutation concurrency | profile/admin routes and services | Implemented; conflicts map to 409, no blind retry. |
+| Cursor pagination | Job portal and Admin list | Job service/UI and Admin service/UI | Implemented in API/client paths; tests cover cursors. |
+| Debounce + AbortController | Search inputs and stale request handling | `JobList.jsx`, `AdminDashboard.jsx` | Source implemented; four UI tests currently fail on old labels. |
+| Vitest/jsdom and Node test runner | Frontend/backend unit/API tests | package scripts and test files | Implemented; current failures documented below. |
+
+Rationale recorded in source/contracts: deterministic IDs avoid email Mango lookup; revision preconditions prevent blind document overwrite; cursor paging avoids offset scans; MapReduce avoids transferring every document to backend for counts. Other performance/security motivations above are audit interpretation, not evidence of a formal decision record.
+
+### 9. API and database inventory
+
+| API | Actor | Data operation | Notes |
+|---|---|---|---|
+| `POST /api/v1/auth/register` | Public Candidate | Two User/Candidate writes in configured Auth DB | Not atomic across docs. |
+| `POST /api/v1/auth/login`, `GET /api/v1/auth/me` | Public / authenticated | User lookup/read | Server verifies current account status. |
+| `POST /api/v1/auth/register/recruiter` | Public, feature-gated | Company/Department/Recruiter/User writes | Disabled by default; current tests fail when enabled due organization handling. |
+| `GET/PATCH /api/v1/candidate/profile/me` | Candidate | Mango read + `_rev` update | ETag/If-Match; safe DTO. |
+| `GET /api/v1/jobs`, `GET /api/v1/jobs/:id` | Public | TV2 Job repository `_all_docs` scan/read | OPEN-only list; detail should reject CLOSED at backend. |
+| `GET /api/v1/admin/users`, `GET /users/:id` | Admin | `_all_docs` read / document read | Safe DTO, search/filter/cursor. |
+| `PATCH /api/v1/admin/users/:id/status` | Admin | Conditional document update | ACTIVE↔LOCKED only, no Admin/RESET_REQUIRED change. |
+| `GET /api/v1/admin/stats` | Admin | CouchDB `GET /_design/.../_view/...` | Requires TV1 statistics view and TV2 Job view in configured DBs. |
+
+Auth uses `AUTH_COUCHDB_DATABASE`; Job and TV2 view queries use `COUCHDB_DATABASE`. A process configured with both variables pointing at the demo DB can run the combined dashboard only if both sets of required views exist there. `.env` selects DB names/credentials; it does not install design docs. `recruitment_db` is strictly read-only and must not receive view installation, indexes, seeds, or mutation tests.
+
+### 10. Architecture and workflows
+
+#### TV1 / shared architecture
+
+```mermaid
+flowchart LR
+  UI[React + Vite UI] -->|HTTP /api/v1| API[Express routes]
+  API --> AUTH[Auth / RBAC middleware]
+  AUTH --> SVC[TV1 services]
+  SVC --> REPO[TV1 repositories / CouchDbClient]
+  REPO --> DB[(CouchDB Auth DB)]
+  UI -->|public Jobs API| JOBAPI[TV2 Express Job routes]
+  JOBAPI --> JOBSVC[TV2 JobService]
+  JOBSVC --> JOBDB[(CouchDB Job DB)]
+  ADMIN[Admin Dashboard] -->|GET /admin/stats| STAT[AdminStatisticsRepository]
+  STAT -->|MapReduce GET views| DB
+  STAT -->|group_level=2 existing view| JOBDB
+```
+
+#### UC01–UC03 workflow
+
+```mermaid
+sequenceDiagram
+  participant C as Candidate
+  participant UI as React UI
+  participant API as Auth/Profile API
+  participant S as Auth/Profile service
+  participant DB as Auth CouchDB
+  C->>UI: Register / Login
+  UI->>API: POST register or login
+  API->>S: validate + authenticate
+  S->>DB: deterministic User read/write; Candidate write on registration
+  API-->>UI: safe DTO + short-lived Bearer JWT
+  UI->>API: GET/PATCH profile with token and If-Match
+  API->>S: verify role/owner/revision
+  S->>DB: Mango read / conditional _rev update
+  API-->>UI: profile DTO + ETag
+```
+
+#### UC05–UC07 workflow
+
+```mermaid
+flowchart LR
+  LIST[Job List UI] --> MODE{DEV fixture mode?}
+  MODE -->|Yes| FIX[Explicit publicJobs fixtures]
+  MODE -->|No| API[TV2 public Job API]
+  UIFILTER[Search / skills / industry / seniority] --> API
+  UIFILTER --> FIX
+  API --> SCAN[TV2 bounded _all_docs Job scan]
+  SCAN --> OPEN[OPEN-only filtered page + cursor]
+  OPEN --> DETAIL[Job detail API / UI]
+  DETAIL -. backend should enforce OPEN-only .-> JOB[(Job + Company docs)]
+```
+
+#### UC23–UC25 workflow
+
+```mermaid
+flowchart LR
+  ADMIN[Admin login] --> AUTH[ACTIVE User + ADMIN role check]
+  AUTH --> LIST[UC23: User list/detail read]
+  AUTH --> MUT[UC24: conditional lock/unlock]
+  AUTH --> STATS[UC25: stats API]
+  LIST --> UDB[(Auth DB)]
+  MUT --> UDB
+  STATS --> V1[TV1 User/Candidate MapReduce views]
+  STATS --> V2[TV2 Job composite-key view]
+  V1 --> UDB
+  V2 --> JDB[(Job DB)]
+  STATS -. if view missing .-> ERR[503 setup error; no estimate/fallback]
+```
+
+### 11. Test results from this audit
+
+| Scope / command | Result | Interpretation |
+|---|---:|---|
+| Backend UC25/Admin focused: `node --test tests/auth-foundation/admin-statistics.repository.test.js tests/auth-foundation/domain-routes.test.js tests/auth-foundation/admin-user.service.test.js tests/auth-foundation/auth-mvp.test.js tests/foundation/couchdb.client.test.js` | **31/31 PASS** | Includes MapReduce rows/grouping, missing view, DB errors, Admin/RBAC, UC23/UC24 regressions. Mock/fake clients; no DB write. |
+| Backend Recruitment: `node --test tests/recruitment/*.test.js` | **45/45 PASS** | API/service tests use fixtures/fakes; not live CouchDB verification. |
+| Backend Auth/Profile subset: auth-mvp, auth-routes, auth-contract, authorization, candidate-profile, repositories | **25/26 PASS** | One Recruiter registration route test returned 400 `ORGANIZATION_NOT_SUPPORTED`, expected 201. |
+| Backend full Auth/Foundation targeted: `node --test tests/auth-foundation/*.test.js tests/foundation/*.test.js` | **64/71 PASS** | Seven failures are Recruiter registration route/service tests; no UC25 failure. |
+| Recruiter service file alone | **1/7 PASS** | Six failures caused by `ORGANIZATION_NOT_SUPPORTED` before expected write/organization path; current fixture/setup or enabled flow requires correction. |
+| Frontend Admin UI: `vitest run tests/admin-user-list.test.jsx` | **10/10 PASS** | API is mocked; verifies KPIs, charts, errors/retry and UC23/24 controls. |
+| Frontend full Vitest: `vitest run` | **67/71 PASS** | Four failures in `tests/public-jobs/job-list.test.jsx`; expected old label does not match current labels. Other 7 test files pass. |
+| Frontend Node tests: `node --test tests/auth/auth-helper.test.js tests/public-jobs/public-jobs.test.js` | **7/7 PASS** | Memory logout helper and public Job fixture model. |
+| Frontend lint: `npm.cmd run lint` | **PASS, 0 errors, 2 warnings** | Existing unused React imports in `App.jsx` and `Landing.jsx`. |
+| Frontend build: `npm.cmd run build` | **PASS** | Vite warns bundle is 502.27 kB (>500 kB). |
+| `git diff --check` | **PASS** | No whitespace errors; standard line-ending advisories only. |
+| Browser E2E | **NOT RUN** | No evidence of browser-based UX/responsive acceptance. |
+| Backend `npm test` full data/release suite | **NOT RUN** | Script includes shared scratch/release tests; known risk and not required for these isolated checks. |
+
+### 12. Findings and risks by priority
+
+1. **High — branch/worktree mismatch.** Requested `feature/tv1-admin-management` does not exist. UC23–UC25 changes are split between index and worktree on `feature/admin-management` and are uncommitted. Review/commit ownership must be resolved before claiming delivery from the requested branch.
+2. **High — public Job detail differs across refs.** `feature/job-listing-and-detail-pages` enforces OPEN-only detail, but `feature/admin-management` and `dev` still reject only DRAFT and can expose CLOSED details. Merge the corrected TV2 service change into the intended target ref before accepting the public-detail behavior.
+3. **High — Recruiter registration regression.** Seven auth/Foundation tests fail (including one route test and six service tests); enabled flow returns `ORGANIZATION_NOT_SUPPORTED` before expected operations. This undermines the Recruiter portion of UC01 and must be corrected or intentionally disabled/documented.
+4. **Medium — Job List test/label drift.** Four frontend tests fail at label lookup. Align accessible labels and tests; do not treat successful model/API tests as UI acceptance.
+5. **Medium — no browser E2E.** Forms, viewport behavior, navigation, loading/error/retry and actual session persistence have not been visually/interaction tested in this audit.
+6. **Medium — UC25 production prerequisites.** `recruitment_db` has no UC25 view; production stats must remain unavailable until approved design docs are deployed to the right DBs and TV2 view presence is confirmed. Current behavior correctly returns an explicit error instead of fake figures.
+7. **Medium — Candidate registration is multi-document.** User and Candidate writes are not transactional; staged RESET_REQUIRED records require reconciliation after partial failure.
+8. **Medium — Auth token revocation.** Logout is local token deletion; existing token remains valid until 15-minute expiry, except current User lock checks reject while locked.
+9. **Low/scale — `_all_docs` and Mango paths.** Admin listing and Job browse scan bounded pages; Candidate lookup uses Mango. Confirm query/index plan and measure with realistic DB before scale.
+10. **Build warning.** Frontend JS chunk exceeds 500 kB; build succeeds but may need code splitting.
+
+### 13. TV1 / TV2 / TV3 ownership boundaries
+
+| Module | Owner | TV1 contribution | Dependency / boundary |
+|---|---|---|---|
+| Auth, Candidate registration/Profile, Admin identity | TV1 | Auth routes/services, Candidate profile, Admin UI and endpoints | Shared CouchDB Foundation; team session/onboarding policy; no TV1 claim to CouchDB platform ownership beyond agreed shared foundation. |
+| Public Job portal UI | TV1 | Listing/search/detail presentation and API adapter; explicit dev fixtures | TV2 owns Job documents, repository, public API, filtering and backend enforcement. |
+| Job management and Application lifecycle | TV2 | TV1 consumes public Job DTOs; may show application entry/navigation | Do not count JobService, Apply, stage transitions, or Job DB writes as TV1 implementation. |
+| Interview / scoring / ranking / audit | TV3 | No direct UC01–UC07 or UC23–UC25 implementation established here | TV3 owns Interview/scoring/audit contracts and persistence. UC25 does not count Interview/AI statistics. |
+| UC25 Job statistics view | TV2 source reused by TV1 | TV1 aggregation queries existing composite key and translates status counts | TV2 design document must exist in configured Job DB; no duplicate view or data write by UC25 runtime. |
+
+### 14. Remaining work for acceptance
+
+1. Locate/restore the intended `feature/tv1-admin-management` branch or formally re-scope delivery to the existing branch; preserve current staged and unstaged state.
+2. Review and stage/commit Admin changes only after explicit user/team workflow; this audit did not stage or commit.
+3. Fix or gate Recruiter registration so route/service tests and the organization-selection contract agree.
+4. Enforce `status === 'OPEN'` in TV2 public Job detail backend; add regression test (coordinate with TV2 owner).
+5. Update Job List accessibility selectors/tests to current UI labels; rerun frontend tests.
+6. Run browser acceptance for Candidate registration/login/profile, Jobs search/detail, Admin list/status/statistics at mobile and desktop widths.
+7. Keep production UC25 disabled until design docs are reviewed and installed under an approved deployment on the intended non-production/production target. Never install them on `recruitment_db` under this audit authorization.
+8. Decide logout/revocation semantics; document multi-document registration recovery.
+9. Assess `_all_docs` / Mango query performance and the >500 kB frontend chunk before production-scale acceptance.
+
+### 15. Final assessment
+
+The source contains substantial TV1 implementation, but current Git delivery state and test results do not support a blanket “complete” claim. Candidate Auth/Profile paths and Admin UI have focused automated coverage, Job API tests pass, and UC25 has a recorded live demo verification. The major acceptance gaps are the missing requested branch, uncommitted Admin work, Recruiter registration test failures, four Job List UI test failures, missing browser E2E, and production UC25 view deployment. No production DB writes were performed; `recruitment_db` remains strict read-only.
+
+**Overall TV1 status: PARTIAL — implementation exists; integration, branch provenance, and UI/runtime acceptance remain incomplete.**

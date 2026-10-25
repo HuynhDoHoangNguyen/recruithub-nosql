@@ -22,6 +22,7 @@ export function getAuthDatabaseConfig(environment = process.env) {
 export function createAuthRepositories({ environment = process.env, clientFactory = createCouchDbClient } = {}) {
   const client = clientFactory({ config: getAuthDatabaseConfig(environment) });
   return {
+    client,
     users: new UserRepository({ client }),
     candidates: new CandidateRepository({ client }),
     companies: new CompanyRepository({ client }),

@@ -36,6 +36,29 @@ test('Admin user listing applies owned filters, paging, and safe DTO projection'
   await assert.rejects(() => service.list({ limit: 1, role: 'ADMIN', cursor: page1.nextCursor }), { code: 'INVALID_CURSOR' });
 });
 
+test('Admin user listing rejects invalid filters and bounds scans while preserving a resumable cursor', async () => {
+  const users = Array.from({ length: 5200 }, (_, index) => user({
+    _id: `user:${String(index).padStart(64, '0')}`,
+    email: `person${index}@example.invalid`,
+    email_normalized: `person${index}@example.invalid`,
+    role: 'CANDIDATE',
+  }));
+  const { service, repo } = makeService({ users });
+  await assert.rejects(() => service.list({ search: 'x'.repeat(101) }), { code: 'VALIDATION_ERROR' });
+  await assert.rejects(() => service.list({ role: 'OWNER' }), { code: 'VALIDATION_ERROR' });
+  await assert.rejects(() => service.list({ limit: 51 }), { code: 'VALIDATION_ERROR' });
+
+  const first = await service.list({ search: 'no-match' });
+  assert.equal(first.users.length, 0);
+  assert.ok(first.nextCursor);
+  assert.equal(repo.scans.length, 20);
+  assert.equal(repo.scans.reduce((sum, scan) => sum + scan.limit, 0), 5000);
+  const second = await service.list({ search: 'no-match', cursor: first.nextCursor });
+  assert.equal(second.users.length, 0);
+  assert.equal(repo.scans.length, 21);
+  await assert.rejects(() => service.list({ search: 'different', cursor: first.nextCursor }), { code: 'INVALID_CURSOR' });
+});
+
 test('Admin status changes require current revision and cannot activate RESET_REQUIRED users', async () => {
   const { service, repo } = makeService({ users: [user({ role: 'CANDIDATE', account_status: 'RESET_REQUIRED' })] });
   await assert.rejects(() => service.setAccountStatus(userId, 'ACTIVE', '1-rev'), { code: 'RESET_REQUIRED_PROTECTED' });
@@ -86,14 +109,27 @@ test('Admin status changes keep ETag preconditions and update eligible accounts 
   assert.equal(result.revision, '2-rev');
 });
 
-test('Admin statistics are calculated from repository pages, not hardcoded', async () => {
-  const { service } = makeService({
-    users: [user(), user({ _id: `user:${'b'.repeat(64)}`, role: 'CANDIDATE', account_status: 'LOCKED' })],
-    candidates: [{ _id: 'candidate:1', type: 'candidate' }, { _id: 'candidate:2', type: 'candidate' }],
-  });
-  const stats = await service.getStatistics();
-  assert.equal(stats.totalUsers, 2);
-  assert.equal(stats.totalCandidates, 2);
-  assert.equal(stats.roles.ADMIN, 1);
-  assert.equal(stats.statuses.LOCKED, 1);
+test('UC24 permits only ACTIVE to LOCKED and LOCKED to ACTIVE, with no automatic retry', async () => {
+  const account = user({ role: 'CANDIDATE', account_status: 'ACTIVE' });
+  const { service, repo } = makeService({ users: [account] });
+  const locked = await service.setAccountStatus(userId, 'LOCKED', '1-rev');
+  assert.equal(locked.user.account_status, 'LOCKED');
+  assert.equal(locked.revision, '2-rev');
+  const unlocked = await service.setAccountStatus(userId, 'ACTIVE', '2-rev');
+  assert.equal(unlocked.user.account_status, 'ACTIVE');
+  assert.equal(unlocked.revision, '2-rev');
+  await assert.rejects(() => service.setAccountStatus(userId, 'ACTIVE', '2-rev'), { code: 'INVALID_STATUS_TRANSITION' });
+  await assert.rejects(() => service.setAccountStatus(userId, 'RESET_REQUIRED', '2-rev'), { code: 'VALIDATION_ERROR' });
+  assert.equal(repo.users[0].account_status, 'ACTIVE');
+});
+
+test('UC24 rejects missing targets and never retries a write conflict', async () => {
+  const missing = makeService({ users: [] });
+  await assert.rejects(() => missing.service.setAccountStatus(userId, 'LOCKED', '1-rev'), { code: 'NOT_FOUND' });
+  const account = user({ role: 'RECRUITER', account_status: 'ACTIVE' });
+  const { service } = makeService({ users: [account] });
+  let writes = 0;
+  service.users.update = async () => { writes += 1; throw Object.assign(new Error('conflict'), { code: 'CONFLICT' }); };
+  await assert.rejects(() => service.setAccountStatus(userId, 'LOCKED', '1-rev'), { code: 'REVISION_CONFLICT' });
+  assert.equal(writes, 1);
 });
