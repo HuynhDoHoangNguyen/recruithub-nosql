@@ -7,6 +7,7 @@ export function normalizeJob(job) {
     industry: job.industry,
     description: job.description,
     responsibilities: job.responsibilities || [],
+    requirements: job.requirements || {},
     requiredSkills: job.requiredSkills || job.required_skills || [],
     optionalSkills: job.optionalSkills || job.optional_skills || [],
     deadline: job.deadline || null,
