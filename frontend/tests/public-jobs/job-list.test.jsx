@@ -16,6 +16,7 @@ function renderJobs(entry = '/jobs') {
     <Route path="/jobs" element={<><JobList /><LocationText /></>} />
   </Routes></MemoryRouter>);
 }
+const searchInput = () => screen.getAllByLabelText('Từ khóa')[0];
 
 beforeEach(() => {
   vi.useRealTimers();
@@ -26,7 +27,7 @@ beforeEach(() => {
 describe('Public Job search UI', () => {
   it('restores filters from URL and requests them from the API', async () => {
     renderJobs('/jobs?q=Backend&skills=JavaScript%2C%20SQL&industry=SaaS&seniority=MID');
-    expect(screen.getByLabelText('Tìm theo vị trí, mô tả, ngành nghề hoặc kỹ năng').value).toBe('Backend');
+    expect(searchInput().value).toBe('Backend');
     expect(screen.getByLabelText('Kỹ năng').value).toBe('JavaScript, SQL');
     expect(screen.getByLabelText('Ngành nghề').value).toBe('SaaS');
     expect(screen.getByLabelText('Cấp độ').value).toBe('MID');
@@ -39,7 +40,7 @@ describe('Public Job search UI', () => {
     renderJobs('/jobs?q=Backend&skills=JavaScript&industry=SaaS&seniority=MID');
     fireEvent.click(screen.getByRole('button', { name: 'Xóa lọc' }));
     await waitFor(() => expect(screen.getByTestId('location-search').textContent).toBe(''));
-    expect(screen.getByLabelText('Tìm theo vị trí, mô tả, ngành nghề hoặc kỹ năng').value).toBe('');
+    expect(searchInput().value).toBe('');
     expect(screen.getByLabelText('Kỹ năng').value).toBe('');
     expect(screen.getByLabelText('Ngành nghề').value).toBe('');
     expect(screen.getByLabelText('Cấp độ').value).toBe('');
@@ -57,7 +58,7 @@ describe('Public Job search UI', () => {
       .mockResolvedValue({ jobs: [{ id: 'job:filtered', title: 'Filtered job', status: 'OPEN', industry: 'SaaS', seniority: 'MID', requiredSkills: [] }], nextPage: null });
     renderJobs();
     expect(await screen.findByText('First job')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tiếp' }));
     await waitFor(() => expect(listPublicJobs).toHaveBeenCalledTimes(2));
     expect(listPublicJobs.mock.calls[1][0]).toMatchObject({ page: 2, bookmark: 'cursor-next' });
     fireEvent.change(screen.getByLabelText('Cấp độ'), { target: { value: 'MID' } });
@@ -75,7 +76,7 @@ describe('Public Job search UI', () => {
     }));
     renderJobs();
     await act(async () => {});
-    fireEvent.change(screen.getByLabelText('Tìm theo vị trí, mô tả, ngành nghề hoặc kỹ năng'), { target: { value: 'React' } });
+    fireEvent.change(searchInput(), { target: { value: 'React' } });
     await act(async () => { await vi.advanceTimersByTimeAsync(350); });
     await act(async () => { resolveNew({ jobs: [{ id: 'job:new', title: 'React Engineer', status: 'OPEN', industry: 'SaaS', seniority: 'MID', requiredSkills: [] }], nextPage: null }); });
     expect(screen.getByText('React Engineer')).toBeTruthy();

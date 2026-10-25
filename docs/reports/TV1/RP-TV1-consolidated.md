@@ -1,6 +1,6 @@
 # Báo cáo tổng hợp TV1 — Toàn bộ hồ sơ giai đoạn
 
-Ngày cập nhật: 2026-10-24. Tài liệu này gom nguyên văn 16 báo cáo TV1 trước đây và bổ sung các báo cáo Phase C.1C, Auth UI/Recruiter Registration ở cuối. Các trạng thái trong phụ lục là trạng thái lịch sử tại thời điểm từng báo cáo; trạng thái tích hợp hiện tại là merge commit `260cf4a` trên `feature/identity-candidate-portal`. Nhánh `dev` hiện vẫn ở parent `91f8346`. Full backend suite chưa PASS; các subset test không thay thế kết quả full suite.
+Ngày cập nhật: 2026-10-25. Tài liệu này gom nguyên văn các báo cáo TV1 trước đây và bổ sung các báo cáo UC06, UC07, Phase C.1C, Auth UI/Recruiter Registration ở cuối. Các trạng thái trong phụ lục là trạng thái lịch sử tại thời điểm từng báo cáo; trạng thái tích hợp hiện tại được ghi theo từng báo cáo tính năng.
 
 Báo cáo TV1 + TV2 và hướng dẫn kiểm thử được chuyển sang [báo cáo tổng hợp TV2](../TV2/RP-TV2-consolidated.md#rp-tv1-tv2-merge-test-guide). Contract hiện hành: [TV1 Auth contract](../../shared/TV1_AUTH_MODULE_CONTRACT.md), [CouchDB Foundation guide](../../shared/COUCHDB_FOUNDATION_GUIDE.md).
 
@@ -24,6 +24,7 @@ Báo cáo TV1 + TV2 và hướng dẫn kiểm thử được chuyển sang [báo
 16. [RP-TV1-technical-decision-register.md](#rp-tv1-technical-decision-register)
 17. [RP-TV1-phase-c1c-recruiter-ownership-integration.md](#rp-tv1-phase-c1c-recruiter-ownership-integration)
 18. [RP-TV1-auth-recruiter-registration-login-ui.md](#rp-tv1-auth-recruiter-registration-login-ui)
+19. [RP-TV1-UC07-job-detail.md](#rp-tv1-uc07-job-detail)
 
 
 <a id="rp-tv1-couchdb-client-repository"></a>
@@ -2428,3 +2429,27 @@ Chi tiết fields, API, query strategy, giới hạn, tests và hướng dẫn t
 ### Cập nhật UI template (2026-10-25)
 
 Tinh chỉnh `/jobs` theo ảnh tham khảo: sidebar tìm kiếm bên trái, panel kết quả bên phải, Job cards ngang có metadata/icon/skill chips, màu và khoảng cách thống nhất, phân trang cursor ở cuối panel; tablet/mobile giữ search dễ truy cập và bộ lọc dạng panel. Không thêm location/salary filters, relevance sort hoặc tổng count giả vì schema/API hiện chưa hỗ trợ. Frontend production build PASS; báo cáo chi tiết và giới hạn: [RP-TV1-UC06-job-search-filter-pagination.md](RP-TV1-UC06-job-search-filter-pagination.md).
+
+---
+
+### TV1 UC07 — Job Detail (2026-10-25)
+
+Hoàn thiện `GET /api/v1/jobs/:id` để chỉ công khai Job `OPEN`, bổ sung Company DTO an toàn và xử lý reference thiếu; `DRAFT`/`CLOSED`/không tồn tại trả 404. Thiết kế lại `/jobs/:id` theo layout hai cột responsive, hiển thị đúng trường schema, ẩn section rỗng, escape nội dung, và tái sử dụng Application/Apply flow hiện có. Guest được đưa về đúng trang sau đăng nhập Candidate; Recruiter/Admin không thể ứng tuyển; Apply tắt khi deadline qua. CouchDB `recruitment_db` chỉ đọc, không sửa schema/index/dữ liệu.
+
+Báo cáo chi tiết gồm Job field matrix, kết quả scan Job/Company, public DTO, kiểm thử và hướng dẫn UI: [RP-TV1-UC07-job-detail.md](RP-TV1-UC07-job-detail.md).
+
+---
+
+## Nhật ký nhánh `feature/job-listing-and-detail-pages` — 2026-10-25
+
+- **Một log cho toàn nhánh:** HEAD `018a0d5` (merge PR #4); lịch sử nhánh bao gồm các commit từ `40b53c0` đến `018a0d5`.
+- **Tổng hợp:** hoàn thiện nền tảng CouchDB và tích hợp liên nhóm; xây Auth, Candidate Profile, Admin và Recruiter; tích hợp Jobs/Applications TV1–TV2; triển khai Public Job search/filter (UC06) và Job Detail (UC07).
+- **Trạng thái hiện tại:** còn thay đổi chưa commit cho UC07 và đồng bộ UC06: cập nhật `JobService`, `JobDetails.jsx`, `JobList.jsx`, `publicJobsModel.js`, `authNavigation.js`, các test Recruitment/Job detail/Job list/auth navigation, cùng báo cáo [RP-TV1-UC07-job-detail.md](RP-TV1-UC07-job-detail.md). Đây là phần working tree, chưa thuộc lịch sử commit của nhánh.
+
+### Trạng thái dữ liệu Jobs hiện tại (2026-10-25)
+
+Public Jobs API đã được triển khai: `GET /api/v1/jobs` và `GET /api/v1/jobs/:id` đọc các Job `OPEN` từ CouchDB; UC06 đã có smoke test chỉ đọc trên `recruitment_db` (lúc kiểm tra có 25.750 documents). Vì vậy dự án đã có dữ liệu Job thật trong CouchDB và API phục vụ chúng.
+
+Riêng frontend khi chạy ở môi trường Vite development mặc định bật fixture, trừ khi đặt `VITE_PUBLIC_JOBS_MODE=api`. Do đó, nếu trang `/jobs` hiện nhãn “dữ liệu minh họa”, đó là do cấu hình adapter phía frontend; không có nghĩa CouchDB chỉ chứa dữ liệu mẫu. Để xem dữ liệu thật, đặt `VITE_PUBLIC_JOBS_MODE=api`, bảo đảm `VITE_API_BASE_URL` trỏ tới Backend đang chạy với `COUCHDB_DATABASE=recruitment_db`, rồi khởi động lại Vite. Khi chạy production, adapter không dùng fixture; trang gọi Public Jobs API.
+
+Các báo cáo Stage 04C–11 phía trên ghi “TV2 API pending/fixture” là ghi nhận lịch sử tại thời điểm đó. Trạng thái mới hơn được mô tả trong UC06/UC07 và phần này.
