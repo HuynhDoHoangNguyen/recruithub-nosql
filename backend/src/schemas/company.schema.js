@@ -10,6 +10,8 @@
  */
 
 import { z } from 'zod';
+import { safeWebUrl } from './recruiter-profile.schema.js';
+import { assetReferenceSchema } from './upload.schema.js';
 import {
   DOCUMENT_TYPES,
   PROVENANCE_CLASSIFICATIONS,
@@ -29,6 +31,9 @@ export const companyDocumentSchema = z
       .regex(/^company:[a-z0-9_:-]+$/, 'Invalid Company _id format. Expected prefix "company:"'),
     _rev: z.string().optional(),
     type: z.literal(DOCUMENT_TYPES.COMPANY),
+    logo_url: safeWebUrl.optional(),
+    logo_asset: assetReferenceSchema.optional(),
+    description: z.string().trim().max(5000).optional(),
     name: z
       .string()
       .trim()

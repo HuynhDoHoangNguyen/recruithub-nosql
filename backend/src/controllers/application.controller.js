@@ -4,6 +4,7 @@ export function applicationController(service) {
   };
   return {
     context: send(req => service.context(req.user)),
+    stats: send(req => service.stats(req.user)),
     create: send(req => service.create(req.user, req.validated.body), 201, 'Đã nộp hồ sơ ứng tuyển.'),
     mine: send(req => service.mine(req.user, req.validated.query)),
     detail: send(req => service.detail(req.user, req.params.id)),

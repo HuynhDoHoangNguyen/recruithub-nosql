@@ -1,0 +1,51 @@
+{
+  "origin": "http://localhost:5173",
+  "checks": [
+    {
+      "route": "/",
+      "state": "initial",
+      "rendered": true
+    },
+    {
+      "route": "/",
+      "state": "reload",
+      "rendered": true
+    },
+    {
+      "route": "/jobs",
+      "state": "initial",
+      "rendered": true
+    },
+    {
+      "route": "/jobs",
+      "state": "reload",
+      "rendered": true
+    },
+    {
+      "route": "/login",
+      "state": "initial",
+      "rendered": true
+    },
+    {
+      "route": "/login",
+      "state": "reload",
+      "rendered": true
+    },
+    {
+      "route": "/register",
+      "state": "initial",
+      "rendered": true
+    },
+    {
+      "route": "/register",
+      "state": "reload",
+      "rendered": true
+    },
+    {
+      "route": "/jobs",
+      "state": "mobile menu",
+      "rendered": true
+    }
+  ],
+  "runtimeOrModuleErrors": []
+}

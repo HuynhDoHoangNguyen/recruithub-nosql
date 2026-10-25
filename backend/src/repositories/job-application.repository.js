@@ -12,13 +12,16 @@ export const recruitmentIndexes = [
   ['job_applications_stage', ['type', 'job_id', 'current_stage', 'applied_at']],
   ['profile_user', ['type', 'user_id']],
   ['application_interviews', ['type', 'application_id']],
-  ['public_jobs', ['type', 'status', 'published_at']],
+  ['public_jobs_created_v2', ['type', 'status', 'created_at', '_id']],
 ];
 export const recruitmentDesign = {
   _id: '_design/job_application', language: 'javascript', views: {
-    jobs_by_recruiter: { map: 'function(doc) { if(doc.type === "job") emit([doc.recruiter_id, doc.status], 1); }', reduce: '_count' },
-    job_ids_by_recruiter: { map: 'function(doc) { if(doc.type === "job") emit(doc.recruiter_id, null); }' },
+    jobs_by_recruiter: { map: 'function(doc) { if(doc.type === "job" && !doc.deleted_at) emit([doc.recruiter_id, doc.status], 1); }', reduce: '_count' },
+    job_ids_by_recruiter: { map: 'function(doc) { if(doc.type === "job" && !doc.deleted_at) emit(doc.recruiter_id, null); }' },
     applications_by_job_stage: { map: 'function(doc) { if(doc.type === "application") emit([doc.job_id, doc.current_stage], 1); }', reduce: '_count' },
+    attempts_by_job: { map: 'function(doc) { if(doc.type === "application") emit(doc.job_id, doc.attempt_number || 1); }', reduce: '_sum' },
+    attempts_by_candidate: { map: 'function(doc) { if(doc.type === "application") emit(doc.candidate_id, doc.attempt_number || 1); }', reduce: '_sum' },
+    applications_by_candidate_stage: { map: 'function(doc) { if(doc.type === "application") emit([doc.candidate_id, doc.current_stage], 1); }', reduce: '_count' },
   },
 };
 
@@ -110,15 +113,28 @@ export class JobApplicationRepository {
     if (!jobs) throw new ApiError(503, 'DATABASE_NOT_INITIALIZED', 'Cần thiết lập index và view cho phân hệ tuyển dụng.');
     const jobRows = await this.view('job_ids_by_recruiter', { keys: [recruiterId] });
     const byStage = {};
+    let total_attempts = 0;
     const stages = ['APPLIED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'];
     // Only IDs and reduced counts cross the database boundary; never full candidate collections.
     for (let offset = 0; offset < jobRows.length; offset += 100) {
       const keys = jobRows.slice(offset, offset + 100).flatMap(row => stages.map(stage => [row.id, stage]));
       const counts = await this.view('applications_by_job_stage', { keys, group: true });
+      const attempts = await this.view('attempts_by_job', { keys: jobRows.slice(offset, offset + 100).map(row => row.id), group: true });
+      total_attempts += attempts.reduce((sum, row) => sum + row.value, 0);
       for (const row of counts) byStage[row.key[1]] = (byStage[row.key[1]] || 0) + row.value;
     }
+    const total_applications = Object.values(byStage).reduce((sum, count) => sum + count, 0);
     return { jobs: Object.fromEntries(jobs.rows.map(row => [row.key[1], row.value])), applications: byStage,
-      total_applications: Object.values(byStage).reduce((sum, count) => sum + count, 0) };
+      total_applications, total_attempts, historical_attempts: total_attempts - total_applications };
+  }
+  async candidateStats(candidateId) {
+    const result = await this.http(`_design/job_application/_view/applications_by_candidate_stage?group=true&startkey=${encodeURIComponent(JSON.stringify([candidateId]))}&endkey=${encodeURIComponent(JSON.stringify([candidateId, {}]))}`);
+    if (!result) throw new ApiError(503, 'DATABASE_NOT_INITIALIZED', 'Cần thiết lập view thống kê hồ sơ ứng tuyển.');
+    const by_stage = Object.fromEntries(result.rows.map(row => [row.key[1], row.value]));
+    const total_applications = Object.values(by_stage).reduce((sum, count) => sum + count, 0);
+    const attempts = await this.view('attempts_by_candidate', { group: true, keys: [candidateId] });
+    const total_attempts = attempts.reduce((sum, row) => sum + row.value, 0);
+    return { by_stage, total_applications, total_attempts, historical_attempts: total_attempts - total_applications };
   }
   async initialize() {
     for (const [name, fields] of recruitmentIndexes) await this.http('_index', 'POST', { index: { fields }, ddoc: name, name, type: 'json' });

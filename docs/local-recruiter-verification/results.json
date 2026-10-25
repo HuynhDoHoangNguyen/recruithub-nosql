@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-10-25T05:37:04.192Z",
+  "origin": "http://localhost:5173",
+  "mocked": false,
+  "database": "recruithub_auth_local_test",
+  "email": "recruiter.test@example.invalid",
+  "checks": [
+    "Protected create route → real login → verified Recruiter → original destination",
+    "Create DRAFT through form → Dashboard reads persisted job",
+    "Edit persisted DRAFT → publish OPEN",
+    "Reload clears memory session → real login again → saved OPEN job persists",
+    "Recruiter header create entry works"
+  ],
+  "runtimeErrors": [],
+  "sampleJobTitle": "Kiểm tra đăng tuyển local 1792906625373 - đã sửa"
+}

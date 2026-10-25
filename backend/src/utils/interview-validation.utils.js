@@ -43,7 +43,7 @@ export const INTERVIEW_RESULTS = Object.freeze({
  * @param {number} round - positive integer 1, 2, 3...
  * @returns {string} interview:<digest>:<round>
  */
-export function interviewIdFromRound(applicationId, round) {
+export function interviewIdFromRound(applicationId, round, attempt = 1) {
   if (typeof applicationId !== 'string' || !applicationId.trim()) {
     throw new TypeError('applicationId must be a non-empty string');
   }
@@ -68,7 +68,8 @@ export function interviewIdFromRound(applicationId, round) {
     throw new TypeError(`round must be a positive integer, received ${round}`);
   }
 
-  return `interview:${appKey}:${round}`;
+  if (!Number.isInteger(attempt) || attempt < 1) throw new TypeError('attempt must be a positive integer');
+  return attempt === 1 ? `interview:${appKey}:${round}` : `interview:${appKey}:attempt:${attempt}:${round}`;
 }
 
 /**
@@ -126,7 +127,7 @@ export function validateInterviewTimeline({ scheduledAt, completedAt, interviewS
  * @param {string} params.applicationId - Application ID
  * @returns {{ valid: boolean, errors: string[] }}
  */
-export function validateInterviewEvidenceForOffer({ interviews, applicationId } = {}) {
+export function validateInterviewEvidenceForOffer({ interviews, applicationId, applicationAttempt = 1 } = {}) {
   const errors = [];
 
   if (!Array.isArray(interviews) || interviews.length === 0) {
@@ -134,7 +135,7 @@ export function validateInterviewEvidenceForOffer({ interviews, applicationId } 
     return { valid: false, errors };
   }
 
-  const appInterviews = interviews.filter((inv) => inv.application_id === applicationId);
+  const appInterviews = interviews.filter((inv) => inv.application_id === applicationId && (inv.application_attempt || 1) === applicationAttempt);
 
   if (appInterviews.length === 0) {
     errors.push(`Cannot transition to OFFER: No interview records associated with application "${applicationId}".`);
@@ -205,6 +206,10 @@ export function validateInterviewCreationScope({ interview, application, job, re
     if (!isAuthorized) {
       errors.push(`Interviewer "${interview.interviewer_id}" does not match assigned recruiter ("${recruiter._id}")`);
     }
+
+  if ((interview.application_attempt || 1) !== (application.attempt_number || 1)) {
+    errors.push('Interview must belong to the current application attempt.');
+  }
   }
 
   return {

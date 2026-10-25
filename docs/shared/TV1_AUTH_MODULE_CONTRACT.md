@@ -1,7 +1,7 @@
 # TV1 Authentication MVP Contract — Stage 04B
 
-**Status:** Implemented as a provisional TV1 MVP; pending team acknowledgement.  
-**Branch:** `feature/identity-candidate-portal`  
+**Status:** Implemented as a provisional TV1 MVP; pending team acknowledgement.
+**Branch:** `feature/identity-candidate-portal`
 **Authority:** Task-level approval authorizes this implementation for TV1. It does not supersede group policy until TV2/TV3 acknowledge it.
 
 ## Scope and ownership

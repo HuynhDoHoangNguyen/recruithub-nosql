@@ -5,6 +5,7 @@ const DASHBOARD_BY_ROLE = Object.freeze({
 });
 
 function allowedDestination(role, pathname) {
+
   if (role === 'CANDIDATE') {
     if (['/profile', '/user/dashboard'].includes(pathname)) return true;
     if (!pathname.startsWith('/jobs/')) return false;
@@ -14,7 +15,8 @@ function allowedDestination(role, pathname) {
       return false;
     }
   }
-  if (role === 'RECRUITER') return /^\/recruiter\/(dashboard|jobs\/create|jobs\/[^/]+\/(edit|applicants))$/.test(pathname);
+  if (role === 'RECRUITER') return /^\/recruiter\/(dashboard|profile|jobs\/create|jobs\/[^/]+\/(edit|applicants))$/.test(pathname);
+
   if (role === 'ADMIN') return pathname === '/admin/dashboard';
   return false;
 }

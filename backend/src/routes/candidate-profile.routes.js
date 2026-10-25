@@ -6,6 +6,7 @@ import { CandidateProfileService } from '../services/candidate-profile.service.j
 import { successResponse } from '../utils/api-response.js';
 import { sendApiError } from '../utils/send-api-error.js';
 import { createOrganizationDirectoryRepositories } from '../services/organization-lookup.service.js';
+import { createAssetRepository } from '../repositories/asset.repository.js';
 
 function createDefaultServices() {
   const repositories = createAuthRepositories();
@@ -15,7 +16,7 @@ function createDefaultServices() {
     auth: new AuthService({ userRepository: users, candidateRepository: candidates,
       companyRepository: organizations.companies, departmentRepository: organizations.departments,
       recruiterRepository: repositories.recruiters, jwtSecret: process.env.JWT_ACCESS_SECRET }),
-    profile: new CandidateProfileService({ candidateRepository: candidates }),
+    profile: new CandidateProfileService({ candidateRepository: candidates, assets: createAssetRepository() }),
   };
 }
 

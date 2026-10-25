@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Profile from '../../src/pages/Profile';
@@ -18,7 +18,11 @@ const existingCandidate = () => ({
 });
 
 const profileResponse = (profile = existingCandidate(), etag = '"4-demo"') => ({ data: { data: { profile } }, headers: { etag } });
-const renderProfile = () => render(<MemoryRouter><Profile /></MemoryRouter>);
+const renderProfile = async (tab = 'Thông tin chung') => {
+  render(<MemoryRouter><Profile /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Chỉnh sửa hồ sơ' }));
+  fireEvent.click(screen.getByRole('tab', { name: tab }));
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -38,12 +42,12 @@ describe('Candidate Profile field mapping and legacy preservation', () => {
 
   it('blocks a reversed education date range before sending a PATCH', async () => {
     const user = userEvent.setup();
-    renderProfile();
+    await renderProfile('Học vấn & Bằng cấp');
     const endDate = await screen.findByLabelText('Ngày kết thúc (nếu có)');
     await user.clear(endDate);
     await user.type(endDate, '2018-01');
     await user.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }));
-    expect((await screen.findByRole('alert')).textContent).toContain('Ngày kết thúc không được trước ngày bắt đầu.');
+    expect((await screen.findAllByRole('alert')).some(alert => alert.textContent.includes('Ngày kết thúc không được trước ngày bắt đầu.'))).toBe(true);
     expect(api.patch).not.toHaveBeenCalled();
   });
 
@@ -63,7 +67,7 @@ describe('Candidate Profile field mapping and legacy preservation', () => {
     const user = userEvent.setup();
     api.patch.mockResolvedValue({ data: { data: {} }, headers: { etag: '"5-demo"' } });
     api.get.mockResolvedValueOnce(profileResponse()).mockResolvedValueOnce(profileResponse(existingCandidate(), '"5-demo"'));
-    renderProfile();
+    await renderProfile('Kinh nghiệm & Dự án');
     const nameField = await screen.findByLabelText('Tên dự án');
     await user.clear(nameField);
     await user.type(nameField, 'Hệ thống nâng cấp');
@@ -80,7 +84,7 @@ describe('Candidate Profile field mapping and legacy preservation', () => {
   it('preserves local edits and reports ETag conflict without overwriting them', async () => {
     const user = userEvent.setup();
     api.patch.mockRejectedValue({ response: { status: 409, data: { error: { code: 'REVISION_CONFLICT' } } } });
-    renderProfile();
+    await renderProfile();
     const roleField = await screen.findByLabelText('Vị trí mong muốn');
     await user.clear(roleField);
     await user.type(roleField, 'Architect');
@@ -94,7 +98,7 @@ describe('Candidate Profile field mapping and legacy preservation', () => {
   it('keeps edits after a non-conflict save error and cancel restores the loaded values', async () => {
     const user = userEvent.setup();
     api.patch.mockRejectedValue({ response: { status: 503, data: { error: { message: 'Dịch vụ tạm thời không khả dụng.' } } } });
-    renderProfile();
+    await renderProfile();
     const roleField = await screen.findByLabelText('Vị trí mong muốn');
     await user.clear(roleField);
     await user.type(roleField, 'Platform Engineer');
@@ -109,7 +113,7 @@ describe('Candidate Profile field mapping and legacy preservation', () => {
     const user = userEvent.setup();
     api.patch.mockResolvedValue({ data: { data: {} } });
     api.get.mockResolvedValueOnce(profileResponse()).mockResolvedValueOnce(profileResponse(existingCandidate(), '"5-demo"'));
-    renderProfile();
+    await renderProfile('Kỹ năng & Chuyên môn');
     await screen.findByLabelText('Tên kỹ năng 1');
     await user.click(screen.getByRole('button', { name: 'Xóa kỹ năng 1' }));
     await user.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }));

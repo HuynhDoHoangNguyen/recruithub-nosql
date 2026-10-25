@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-25T09:18:41.819Z",
+  "origin": "http://localhost:5173",
+  "mocked": false,
+  "checks": [
+    "Real Recruiter profile route, immutable email, personal/contact edits persisted; company logo saved through its own API",
+    "Four level choices; create persists separate work mode/employment/range salary; edit restores fields and saves Intern/Part time/negotiable",
+    "Logo and salary render from stored company/job data; compact icon buttons in Job cards and applicants",
+    "Delete from applicants confirms, hides Job/public page and preserves the exact CV/history/revision",
+    "Mobile profile reload retains stored contact fields and has no horizontal overflow"
+  ],
+  "runtime_errors": [],
+  "job_title": "Tin UI lương và loại hợp đồng 1792919932015",
+  "job_id": "job:1dc19614-c4b9-49fd-bcdf-e0d2d13f40b7",
+  "test_profile_and_logo_restored": true,
+  "historical_database_unchanged": true
+}

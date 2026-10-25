@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-10-25T12:06:21.025Z",
+  "mocked": false,
+  "checks": [
+    "Real API rejects short/long/alphabetic Candidate phone, short Recruiter phone and unsafe company website; private document revisions remain unchanged",
+    "Both profile UIs show inline errors, block invalid saves without HTTP PATCH and keep entered values; a complete +84 number clears the phone error",
+    "New hero and featured cards use real API jobs; search navigates correctly; 390px landing/profile have no horizontal overflow"
+  ],
+  "runtime_errors": [],
+  "primary_before": {
+    "doc_count": 25761,
+    "update_seq": "25762-g1AAAACReJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyMpiTGBiMZuYCxdjTEi1MzYzM0LXhMCiRIakeYQIn2ASjRMs0CzMTdPVZAN_3K2g"
+  },
+  "primary_after": {
+    "doc_count": 25761,
+    "update_seq": "25762-g1AAAACReJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyMpiTGBiMZuYCxdjTEi1MzYzM0LXhMCiRIakeYQIn2ASjRMs0CzMTdPVZAN_3K2g"
+  },
+  "primary_unchanged": true
+}

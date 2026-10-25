@@ -5,6 +5,8 @@ export function normalizeJob(job) {
     company: typeof job.company === 'string' ? { name: job.company } : job.company || (job.company_name ? { name: job.company_name } : null),
     seniority: job.seniority,
     industry: job.industry,
+    employment_type: job.employment_type, salary: job.salary, company_logo_url: job.company_logo_url,
+    location_label: job.location_label, work_mode_label: job.work_mode_label, location: job.location, work_mode: job.work_mode,
     description: job.description,
     responsibilities: job.responsibilities || [],
     requirements: job.requirements || {},
@@ -13,6 +15,8 @@ export function normalizeJob(job) {
     deadline: job.deadline || null,
     createdAt: job.createdAt || job.created_at || null,
     status: job.status,
+    catalog_source: job.catalog_source,
+    application_available: job.application_available,
   };
 }
 

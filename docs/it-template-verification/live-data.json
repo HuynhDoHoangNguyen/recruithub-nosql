@@ -1,0 +1,83 @@
+{
+  "checkedAt": "2026-10-24T17:50:01.302Z",
+  "database": "recruitment_db",
+  "mode": "Read-only real CouchDB and live Vite/Express; no Identity session",
+  "businessDocumentCount": 25750,
+  "databaseDocCount": 25761,
+  "counts": {
+    "resume_analysis": 1200,
+    "application": 1200,
+    "candidate": 10000,
+    "company": 50,
+    "department": 150,
+    "interview": 350,
+    "job": 2500,
+    "recruiter": 150,
+    "user": 10150
+  },
+  "jobs": {
+    "statuses": {
+      "DRAFT": 2300,
+      "OPEN": 200
+    },
+    "openWithoutPublishedAt": 200,
+    "openWithPublishedAt": 0,
+    "expiredOpen": 0,
+    "oldSelectorFirstPage": 0,
+    "publicPages": [
+      50,
+      50,
+      50,
+      50,
+      0
+    ],
+    "uniquePublicIds": 200
+  },
+  "users": {
+    "byStatus": {
+      "RESET_REQUIRED": 10150
+    },
+    "byRole": {
+      "CANDIDATE": 10000,
+      "RECRUITER": 150
+    }
+  },
+  "scope": {
+    "recruiters": 150,
+    "invalidRecruiters": 0,
+    "invalidJobs": 0
+  },
+  "candidateAggregate": {
+    "viewInstalled": true,
+    "actual": {
+      "by_stage": {
+        "APPLIED": 1
+      },
+      "total_applications": 1
+    },
+    "independentReadbackMatches": true
+  },
+  "endpoints": {
+    "POST /auth/login": {
+      "status": 404,
+      "code": "NOT_FOUND"
+    },
+    "GET /users/me": {
+      "status": 404,
+      "code": "NOT_FOUND"
+    },
+    "GET /recruiter/context": {
+      "status": 401,
+      "code": "UNAUTHENTICATED"
+    },
+    "GET /applications/stats": {
+      "status": 401,
+      "code": "UNAUTHENTICATED"
+    },
+    "POST /interviews": {
+      "status": 404,
+      "code": "NOT_FOUND"
+    }
+  },
+  "businessWrites": 0
+}

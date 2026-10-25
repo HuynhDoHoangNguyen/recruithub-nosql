@@ -1,0 +1,37 @@
+{
+  "checked_at": "2026-10-25T12:25:58.543Z",
+  "mocked": false,
+  "read_only": true,
+  "checks": [
+    {
+      "role": "CANDIDATE",
+      "page_1": 5,
+      "page_2": 5,
+      "api_limit": 5,
+      "requests": 6,
+      "next_previous_stable": true,
+      "filter_resets_bookmark": true,
+      "mobile_overflow": false
+    },
+    {
+      "role": "RECRUITER",
+      "page_1": 5,
+      "page_2": 5,
+      "api_limit": 5,
+      "requests": 6,
+      "next_previous_stable": true,
+      "filter_resets_bookmark": true,
+      "mobile_overflow": false
+    }
+  ],
+  "runtime_errors": [],
+  "primary_before": {
+    "doc_count": 25761,
+    "update_seq": "25762-g1AAAACReJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyMpiTGBiMZuYCxdjTEi1MzYzM0LXhMCiRIakeYQIn2ASjRMs0CzMTdPVZAN_3K2g"
+  },
+  "primary_after": {
+    "doc_count": 25761,
+    "update_seq": "25762-g1AAAACReJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyMpiTGBiMZuYCxdjTEi1MzYzM0LXhMCiRIakeYQIn2ASjRMs0CzMTdPVZAN_3K2g"
+  },
+  "primary_unchanged": true
+}
