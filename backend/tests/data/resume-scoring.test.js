@@ -1261,3 +1261,496 @@ test('DATA-03.4A: Deterministic per-Job Candidate Ranking Acceptance Tests', asy
     assert.equal(ranked[0].analysis._id, analysis1._id);
   });
 });
+
+test('TV3-UC21-002: Numeric Integrity, Strict Availability & Education Evidence Verification', async (t) => {
+  const { jobExperienceRequirementSchema } = await import('../../src/schemas/job.schema.js');
+  const { candidateProfileSchema } = await import('../../src/schemas/candidate.schema.js');
+  const { SENIORITY_LEVELS } = await import('../../src/constants/document.constants.js');
+
+  await t.test('NUM-01: Upstream Zod schemas strictly reject NaN, Infinity, fractional, and negative values', () => {
+    // 1. jobExperienceRequirementSchema rejects non-positive/non-integer/non-finite required_months
+    assert.equal(
+      jobExperienceRequirementSchema.safeParse({
+        status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED,
+        required_months: NaN,
+      }).success,
+      false,
+      'jobExperienceRequirementSchema must reject NaN required_months',
+    );
+    assert.equal(
+      jobExperienceRequirementSchema.safeParse({
+        status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED,
+        required_months: Infinity,
+      }).success,
+      false,
+      'jobExperienceRequirementSchema must reject Infinity required_months',
+    );
+    assert.equal(
+      jobExperienceRequirementSchema.safeParse({
+        status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED,
+        required_months: 1.5,
+      }).success,
+      false,
+      'jobExperienceRequirementSchema must reject fractional (1.5) required_months',
+    );
+    assert.equal(
+      jobExperienceRequirementSchema.safeParse({
+        status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED,
+        required_months: 0,
+      }).success,
+      false,
+      'jobExperienceRequirementSchema must reject 0 required_months under REQUIRED',
+    );
+    assert.equal(
+      jobExperienceRequirementSchema.safeParse({
+        status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED,
+        required_months: -1,
+      }).success,
+      false,
+      'jobExperienceRequirementSchema must reject negative (-1) required_months',
+    );
+    assert.equal(
+      jobExperienceRequirementSchema.safeParse({
+        status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED,
+        required_months: 24,
+      }).success,
+      true,
+      'jobExperienceRequirementSchema must accept valid positive integer (24)',
+    );
+
+    // 2. candidateProfileSchema rejects non-integer/non-finite/negative experience_months
+    const validBaseProfile = {
+      role: 'Software Engineer',
+      seniority: SENIORITY_LEVELS.MID,
+      industry: 'Technology',
+      years_experience: 2,
+    };
+
+    assert.equal(
+      candidateProfileSchema.safeParse({ ...validBaseProfile, experience_months: NaN }).success,
+      false,
+      'candidateProfileSchema must reject NaN experience_months',
+    );
+    assert.equal(
+      candidateProfileSchema.safeParse({ ...validBaseProfile, experience_months: Infinity }).success,
+      false,
+      'candidateProfileSchema must reject Infinity experience_months',
+    );
+    assert.equal(
+      candidateProfileSchema.safeParse({ ...validBaseProfile, experience_months: 1.5 }).success,
+      false,
+      'candidateProfileSchema must reject fractional experience_months',
+    );
+    assert.equal(
+      candidateProfileSchema.safeParse({ ...validBaseProfile, experience_months: -1 }).success,
+      false,
+      'candidateProfileSchema must reject negative experience_months',
+    );
+    assert.equal(
+      candidateProfileSchema.safeParse({ ...validBaseProfile, experience_months: 24 }).success,
+      true,
+      'candidateProfileSchema must accept valid non-negative integer matching years*12',
+    );
+  });
+
+  await t.test('NUM-02: calculateExperienceScore properly rejects required_months <= 0 with INVALID_JOB_EXPERIENCE_REQUIREMENT', () => {
+    const resZero = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: 0 },
+      12,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resZero.score, null);
+    assert.equal(resZero.missingInput?.code, 'INVALID_JOB_EXPERIENCE_REQUIREMENT');
+
+    const resNegative = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: -1 },
+      12,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resNegative.score, null);
+    assert.equal(resNegative.missingInput?.code, 'INVALID_JOB_EXPERIENCE_REQUIREMENT');
+  });
+
+  await t.test('NUM-03: Scorer behavior characterization on NaN inputs (Defense-in-depth observation)', () => {
+    // CHARACTERIZATION ONLY: Documents lack of defense-in-depth guards in calculateExperienceScore when bypassed upstream.
+    // In pure JS, typeof NaN === 'number' and NaN comparisons evaluate false. This is NOT approved scoring behavior.
+    const resJobNaN = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: NaN },
+      12,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.ok(Number.isNaN(resJobNaN.score), 'Pure scorer currently evaluates Math.min(100, cand/NaN) to NaN');
+    assert.equal(resJobNaN.missingInput, undefined, 'Pure scorer currently omits missingInput on NaN required_months');
+
+    const resCandNaN = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: 12 },
+      NaN,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.ok(Number.isNaN(resCandNaN.score), 'Pure scorer currently evaluates Math.min(100, NaN/req) to NaN');
+    assert.equal(resCandNaN.missingInput, undefined, 'Pure scorer currently omits missingInput on NaN candidateMonths');
+  });
+
+  await t.test('NUM-04: Scorer behavior characterization on Infinity inputs (Defense-in-depth observation)', () => {
+    // CHARACTERIZATION ONLY: Documents lack of Number.isFinite() guards in calculateExperienceScore.
+    // Under pure JavaScript arithmetic, cand*100/Infinity evaluates to 0, and Infinity*100/req caps at 100.
+    // This is NOT approved scoring behavior; upstream Zod rejects Infinity before reaching scoring engine.
+    const resJobInf = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: Infinity },
+      12,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resJobInf.score, 0, 'Pure scorer currently yields 0 due to 12*100/Infinity = 0');
+    assert.equal(resJobInf.missingInput, undefined);
+
+    const resCandInf = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: 12 },
+      Infinity,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resCandInf.score, 100, 'Pure scorer currently yields 100 due to Math.min(100, Infinity)');
+    assert.equal(resCandInf.missingInput, undefined);
+  });
+
+  await t.test('NUM-05: Scorer behavior characterization on fractional month inputs (Defense-in-depth observation)', () => {
+    // CHARACTERIZATION ONLY: Documents lack of Number.isInteger() check in calculateExperienceScore.
+    // Pure scorer calculates continuous ratio for fractional months; upstream Zod enforces integer months.
+    const resFractionalCand = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: 12 },
+      1.5,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resFractionalCand.score, 12.5, 'Pure scorer calculates continuous ratio (100 * 1.5 / 12 = 12.5)');
+    assert.equal(resFractionalCand.missingInput, undefined);
+
+    const resFractionalJob = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: 1.5 },
+      3,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resFractionalJob.score, 100, 'Pure scorer calculates continuous ratio capped at 100');
+    assert.equal(resFractionalJob.missingInput, undefined);
+  });
+
+  await t.test('AVAIL-01: EXP-A NO_MINIMUM + UNAVAILABLE candidate yields legitimate score 100', () => {
+    const res = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.NO_MINIMUM },
+      null,
+      AVAILABILITY_STATES.UNAVAILABLE,
+    );
+    assert.equal(res.score, 100);
+    assert.equal(res.details.unrounded_score, 100);
+    assert.equal(res.details.required_months, null);
+    assert.equal(res.details.requirement_status, REQUIREMENT_STATUSES.EXPERIENCE.NO_MINIMUM);
+    assert.equal(res.missingInput, undefined);
+  });
+
+  await t.test('AVAIL-02: EDU-B NO_MINIMUM + UNAVAILABLE candidate yields legitimate score 100', () => {
+    const res = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.NO_MINIMUM },
+      [],
+      AVAILABILITY_STATES.UNAVAILABLE,
+    );
+    assert.equal(res.score, 100);
+    assert.equal(res.details.unrounded_score, 100);
+    assert.equal(res.details.minimum_degree, null);
+    assert.equal(res.details.requirement_status, REQUIREMENT_STATUSES.EDUCATION.NO_MINIMUM);
+    assert.equal(res.missingInput, undefined);
+  });
+
+  await t.test('AVAIL-03: PROJ-A NO_REQUIREMENT + UNAVAILABLE candidate yields legitimate score 100', () => {
+    const res = calculateProjectScore(
+      { status: REQUIREMENT_STATUSES.PROJECT.NO_REQUIREMENT },
+      [],
+      AVAILABILITY_STATES.UNAVAILABLE,
+    );
+    assert.equal(res.score, 100);
+    assert.equal(res.details.unrounded_score, 100);
+    assert.deepEqual(res.details.required_technologies, []);
+    assert.equal(res.details.requirement_status, REQUIREMENT_STATUSES.PROJECT.NO_REQUIREMENT);
+    assert.equal(res.missingInput, undefined);
+  });
+
+  await t.test('AVAIL-04: Missing or invalid availability with NO_MINIMUM / NO_REQUIREMENT is rejected with score null', () => {
+    // EXP-A: undefined availability
+    const expMissing = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.NO_MINIMUM },
+      null,
+      undefined,
+    );
+    assert.equal(expMissing.score, null);
+    assert.equal(expMissing.missingInput?.code, 'MISSING_CANDIDATE_EXPERIENCE_AVAILABILITY');
+
+    // EXP-A: invalid availability string
+    const expInvalid = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.NO_MINIMUM },
+      null,
+      'INVALID_AVAILABILITY',
+    );
+    assert.equal(expInvalid.score, null);
+    assert.equal(expInvalid.missingInput?.code, 'INVALID_CANDIDATE_EXPERIENCE_AVAILABILITY');
+
+    // EDU-B: undefined availability
+    const eduMissing = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.NO_MINIMUM },
+      [],
+      undefined,
+    );
+    assert.equal(eduMissing.score, null);
+    assert.equal(eduMissing.missingInput?.code, 'MISSING_CANDIDATE_EDUCATION_AVAILABILITY');
+
+    // EDU-B: invalid availability string
+    const eduInvalid = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.NO_MINIMUM },
+      [],
+      'INVALID_AVAILABILITY',
+    );
+    assert.equal(eduInvalid.score, null);
+    assert.equal(eduInvalid.missingInput?.code, 'INVALID_CANDIDATE_EDUCATION_AVAILABILITY');
+
+    // PROJ-A: undefined availability
+    const projMissing = calculateProjectScore(
+      { status: REQUIREMENT_STATUSES.PROJECT.NO_REQUIREMENT },
+      [],
+      undefined,
+    );
+    assert.equal(projMissing.score, null);
+    assert.equal(projMissing.missingInput?.code, 'MISSING_CANDIDATE_PROJECTS_AVAILABILITY');
+
+    // PROJ-A: invalid availability string
+    const projInvalid = calculateProjectScore(
+      { status: REQUIREMENT_STATUSES.PROJECT.NO_REQUIREMENT },
+      [],
+      'INVALID_AVAILABILITY',
+    );
+    assert.equal(projInvalid.score, null);
+    assert.equal(projInvalid.missingInput?.code, 'INVALID_CANDIDATE_PROJECTS_AVAILABILITY');
+  });
+
+  await t.test('EDU-01: AVAILABLE candidate with only unknown degrees returns MISSING_CANDIDATE_EDUCATION_EVIDENCE', () => {
+    const res = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED, minimum_degree: 'BACHELOR' },
+      [{ degree: 'BOOTCAMP_CERTIFICATE' }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, null);
+    assert.equal(res.missingInput?.code, 'MISSING_CANDIDATE_EDUCATION_EVIDENCE');
+    assert.equal(res.details.candidate_degree, null);
+  });
+
+  await t.test('EDU-02: AVAILABLE candidate with mixed unknown and valid degrees evaluates highest valid degree', () => {
+    const res = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED, minimum_degree: 'BACHELOR' },
+      [{ degree: 'UNRECOGNIZED_COURSE' }, { degree: 'MASTER' }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, 100);
+    assert.equal(res.details.candidate_degree, 'MASTER');
+    assert.equal(res.details.candidate_rank, 3);
+    assert.equal(res.missingInput, undefined);
+  });
+
+  await t.test('EDU-03: NONE_DECLARED candidate with REQUIRED job degree returns score 0 without missingInput', () => {
+    const res = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED, minimum_degree: 'BACHELOR' },
+      [],
+      AVAILABILITY_STATES.NONE_DECLARED,
+    );
+    assert.equal(res.score, 0);
+    assert.equal(res.missingInput, undefined);
+    assert.equal(res.details.candidate_rank, 0);
+    assert.equal(res.details.candidate_degree, null);
+    assert.equal(res.details.unrounded_score, 0);
+  });
+
+  await t.test('EDU-04: REQUIRED job with unknown minimum_degree returns INVALID_JOB_EDUCATION_REQUIREMENT', () => {
+    const res = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED, minimum_degree: 'UNKNOWN_DEGREE_SPEC' },
+      [{ degree: 'BACHELOR' }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, null);
+    assert.equal(res.missingInput?.code, 'INVALID_JOB_EDUCATION_REQUIREMENT');
+    assert.equal(res.details.minimum_degree, null);
+  });
+});
+
+test('TV3-UC21-003: Remaining EXP-A, EDU-B and PROJ-A Contract Verification', async (t) => {
+  // Experience — 2 subtests
+  await t.test('EXP-01: String/null required months under REQUIRED returns INVALID_JOB_EXPERIENCE_REQUIREMENT', () => {
+    // String required_months
+    const resString = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: 'twelve' },
+      12,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resString.score, null);
+    assert.equal(resString.missingInput?.code, 'INVALID_JOB_EXPERIENCE_REQUIREMENT');
+
+    // Null required_months
+    const resNull = calculateExperienceScore(
+      { status: REQUIREMENT_STATUSES.EXPERIENCE.REQUIRED, required_months: null },
+      12,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resNull.score, null);
+    assert.equal(resNull.missingInput?.code, 'INVALID_JOB_EXPERIENCE_REQUIREMENT');
+  });
+
+  await t.test('EXP-02: Unknown experience requirement status returns UNRECOGNIZED_EXPERIENCE_REQUIREMENT', () => {
+    const res = calculateExperienceScore(
+      { status: 'UNKNOWN_EXPERIENCE_STATUS' },
+      12,
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, null);
+    assert.equal(res.missingInput?.code, 'UNRECOGNIZED_EXPERIENCE_REQUIREMENT');
+    assert.equal(res.details.requirement_status, 'UNKNOWN_EXPERIENCE_STATUS');
+  });
+
+  // Education — 5 subtests
+  await t.test('EDU-05: UNAVAILABLE candidate with REQUIRED education returns CANDIDATE_EDUCATION_UNAVAILABLE', () => {
+    const res = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED, minimum_degree: 'BACHELOR' },
+      [],
+      AVAILABILITY_STATES.UNAVAILABLE,
+    );
+    assert.equal(res.score, null);
+    assert.equal(res.missingInput?.code, 'CANDIDATE_EDUCATION_UNAVAILABLE');
+    assert.equal(res.details.minimum_degree, 'BACHELOR');
+    assert.equal(res.details.minimum_rank, 2);
+  });
+
+  await t.test('EDU-06: Multiple recognized degrees selects highest rank', () => {
+    // Candidate holds both BACHELOR (rank 2) and MASTER (rank 3), job requires MASTER (rank 3)
+    const res = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED, minimum_degree: 'MASTER' },
+      [{ degree: 'BACHELOR' }, { degree: 'MASTER' }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, 100);
+    assert.equal(res.details.candidate_degree, 'MASTER');
+    assert.equal(res.details.candidate_rank, 3);
+    assert.equal(res.missingInput, undefined);
+  });
+
+  await t.test('EDU-07: Canonical mapping of degree aliases bsc and mba in EDU path', () => {
+    // bsc -> BACHELOR
+    const resBsc = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED, minimum_degree: 'BACHELOR' },
+      [{ degree: 'bsc' }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resBsc.score, 100);
+    assert.equal(resBsc.details.candidate_degree, 'BACHELOR');
+    assert.equal(resBsc.details.candidate_rank, 2);
+
+    // mba -> MASTER
+    const resMba = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED, minimum_degree: 'MASTER' },
+      [{ degree: 'mba' }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resMba.score, 100);
+    assert.equal(resMba.details.candidate_degree, 'MASTER');
+    assert.equal(resMba.details.candidate_rank, 3);
+  });
+
+  await t.test('EDU-08: DOCTORATE versus MASTER required yields score 100', () => {
+    const res = calculateEducationScore(
+      { status: REQUIREMENT_STATUSES.EDUCATION.REQUIRED, minimum_degree: 'MASTER' },
+      [{ degree: 'DOCTORATE' }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, 100);
+    assert.equal(res.details.candidate_degree, 'DOCTORATE');
+    assert.equal(res.details.candidate_rank, 4);
+    assert.equal(res.details.minimum_rank, 3);
+    assert.equal(res.missingInput, undefined);
+  });
+
+  await t.test('EDU-09: Unknown education requirement status returns UNRECOGNIZED_EDUCATION_REQUIREMENT', () => {
+    const res = calculateEducationScore(
+      { status: 'UNKNOWN_EDUCATION_STATUS' },
+      [{ degree: 'BACHELOR' }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, null);
+    assert.equal(res.missingInput?.code, 'UNRECOGNIZED_EDUCATION_REQUIREMENT');
+    assert.equal(res.details.requirement_status, 'UNKNOWN_EDUCATION_STATUS');
+  });
+
+  // Project — 5 subtests
+  await t.test('PROJ-01: Required technology canonicalization, aliases, and deduplication', () => {
+    // Job requires redundant aliases: ['React', 'react.js', 'react'] -> dedupes to single canonical ['react']
+    const res = calculateProjectScore(
+      {
+        status: REQUIREMENT_STATUSES.PROJECT.REQUIRED,
+        required_technologies: ['React', 'react.js', 'react'],
+      },
+      [{ technologies: ['React'] }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, 100);
+    assert.deepEqual(res.details.required_technologies, ['react']);
+    assert.deepEqual(res.details.matched_technologies, ['react']);
+    assert.deepEqual(res.details.missing_technologies, []);
+    assert.equal(res.missingInput, undefined);
+  });
+
+  await t.test('PROJ-02: Empty or whitespace-only required technologies returns EMPTY_JOB_REQUIRED_TECHNOLOGIES', () => {
+    // Empty array
+    const resEmpty = calculateProjectScore(
+      { status: REQUIREMENT_STATUSES.PROJECT.REQUIRED, required_technologies: [] },
+      [{ technologies: ['docker'] }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resEmpty.score, null);
+    assert.equal(resEmpty.missingInput?.code, 'EMPTY_JOB_REQUIRED_TECHNOLOGIES');
+
+    // Whitespace-only entries
+    const resWhitespace = calculateProjectScore(
+      { status: REQUIREMENT_STATUSES.PROJECT.REQUIRED, required_technologies: ['   ', ''] },
+      [{ technologies: ['docker'] }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(resWhitespace.score, null);
+    assert.equal(resWhitespace.missingInput?.code, 'EMPTY_JOB_REQUIRED_TECHNOLOGIES');
+  });
+
+  await t.test('PROJ-03: AVAILABLE with empty project evidence returns MISSING_CANDIDATE_PROJECT_EVIDENCE', () => {
+    const res = calculateProjectScore(
+      { status: REQUIREMENT_STATUSES.PROJECT.REQUIRED, required_technologies: ['docker'] },
+      [],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, null);
+    assert.equal(res.missingInput?.code, 'MISSING_CANDIDATE_PROJECT_EVIDENCE');
+    assert.deepEqual(res.details.candidate_technologies, []);
+  });
+
+  await t.test('PROJ-04: SYNTHETIC project evidence with REQUIRED technologies yields valid numeric score', () => {
+    const res = calculateProjectScore(
+      { status: REQUIREMENT_STATUSES.PROJECT.REQUIRED, required_technologies: ['docker', 'kubernetes'] },
+      [{ name: 'Demo Cloud Project', technologies: ['docker', 'kubernetes'], is_synthetic: true }],
+      AVAILABILITY_STATES.SYNTHETIC,
+    );
+    assert.equal(res.score, 100);
+    assert.equal(res.details.unrounded_score, 100);
+    assert.deepEqual(res.details.matched_technologies, ['docker', 'kubernetes']);
+    assert.equal(res.missingInput, undefined);
+  });
+
+  await t.test('PROJ-05: Unknown project requirement status returns UNRECOGNIZED_PROJECT_REQUIREMENT', () => {
+    const res = calculateProjectScore(
+      { status: 'UNKNOWN_PROJECT_STATUS' },
+      [{ technologies: ['docker'] }],
+      AVAILABILITY_STATES.AVAILABLE,
+    );
+    assert.equal(res.score, null);
+    assert.equal(res.missingInput?.code, 'UNRECOGNIZED_PROJECT_REQUIREMENT');
+    assert.equal(res.details.requirement_status, 'UNKNOWN_PROJECT_STATUS');
+  });
+});
+
+
