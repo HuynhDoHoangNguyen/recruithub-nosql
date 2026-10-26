@@ -65,10 +65,10 @@ export class JobService {
       throw new ApiError(400, 'INVALID_DEADLINE', 'Hạn nộp hồ sơ phải sau thời điểm hiện tại.', [{ field: 'deadline', message: 'Chọn hạn nộp trong tương lai.' }]);
     }
   }
-  async create(user, payload) {
+  async create(user, payload, { documentId } = {}) {
     const recruiter = await recruiterScope(this.repo, user);
     const timestamp = this.now().toISOString();
-    const document = { ...payload, _id: `job:${randomUUID()}`, type: 'job',
+    const document = { ...payload, _id: documentId || `job:${randomUUID()}`, type: 'job',
       recruiter_id: recruiter._id, company_id: recruiter.company_id, department_id: recruiter.department_id,
       created_at: timestamp, updated_at: timestamp, ...(payload.status === 'OPEN' ? { published_at: timestamp } : {}),
       provenance: runtimeProvenance(Object.keys(payload)),

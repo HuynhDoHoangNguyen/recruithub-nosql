@@ -17,8 +17,10 @@ import { createRecruiterProfileRoutes } from './routes/recruiter-profile.routes.
 import { createAssetRepository } from './repositories/asset.repository.js';
 import { UploadService } from './services/upload.service.js';
 import { createUploadRoutes } from './routes/upload.routes.js';
+import { createRecruiterJobImportExportRoutes } from './routes/recruiter-job-import-export.routes.js';
+import { RecruiterJobImportExportService } from './services/recruiter-job-import-export.service.js';
 
-function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://127.0.0.1:5177') {
+function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://127.0.0.1:5178') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
   if (!origins.length || origins.some(origin => {
     try {
@@ -67,6 +69,11 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
       : new PublicJobCatalogService({ live: liveCatalog, dataset: new JobService(publicRepository, now) }),
     applications: new ApplicationService(repository, { now, analyzeApplication, assets }),
   };
+  dependencies.jobImportExport = new RecruiterJobImportExportService(jobs, {
+    env: jwtEnv,
+    databaseName: jwtEnv.AUTH_COUCHDB_DATABASE || jwtEnv.COUCHDB_DATABASE || 'recruitment_db',
+    now: now || (() => new Date()),
+  });
 
   app.use(cors({
     origin: (origin, callback) => callback(null, !origin || origins.includes(origin)),
@@ -80,6 +87,8 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
 
   // Identity routes and Job/Application routes share one v1 namespace and auth contract.
   app.use('/api/v1', apiV1Routes);
+  // Mount static recruiter job endpoints before /jobs/:id routes.
+  app.use('/api/v1', createRecruiterJobImportExportRoutes({ authenticate: dependencies.authenticate, service: dependencies.jobImportExport }));
   app.use('/api/v1', createJobRoutes(dependencies));
   app.use('/api/v1', createRecruiterProfileRoutes(dependencies));
   app.use('/api/v1', createUploadRoutes(dependencies));

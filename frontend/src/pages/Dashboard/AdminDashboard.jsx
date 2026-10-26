@@ -37,7 +37,7 @@ function StatusBadge({ status }) {
 
 function RoleBadge({ role }) {
   const style = role === 'ADMIN' ? 'bg-blue-50 text-blue-700' : role === 'RECRUITER' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-700';
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${style}`}>{role === 'ADMIN' ? 'Admin' : role === 'RECRUITER' ? 'Nhà tuyển dụng' : 'Ứng viên'}</span>;
+  return <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${style}`}>{role === 'ADMIN' ? 'Admin' : role === 'RECRUITER' ? 'Nhà tuyển dụng' : 'Ứng viên'}</span>;
 }
 
 function RoleDistribution({ roles = {}, total = 0 }) {
@@ -129,7 +129,7 @@ function UserActionSelect({ user, onView, onStatusChange, onPasswordReset, disab
       onChange={handleChange}
       disabled={disabled}
       aria-label={`Thao tác cho ${user.email}`}
-      className="input-field !h-9 !w-36 !py-1.5 text-xs font-semibold"
+      className="input-field !h-10 !w-40 !py-1.5 text-xs font-semibold shadow-sm focus:!border-blue-400 focus:!ring-2 focus:!ring-blue-100"
     >
       <option value="">Chọn thao tác</option>
       <option value="details">Chi tiết</option>
@@ -368,26 +368,26 @@ const AdminDashboard = () => {
         </section>}
 
         <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.07)]">
-          <div className="border-b border-slate-100 p-5 sm:p-6">
+          <div className="border-b border-slate-100 bg-gradient-to-b from-white to-slate-50/40 p-4 sm:p-6">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div><h2 className="text-lg font-bold text-slate-900">Danh sách tài khoản</h2><p className="mt-1 text-sm text-slate-500">Tìm kiếm, lọc và xem chi tiết người dùng.</p></div>
               <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{users.length} tài khoản trên trang</span>
             </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-[minmax(220px,1fr)_190px_190px_auto_auto]">
-              <label className="relative block"><span className="sr-only">Tìm theo email</span><FaSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" /><input className="input-field !pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo email…" /></label>
-              <label><span className="sr-only">Lọc theo vai trò</span><select className="input-field !py-3" value={role} onChange={(event) => setRole(event.target.value)}><option value="">Tất cả vai trò</option><option value="CANDIDATE">Ứng viên</option><option value="RECRUITER">Nhà tuyển dụng</option><option value="ADMIN">Admin</option></select></label>
-              <label><span className="sr-only">Lọc theo trạng thái</span><select className="input-field !py-3" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">Tất cả trạng thái</option><option value="ACTIVE">Hoạt động</option><option value="LOCKED">Đã khóa</option><option value="RESET_REQUIRED">Cần đặt lại mật khẩu</option></select></label>
-              <button className="btn-primary" type="button" onClick={() => { setCursorHistory([]); load(); }} disabled={loading}><FaFilter className="mr-2" aria-hidden="true" />Lọc</button>
-              <button className="btn-secondary" type="button" onClick={resetFilters} disabled={!search && !role && !status}>Xóa lọc</button>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_210px_auto_auto]">
+              <label className="relative block sm:col-span-2 xl:col-span-1"><span className="sr-only">Tìm theo email</span><FaSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" /><input className="input-field !h-11 !pl-11 shadow-sm focus:!border-blue-400 focus:!ring-2 focus:!ring-blue-100" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo email…" /></label>
+              <label><span className="sr-only">Lọc theo vai trò</span><select className="input-field !h-11 !py-2.5 shadow-sm focus:!border-blue-400 focus:!ring-2 focus:!ring-blue-100" value={role} onChange={(event) => setRole(event.target.value)}><option value="">Tất cả vai trò</option><option value="CANDIDATE">Ứng viên</option><option value="RECRUITER">Nhà tuyển dụng</option><option value="ADMIN">Admin</option></select></label>
+              <label><span className="sr-only">Lọc theo trạng thái</span><select className="input-field !h-11 !py-2.5 shadow-sm focus:!border-blue-400 focus:!ring-2 focus:!ring-blue-100" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">Tất cả trạng thái</option><option value="ACTIVE">Hoạt động</option><option value="LOCKED">Đã khóa</option><option value="RESET_REQUIRED">Cần đặt lại mật khẩu</option></select></label>
+              <button className="btn-primary !h-11 min-w-24 justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-sm shadow-blue-900/15" type="button" onClick={() => { setCursorHistory([]); load(); }} disabled={loading}><FaFilter className="mr-2" aria-hidden="true" />Lọc</button>
+              <button className="btn-secondary !h-11 min-w-24 justify-center rounded-xl border-blue-100 bg-white" type="button" onClick={resetFilters} disabled={!search && !role && !status}>Xóa lọc</button>
             </div>
-            <p className="mt-3 text-xs leading-5 text-slate-500">CANDIDATE/RECRUITER ACTIVE có thể khóa; LOCKED có thể mở khóa. Với RESET_REQUIRED, Admin có thể cấp mã reset dùng một lần; chủ tài khoản đặt mật khẩu mới để kích hoạt. ADMIN do operator quản lý.</p>
+            <p className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 px-3.5 py-2.5 text-xs leading-5 text-slate-600">CANDIDATE/RECRUITER ACTIVE có thể khóa; LOCKED có thể mở khóa. Với RESET_REQUIRED, Admin có thể cấp mã reset dùng một lần; chủ tài khoản đặt mật khẩu mới để kích hoạt. ADMIN do operator quản lý.</p>
           </div>
 
           {loading && !stats ? <div role="status" aria-label="Loading accounts" className="space-y-3 p-5 sm:p-6">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-xl bg-slate-100" />)}</div> : users.length === 0 && !loading ? (
             <div className="p-12 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><FaUsers aria-hidden="true" /></div><p className="mt-4 font-semibold text-slate-800">Không tìm thấy tài khoản</p><p className="mt-1 text-sm text-slate-500">Thử thay đổi từ khóa hoặc bộ lọc.</p></div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full min-w-[1060px] table-fixed text-left text-sm"><colgroup><col style={{ width: "40%" }} /><col style={{ width: "14%" }} /><col style={{ width: "19%" }} /><col style={{ width: "11%" }} /><col style={{ width: "200px" }} /></colgroup>
                 <thead className="bg-blue-50/80 text-xs uppercase tracking-wide text-blue-800"><tr><th className="px-5 py-4 font-semibold">Tài khoản</th><th className="px-5 py-4 font-semibold">Vai trò</th><th className="px-5 py-4 font-semibold">Trạng thái</th><th className="px-5 py-4 font-semibold">Ngày tạo</th><th className="px-5 py-4 text-right font-semibold">Thao tác</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">{users.map((item) => <tr key={item.id} className="transition hover:bg-blue-50/40"><td className="px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold uppercase text-blue-700">{(item.email || '?').charAt(0)}</span><div className="min-w-0"><p className="truncate font-semibold text-slate-800">{item.email}</p><p className="mt-0.5 truncate text-xs text-slate-400">{item.id}</p></div></div></td><td className="px-5 py-4"><RoleBadge role={item.role} /></td><td className="px-5 py-4"><StatusBadge status={item.account_status} /></td><td className="whitespace-nowrap px-5 py-4 text-slate-500">{item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '—'}</td><td className="px-5 py-4"><div className="flex justify-end"><UserActionSelect user={item} onView={viewUser} onStatusChange={beginStatusChange} onPasswordReset={beginPasswordReset} disabled={Boolean(statusUpdatingId)} /></div></td></tr>)}</tbody>
               </table>

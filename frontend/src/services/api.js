@@ -1,11 +1,12 @@
 import axios from 'axios';
 import { getAccessToken } from '../utils/authHelper';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /** Browser API calls stay same-origin and pass through the /api proxy. */
-export function normalizeApiBaseUrl() {
-  return API_BASE_URL;
+export function normalizeApiBaseUrl(value = API_BASE_URL) {
+  const normalized = String(value || '/api').trim().replace(/\/+$/, '');
+  return normalized || '/api';
 }
 
 const api = axios.create({

@@ -14,7 +14,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5177`. Axios uses the single same-origin `/api` base. Vite proxies `/api` to backend `PORT` from root/backend `.env` (default `5000`); use `VITE_API_PROXY_TARGET` only for a non-default backend host and restart Vite after configuration changes.
+Open `http://127.0.0.1:5178`. Axios uses the single same-origin `/api` base. Vite proxies `/api` to backend `PORT` from root/backend `.env` (default `5000`); use `VITE_API_PROXY_TARGET` only for a non-default backend host and restart Vite after configuration changes.
 
 ```powershell
 npm test -- --maxWorkers=1
@@ -47,4 +47,4 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## Unified local API endpoint
 
-Open `http://127.0.0.1:5177`. Frontend modules use the same-origin `/api` base; Vite proxies `/api` to the backend port from root/backend `.env` (`PORT`, default `5000`). Set `VITE_API_PROXY_TARGET` only for a non-default backend host, then restart Vite. Production hosting must route `/api` to the backend as well.
+Open `http://127.0.0.1:5178`. Frontend modules use the same-origin `/api` base; Vite proxies `/api` to the backend port from root/backend `.env` (`PORT`, default `5000`). Set `VITE_API_PROXY_TARGET` only for a non-default backend host, then restart Vite. Production hosting must route `/api` to the backend as well.
