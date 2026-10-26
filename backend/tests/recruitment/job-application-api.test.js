@@ -243,6 +243,24 @@ test('Ownership and DTOs prevent cross-user reads, recruiter impersonation, admi
   assert.deepEqual((await f.request('GET', '/applications/my-applications', undefined, 'otherCandidate')).body.data.items, []);
 });
 
+test('Candidate reads CLOSED Job details only through their own application history', async t => {
+  const f = await startFixture(t);
+  const application = (await apply(f)).body.data;
+  const currentJob = f.repo.docs.get(f.job._id);
+  const closed = await f.request('PATCH', `/jobs/${f.job._id}/status`, {
+    status: 'CLOSED', expected_rev: currentJob._rev,
+  }, 'recruiter');
+  assert.equal(closed.status, 200);
+
+  assert.equal((await f.request('GET', `/jobs/${f.job._id}`, undefined, null)).status, 404);
+  const ownHistory = await f.request('GET', `/applications/my-applications?job_id=${encodeURIComponent(f.job._id)}`);
+  assert.equal(ownHistory.status, 200);
+  assert.equal(ownHistory.body.data.items[0]._id, application._id);
+  assert.equal(ownHistory.body.data.items[0].job._id, f.job._id);
+  assert.equal(ownHistory.body.data.items[0].job.status, 'CLOSED');
+  assert.deepEqual((await f.request('GET', `/applications/my-applications?job_id=${encodeURIComponent(f.job._id)}`, undefined, 'otherCandidate')).body.data.items, []);
+});
+
 test('Withdraw is allowed only from three stages and reapplication requires a fresh request and expected revision', async t => {
   for (const stage of ['APPLIED', 'SCREENING', 'INTERVIEW']) {
     const f = await startFixture(t); let app = (await apply(f)).body.data;

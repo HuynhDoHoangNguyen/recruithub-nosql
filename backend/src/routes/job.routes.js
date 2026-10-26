@@ -15,12 +15,12 @@ export function createJobRoutes({ authenticate, jobs, publicJobs = jobs, applica
   router.get('/recruiter/jobs/:id', ...recruiter, validate(jobParamsSchema, 'params'), controller.detail);
   router.get('/jobs', validate(publicJobQuerySchema, 'query'), publicController.publicList);
   router.get('/jobs/all', validate(publicJobQuerySchema, 'query'), publicController.publicList);
+  router.get('/jobs/metadata', publicController.metadata);
   router.post('/jobs', ...recruiter, validate(createJobRequestSchema), controller.create);
   router.get('/jobs/:id/applicants', ...recruiter, validate(jobParamsSchema, 'params'), validate(applicantQuerySchema, 'query'), applicationController(applications).applicants);
   router.patch('/jobs/:id/status', ...recruiter, validate(jobParamsSchema, 'params'), validate(statusRequestSchema), controller.status);
   router.patch('/jobs/:id', ...recruiter, validate(jobParamsSchema, 'params'), validate(editJobRequestSchema), controller.edit);
   router.delete('/jobs/:id', ...recruiter, validate(jobParamsSchema, 'params'), validate(deleteJobRequestSchema), controller.remove);
-  router.get('/jobs/metadata', publicController.metadata);
   router.get('/jobs/:id', validate(jobParamsSchema, 'params'), publicController.publicDetail);
   return router;
 }

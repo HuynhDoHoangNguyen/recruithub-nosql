@@ -14,7 +14,7 @@ npm ci
 npm run dev
 ```
 
-Mở http://localhost:5173. Vite proxy `/api` tới Backend, mặc định cổng 5000; Axios dùng `/api/v1`. Nếu Backend dùng host khác, đặt `VITE_API_PROXY_TARGET` theo `.env.example`. Không cần sửa hoặc sao chép mật khẩu CouchDB sang frontend. Cấu hình URL tuyệt đối qua `VITE_API_BASE_URL` vẫn được hỗ trợ; restart Vite khi đổi env.
+Open `http://127.0.0.1:5178`. Axios uses the single same-origin `/api` base. Vite proxies `/api` to backend `PORT` from root/backend `.env` (default `5000`); use `VITE_API_PROXY_TARGET` only for a non-default backend host and restart Vite after configuration changes.
 
 ```powershell
 npm test -- --maxWorkers=1
@@ -44,3 +44,7 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Unified local API endpoint
+
+Open `http://127.0.0.1:5178`. Frontend modules use the same-origin `/api` base; Vite proxies `/api` to the backend port from root/backend `.env` (`PORT`, default `5000`). Set `VITE_API_PROXY_TARGET` only for a non-default backend host, then restart Vite. Production hosting must route `/api` to the backend as well.

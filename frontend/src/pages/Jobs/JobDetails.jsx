@@ -30,7 +30,7 @@ function Section({ title, icon: Icon, children, className = '' }) {
 }
 
 function LoadingDetail() {
-  return <main className="min-h-screen bg-[#CDEAF4] px-4 py-8 sm:px-6"><div className="mx-auto max-w-[1240px] rounded-[22px] border border-white/75 bg-white/90 p-4 shadow-[0_12px_40px_rgba(30,110,145,0.10)] sm:p-6"><div className="animate-pulse space-y-6">
+  return <main className="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6"><div className="mx-auto max-w-[1240px] rounded-[22px] border border-blue-100 bg-white p-4 shadow-[0_12px_35px_-10px_rgba(15,23,42,0.18)] sm:p-6"><div className="animate-pulse space-y-6">
     <div className="h-4 w-40 rounded bg-slate-200" /><div className="rounded-xl border border-[#DFE5EF] bg-white p-7"><div className="h-8 w-2/3 rounded bg-slate-200" /><div className="mt-4 h-4 w-1/3 rounded bg-slate-100" /></div>
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,0.95fr)]"><div className="space-y-5"><div className="h-52 rounded-xl bg-white" /><div className="h-40 rounded-xl bg-white" /></div><div className="h-72 rounded-xl bg-white" /></div>
   </div></div></main>;
@@ -38,7 +38,7 @@ function LoadingDetail() {
 
 function DetailError({ error, retry }) {
   const notFound = error?.status === 404 || error?.code === 'NOT_FOUND';
-  return <main className="min-h-screen bg-[#CDEAF4] px-4 py-16 sm:px-6"><div className="mx-auto max-w-xl rounded-[18px] border border-white bg-white p-8 text-center shadow-[0_12px_36px_rgba(30,110,145,0.10)]">
+  return <main className="min-h-screen bg-[#F8FAFC] px-4 py-16 sm:px-6"><div className="mx-auto max-w-xl rounded-[22px] border border-blue-100 bg-white p-8 text-center shadow-[0_12px_35px_-10px_rgba(15,23,42,0.18)]">
     <h1 className="text-2xl font-bold text-[#152348]">{notFound ? 'Tin tuyển dụng không khả dụng' : 'Không thể tải tin tuyển dụng'}</h1>
     <p role="alert" className="mt-3 text-[#64748B]">{notFound ? 'Tin này không tồn tại hoặc hiện không còn được công khai.' : (error?.message || 'Đã xảy ra lỗi kết nối. Vui lòng thử lại.')}</p>
     {!notFound && <button onClick={retry} className="mt-6 rounded-lg bg-[#12B5EC] px-5 py-2.5 font-semibold text-white hover:bg-[#079DD7]">Thử lại</button>}
@@ -58,10 +58,32 @@ export default function JobDetails() {
   const [showApply, setShowApply] = useState(false);
   const [message, setMessage] = useState('');
   const resource = useApiResource(useCallback(async () => {
-    const job = await getPublicJob(id);
-    if (!job) throw Object.assign(new Error('Không tìm thấy tin tuyển dụng.'), { status: 404 });
-    const applications = isCandidate && !isPublicJobsMockMode && job.application_available !== false ? await applicationApi.mine({ job_id: id, limit: 20 }) : { items: [] };
-    return { job, application: applications.items[0] };
+    let job;
+    let application;
+    let publicDetailError;
+    try {
+      job = await getPublicJob(id);
+    } catch (error) {
+      if (error.status !== 404) throw error;
+      publicDetailError = error;
+    }
+
+    if (!job && isCandidate && !isPublicJobsMockMode) {
+      const history = await applicationApi.mine({ job_id: id, limit: 20 });
+      application = history.items.find(item => item.job_id === id && item.job?._id === id && item.job.status === 'CLOSED');
+      if (application) job = { ...application.job, catalog_source: 'application_history', application_available: true };
+    }
+
+    if (!job) {
+      if (publicDetailError) throw publicDetailError;
+      throw Object.assign(new Error(), { status: 404 });
+    }
+
+    if (!application && isCandidate && !isPublicJobsMockMode && job.application_available !== false) {
+      const history = await applicationApi.mine({ job_id: id, limit: 20 });
+      application = history.items[0];
+    }
+    return { job, application };
   }, [id, isCandidate]));
   const { job, application } = resource.data || {};
 
@@ -83,8 +105,8 @@ export default function JobDetails() {
   if (resource.error) return <DetailError error={resource.error} retry={resource.reload} />;
   if (!job) return <DetailError error={{ status: 404 }} retry={resource.reload} />;
 
-  return <main className="min-h-screen bg-[#CDEAF4] px-4 py-6 text-[#334155] sm:px-6 sm:py-9">
-    <div className="mx-auto max-w-[1240px] rounded-[22px] border border-white/75 bg-white/90 p-3 shadow-[0_12px_40px_rgba(30,110,145,0.10)] sm:p-5 lg:p-6">
+  return <main className="min-h-screen bg-[#F8FAFC] px-4 py-6 text-[#334155] sm:px-6 sm:py-9">
+    <div className="mx-auto max-w-[1240px] rounded-[22px] border border-blue-100 bg-white p-3 shadow-[0_12px_35px_-10px_rgba(15,23,42,0.18)] sm:p-5 lg:p-6">
       <div className="space-y-5">
       <nav aria-label="Điều hướng" className="flex items-center gap-2 text-sm text-[#64748B]"><Link to="/jobs" className="font-semibold text-[#078FBF] hover:underline">Việc làm</Link><span aria-hidden="true">/</span><span>Chi tiết</span></nav>
       {isPublicJobsMockMode && <p role="note" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Đây là tin minh họa trong chế độ phát triển. Chức năng nộp hồ sơ chỉ hoạt động với tin từ API.</p>}
@@ -98,7 +120,7 @@ export default function JobDetails() {
                 {job.industry && <span className="inline-flex items-center gap-1.5"><Building2 size={15} />{job.industry}</span>}
                 {job.seniority && <span className="inline-flex items-center gap-1.5"><BriefcaseBusiness size={15} />{seniorityLabels[job.seniority] || job.seniority}</span>}
                 {deadline && <span className="inline-flex items-center gap-1.5"><CalendarDays size={15} />Hạn nộp {deadline}</span>}
-                {job.location_label && <span className="inline-flex items-center gap-1.5"><MapPin size={15} />{job.location_label}{job.work_mode_label && ` · ${job.work_mode_label}`}</span>}
+                {(job.location_label || job.location || job.work_mode_label || job.work_mode) && <span className="inline-flex items-center gap-1.5"><MapPin size={15} />{job.location_label || job.location}{(job.work_mode_label || job.work_mode) && ` · ${job.work_mode_label || job.work_mode}`}</span>}
                 {job.salary && <span className="inline-flex items-center gap-1.5 font-semibold text-[#078B68]"><Banknote size={15} />{salaryLabel(job.salary)}</span>}
               </div>
             </div>
@@ -130,6 +152,7 @@ export default function JobDetails() {
             <h2 className="flex items-center gap-2 text-lg font-bold text-[#17243B]"><BriefcaseBusiness size={18} className="text-[#12A8D8]" />Tóm tắt công việc</h2>
             <dl className="mt-4 divide-y divide-[#E5F0F4] text-sm">
               {job.industry && <div className="flex items-center justify-between gap-3 py-3"><dt className="inline-flex items-center gap-2 text-[#64748B]"><Building2 size={15} className="text-[#12A8D8]" />Ngành nghề</dt><dd className="text-right font-semibold text-[#17243B]">{job.industry}</dd></div>}
+              {(job.location_label || job.location || job.work_mode_label || job.work_mode) && <div className="flex items-center justify-between gap-3 py-3"><dt className="inline-flex items-center gap-2 text-[#64748B]"><MapPin size={15} className="text-[#12A8D8]" />Địa điểm</dt><dd className="text-right font-semibold text-[#17243B]">{job.location_label || job.location}{(job.work_mode_label || job.work_mode) && ` · ${job.work_mode_label || job.work_mode}`}</dd></div>}
               {job.seniority && <div className="flex items-center justify-between gap-3 py-3"><dt className="inline-flex items-center gap-2 text-[#64748B]"><BriefcaseBusiness size={15} className="text-[#12A8D8]" />Cấp độ</dt><dd className="text-right font-semibold text-[#17243B]">{seniorityLabels[job.seniority] || job.seniority}</dd></div>}
               <div className="flex items-center justify-between gap-3 py-3"><dt className="inline-flex items-center gap-2 text-[#64748B]"><CalendarDays size={15} className="text-[#12A8D8]" />Hạn nộp</dt><dd className="text-right font-semibold text-[#17243B]">{deadline || 'Chưa có thông tin'}</dd></div>
               {job.salary && <div className="flex items-center justify-between gap-3 py-3"><dt className="text-[#64748B]">Mức lương</dt><dd className="text-right font-semibold text-[#078B68]">{salaryLabel(job.salary)}</dd></div>}

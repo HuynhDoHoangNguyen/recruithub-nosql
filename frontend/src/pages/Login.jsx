@@ -71,6 +71,7 @@ const Login = () => {
           {loading ? <span role="status" className="inline-flex items-center gap-2"><span className="loading-spinner" aria-hidden="true" />Đang đăng nhập…</span> : 'Đăng nhập'}
         </button>
       </form>
+      <p className="mt-4 text-center text-sm text-slate-600">Được Admin cấp mã reset? <Link to="/reset-password" className="font-semibold text-blue-700 hover:text-blue-800">Đặt mật khẩu mới</Link></p>
       <p className="mt-6 text-center text-sm text-slate-600">Chưa có tài khoản? <Link to="/register" className="font-semibold text-blue-700 hover:text-blue-800 focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Đăng ký</Link></p>
     </AuthLayout>
   );

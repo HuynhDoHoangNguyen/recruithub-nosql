@@ -207,7 +207,7 @@ cd ../frontend
 npm install
 npm run dev
 ```
-Giao diện ứng dụng sẽ hoạt động tại: [http://localhost:5173](http://localhost:5173).
+Giao diện ứng dụng sẽ hoạt động tại: [http://127.0.0.1:5178](http://127.0.0.1:5178).
 
 Frontend dùng proxy `/api` tới Backend trong development. Hướng dẫn cấu hình và menu nằm ở [frontend/README.md](frontend/README.md). Việc import dữ liệu là bước chuẩn bị riêng, không chạy lại mỗi lần khởi động. Luồng đăng nhập cần API Identity, hiện chưa được tích hợp trên nhánh này.
 
