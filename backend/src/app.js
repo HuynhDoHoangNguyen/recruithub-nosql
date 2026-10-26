@@ -19,6 +19,7 @@ import { createRecruiterProfileRoutes } from './routes/recruiter-profile.routes.
 import { createAssetRepository } from './repositories/asset.repository.js';
 import { UploadService } from './services/upload.service.js';
 import { createUploadRoutes } from './routes/upload.routes.js';
+import { CandidateRankingService } from './services/scoring/candidate-ranking.service.js';
 
 function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://localhost:5173') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
@@ -46,12 +47,12 @@ function createConfiguredRepository(environment, { readOnly = false } = {}) {
   // The public catalog can read the existing dataset without granting any
   // mutation or identity capability on that database.
   const methods = readOnly ? ['get', 'find', 'scanPublicJobs']
-    : ['get', 'put', 'find', 'scanPublicJobs', 'profile', 'allInterviews', 'view', 'stats', 'candidateStats', 'initialize'];
+    : ['get', 'put', 'find', 'scanPublicJobs', 'profile', 'allInterviews', 'view', 'stats', 'candidateStats', 'initialize', 'allApplicationsForJob', 'getMany'];
   return Object.fromEntries(methods
     .map(method => [method, (...args) => getRepository()[method](...args)]));
 }
 
-export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
+export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, ranking: suppliedRanking, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
   const app = express();
   const origins = configuredFrontendOrigins(jwtEnv.FRONTEND_URL);
   const repository = suppliedRepository || createConfiguredRepository(jwtEnv);
@@ -78,6 +79,7 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
       getAnalysisSummary: scoringService.getAnalysisSummary,
     }),
     scoring: scoringService,
+    ranking: suppliedRanking || new CandidateRankingService(repository),
   };
 
   app.use(cors({

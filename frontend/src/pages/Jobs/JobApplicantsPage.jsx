@@ -10,10 +10,12 @@ import ApplicantDetailModal from '../../features/applications/components/Applica
 import { useApiResource, useBookmarkPage } from '../../features/applications/useApiResource';
 import MatchScoreBadge from '../../features/scoring/components/MatchScoreBadge';
 import ScoreBreakdownDrawer from '../../features/scoring/components/ScoreBreakdownDrawer';
+import CandidateRankingView from '../../features/scoring/components/CandidateRankingView';
 
 export default function JobApplicantsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [viewMode, setViewMode] = useState('list');
   const [stage, setStage] = useState('');
   const [selected, setSelected] = useState(null);
   const [scoreAppId, setScoreAppId] = useState(null);
@@ -24,7 +26,43 @@ export default function JobApplicantsPage() {
   return <Page className="rh-surface-page rh-applicants" title="Hồ sơ ứng viên" subtitle={resource.data?.job.title}
     action={<div className="flex flex-wrap items-start gap-2"><Link to="/recruiter/dashboard" className="btn-secondary inline-flex gap-2 items-center text-xs"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Về quản lý tuyển dụng</Link>{resource.data?.job && <DeleteJobButton job={resource.data.job} onDeleted={() => navigate('/recruiter/dashboard')} onConflict={resource.reload} />}</div>}>
     {resource.data?.job && <div className="rh-panel rh-summary-card rounded-2xl border border-blue-100 bg-gradient-to-r from-white to-blue-50/50 p-5 flex items-center gap-4 shadow-sm"><CompanyLogo name={resource.data.job.company_name} src={resource.data.job.company_logo_url} /><div><p className="text-xs text-slate-500 mb-1">{resource.data.job.company_name}</p><h2 className="font-extrabold text-slate-800">{resource.data.job.title}</h2><p className="text-xs text-slate-400 mt-2 flex gap-2 items-center"><Users className="h-4 w-4" aria-hidden="true" />Danh sách ứng viên đã nộp hồ sơ</p></div></div>}
-    <StageFilter value={stage} onChange={value => { setStage(value); pager.reset(); }} />
+    <div role="group" aria-label="Chế độ xem ứng viên" className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
+      <button
+        type="button"
+        aria-pressed={viewMode === 'list'}
+        className={`px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors ${
+          viewMode === 'list'
+            ? 'bg-white text-blue-700 shadow-sm'
+            : 'text-slate-600 hover:text-slate-900'
+        }`}
+        onClick={() => {
+          setViewMode('list');
+          setSelected(null);
+          setScoreAppId(null);
+        }}
+      >
+        Danh sách xử lý
+      </button>
+      <button
+        type="button"
+        aria-pressed={viewMode === 'ranking'}
+        className={`px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors ${
+          viewMode === 'ranking'
+            ? 'bg-white text-blue-700 shadow-sm'
+            : 'text-slate-600 hover:text-slate-900'
+        }`}
+        onClick={() => {
+          setViewMode('ranking');
+          setSelected(null);
+          setScoreAppId(null);
+        }}
+      >
+        Xếp hạng phù hợp
+      </button>
+    </div>
+    {viewMode === 'list' ? (
+      <>
+        <StageFilter value={stage} onChange={value => { setStage(value); pager.reset(); }} />
     <Resource resource={resource} empty={!resource.data?.items.length} emptyMessage="Chưa có ứng viên ở trạng thái này.">
       <div className="rh-applicant-table overflow-x-auto rounded-2xl border border-blue-100 bg-white shadow-sm"><table className="w-full min-w-[800px] text-left text-sm"><thead className="bg-blue-50/70 text-slate-500"><tr>
         {['Ứng viên', 'Ngày nộp', 'Điểm phù hợp', 'Kỹ năng', 'Trạng thái', 'Thao tác'].map(label => <th key={label} className="p-4 font-semibold">{label}</th>)}
@@ -72,6 +110,10 @@ export default function JobApplicantsPage() {
         onRecomputed={resource.reload}
         returnFocusId={`applicant-score-${scoreAppId.replace(/[^a-zA-Z0-9_-]/g, '_')}`}
       />
+    )}
+      </>
+    ) : (
+      <CandidateRankingView jobId={id} />
     )}
   </Page>;
 }

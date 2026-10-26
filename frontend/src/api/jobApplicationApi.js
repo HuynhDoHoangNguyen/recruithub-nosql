@@ -40,6 +40,13 @@ export const applicationApi = {
   mine: params => unwrap(client.get('/v1/applications/my-applications', { params })),
   detail: id => unwrap(client.get(`/v1/applications/${idPath(id)}`)),
   applicants: (id, params) => unwrap(client.get(`/v1/jobs/${idPath(id)}/applicants`, { params })),
+  ranking: (id, params) =>
+    unwrap(
+      client.get(
+        `/v1/jobs/${idPath(id)}/applicant-ranking`,
+        { params }
+      )
+    ),
   withdraw: application => unwrap(client.patch(`/v1/applications/${idPath(application._id)}/withdraw`, {
     expected_stage: application.current_stage, expected_rev: application._rev,
   })),

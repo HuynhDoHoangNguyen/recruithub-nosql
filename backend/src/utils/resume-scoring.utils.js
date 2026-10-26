@@ -1090,6 +1090,45 @@ export function evaluateResumeAnalysis({ application, candidate, job, analyzedAt
 }
 
 /**
+ * Compares two ranked candidate items deterministically:
+ * 1. total_score DESC (exact unrounded)
+ * 2. scores.skill DESC (exact unrounded)
+ * 3. application.applied_at ASC (earliest first)
+ * 4. application._id ASC (binary lexical comparison, locale-independent)
+ *
+ * @param {{ analysis: Object, application: Object }} a
+ * @param {{ analysis: Object, application: Object }} b
+ * @returns {number}
+ */
+export function compareRankedItems(a, b) {
+  // 1. total_score DESC (unrounded, exact raw difference)
+  if (b.analysis.total_score !== a.analysis.total_score) {
+    return b.analysis.total_score > a.analysis.total_score ? 1 : -1;
+  }
+
+  // 2. scores.skill DESC (unrounded, exact raw difference)
+  const skillA = a.analysis.scores?.skill ?? 0;
+  const skillB = b.analysis.scores?.skill ?? 0;
+  if (skillB !== skillA) {
+    return skillB > skillA ? 1 : -1;
+  }
+
+  // 3. application.applied_at ASC
+  const timeA = new Date(a.application.applied_at).getTime();
+  const timeB = new Date(b.application.applied_at).getTime();
+  if (timeA !== timeB) {
+    return timeA - timeB;
+  }
+
+  // 4. application._id ASC (binary lexical comparison, locale-independent)
+  if (a.application._id !== b.application._id) {
+    return a.application._id < b.application._id ? -1 : 1;
+  }
+
+  return 0;
+}
+
+/**
  * Deterministically ranks candidates for a Job.
  * 
  * Rules:
@@ -1152,29 +1191,7 @@ export function rankAnalyses(analyses, applicationsMap, options = {}) {
     eligibleItems.push({ analysis, application: app });
   }
 
-  eligibleItems.sort((a, b) => {
-    // 1. total_score DESC (unrounded)
-    const diffTotal = b.analysis.total_score - a.analysis.total_score;
-    if (Math.abs(diffTotal) > 1e-9) {
-      return diffTotal;
-    }
-
-    // 2. scores.skill DESC (unrounded)
-    const diffSkill = b.analysis.scores.skill - a.analysis.scores.skill;
-    if (Math.abs(diffSkill) > 1e-9) {
-      return diffSkill;
-    }
-
-    // 3. application.applied_at ASC
-    const timeA = new Date(a.application.applied_at).getTime();
-    const timeB = new Date(b.application.applied_at).getTime();
-    if (timeA !== timeB) {
-      return timeA - timeB;
-    }
-
-    // 4. application._id ASC
-    return a.application._id.localeCompare(b.application._id);
-  });
+  eligibleItems.sort(compareRankedItems);
 
   return eligibleItems.map((item, idx) => ({
     rank: idx + 1,
