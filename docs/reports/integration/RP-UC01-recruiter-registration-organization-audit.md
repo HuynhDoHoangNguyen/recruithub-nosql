@@ -2,7 +2,7 @@
 
 **Ngày:** 2026-10-26 (Asia/Saigon)  
 **Phạm vi:** audit read-only Register → Auth → Company/Department → Recruiter → Job; đọc CouchDB bằng GET và chạy test cô lập dùng mock/in-memory.  
-**Trạng thái:** Hoàn tất audit; không sửa source, `.env`, test data hoặc CouchDB.
+**Trạng thái:** Audit gốc là snapshot read-only ngày 2026-10-26. Xem mục H để biết cập nhật triển khai/test sau quyết định nghiệp vụ của người dùng ngày 2026-11-11.
 
 ## A. Root Cause
 
@@ -118,4 +118,26 @@ Không có cột trạng thái Company/Department trong schema để xác địn
 - Module Register được xác minh dùng Vite flag `true` bằng một probe module tạm; file probe đã được xóa. GET health xác nhận vẫn là `recruitment_db`, 25.765 documents.
 - Không gửi POST đăng ký, không tạo User/Recruiter/Company/Department/Job và không thay đổi CouchDB. Do đó luồng signup đăng nhập thật vẫn chưa được E2E xác minh. Backend route và UI đang mở; người dùng có thể đăng ký thật qua giao diện local.
 - Khi dùng luồng này, đăng ký thành công sẽ tạo User role `RECRUITER` và Recruiter profile liên kết Company/Department đã chọn, sau đó kích hoạt User ngay. Đây là quyền tự gia nhập mà người dùng vừa chọn; không phải quy trình được duyệt chung/production. Cấu hình Auth hiện cho phép ghi `recruitment_db`, nên đăng ký thật tiếp theo sẽ ghi vào database này.
+
+## H. Cập nhật triển khai theo nghiệp vụ UC01 hiện hành — 2026-11-11
+
+**Quyết định giữ nguyên nghiệp vụ:** Recruiter tự đăng ký bằng email/mật khẩu, tìm và chọn Company có sẵn, sau đó chọn Department thuộc Company đó. Không tạo Company/Department từ form, không thêm mã mời, mã xác minh, OTP email hoặc bước Admin duyệt. Sau khi backend xác minh quan hệ, User được kích hoạt ngay. UC01 đặc tả hiện có không yêu cầu OTP/email verification; phần này không được tự thêm vào phạm vi.
+
+- Backend contract cuối: `POST /api/v1/auth/register/recruiter` nhận strict DTO `{ email, password, company_id, department_id }`. `role`, `account_status`, object Company/Department hoặc trường thừa đều không được client quyết định.
+- Directory contract: `GET /api/v1/companies?search=<2–100 ký tự>` trả DTO Company an toàn; `GET /api/v1/companies/:companyId/departments` chỉ trả Department của Company đã chọn. Cả hai và đăng ký dùng feature flag `PUBLIC_RECRUITER_REGISTRATION_ENABLED` ở backend; UI dùng `VITE_RECRUITER_REGISTRATION_ENABLED`.
+- Service xác minh Company/Department thật từ repository và `department.company_id === company_id`, ghi User + Recruiter, chuyển User từ trạng thái staging sang `ACTIVE`, rồi xác minh scope. Lỗi giữa chừng trả `REGISTRATION_INCOMPLETE` và mã tham chiếu; không retry/rollback tự động.
+- Sửa test contract cũ vốn gửi nested `company`/`department` hoặc kỳ vọng tự tạo tổ chức. Test mới dùng Company/Department có sẵn và khẳng định hai tài liệu tổ chức không bị ghi/sửa.
+- Backend Auth Foundation: **54/54 PASS**; bộ route + registration + organization lookup: **15/15 PASS**. Frontend Recruiter registration UI/component: **23/23 PASS**.
+- Sửa lệch mã lỗi ở Register UI: backend có thể trả `AUTH_DATABASE_CONFIGURATION_ERROR` hoặc `DATABASE_CONFIGURATION_ERROR`, trước đây frontend chỉ nhận `AUTH_CONFIGURATION_ERROR`. UI hiện có thông báo cụ thể cho lỗi DB/CouchDB và hiển thị code an toàn cho mã lỗi chưa ánh xạ; thêm regression test.
+- Các bài test trên dùng mock/in-memory và HTTP server cục bộ. Không gửi đăng ký đến `recruitment_db`, không tạo User/Recruiter, không sửa Company/Department.
+- Runtime trên `127.0.0.1:5178`/`5011` không phản hồi trong lần kiểm tra hiện tại; vì vậy browser E2E chưa được xác minh. Đăng ký thật là thao tác ghi User/Recruiter vào Auth database đã cấu hình; chỉ tạo tài khoản mẫu sau khi người dùng chủ động gửi form.
+
+Đây là phạm vi tự gia nhập được người dùng lựa chọn. Quyền được đăng ký không chứng minh quan hệ lao động với Company; hệ thống hiện không có membership approval. Không bổ sung kiểm tra/phê duyệt mới trong UC01 này.
+
+## I. Cập nhật cấu hình FE–BE local — 2026-11-11
+
+- Tìm thấy `frontend/.env.local` có dòng `VITE_API_BASE_URL=/apiVITE_API_PROXY_TARGET=http://127.0.0.1:5011`; Axios vì vậy có thể ghép request path sai. Đã tách/sửa API base thành `/api` và giữ proxy target ở `http://127.0.0.1:5011`.
+- Root `.env` trước đó đặt `PORT=5021` trong khi proxy trỏ `5011`; đã đồng bộ `PORT=5011` để lần khởi động sau không lệch cổng. Không thay đổi database name hoặc cờ đăng ký.
+- Khởi động lại backend và Vite trên `5011`/`5178`. GET trực tiếp backend health, health qua Vite proxy, Company lookup và trang `/register`: **200**. Health xác nhận `recruitment_db`, **25.766 documents**.
+- Backend/Vite log không ghi lỗi khởi động/proxy trong lần kiểm tra. Không POST đăng ký, không tạo/sửa dữ liệu CouchDB. Browser automation vẫn unavailable; người dùng cần refresh trang để nhận env mới.
 

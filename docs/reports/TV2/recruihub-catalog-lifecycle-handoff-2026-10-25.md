@@ -34,7 +34,7 @@ Không bịa lương, benefits, quy mô công ty, Verified/HOT. Trường thiế
 | Sửa CLOSED | Bị chặn | Vẫn chặn; luồng mở chỉ nhận status/revision/deadline |
 | Thống kê | Đếm document | Giữ số cặp hiện hành, thêm tổng lần nộp/lần lịch sử riêng |
 
-Đã cập nhật [business rules](recruitment-business-rules.md), mục 3 và bảng chính sách. Terminal semantics vẫn giữ **trong mỗi lần nộp**; không thêm ACCEPTED.
+Đã cập nhật [business rules](../../recruitment-business-rules.md), mục 3 và bảng chính sách. Terminal semantics vẫn giữ **trong mỗi lần nộp**; không thêm ACCEPTED.
 
 ## 3. Thiết kế dữ liệu, API và tương thích
 
@@ -54,7 +54,7 @@ Không trả điểm cũ: hiện NOT_ANALYZED, hook phân tích nhận thêm s�
 
 ### Job, metadata và filters
 
-`location` dùng khóa cấu hình tại [job-catalog.constants.js](../backend/src/constants/job-catalog.constants.js), ví dụ VN-HN/VN-SG/VN-DN. `work_mode`: HYBRID/REMOTE/ONSITE. Form và search cùng lấy khóa/nhãn từ **GET `/api/v1/jobs/metadata`**. Trường optional; khi sửa, null xóa giá trị. Không rewrite Job lịch sử hoặc suy dữ liệu từ tên công ty.
+`location` dùng khóa cấu hình tại [job-catalog.constants.js](../../../backend/src/constants/job-catalog.constants.js), ví dụ VN-HN/VN-SG/VN-DN. `work_mode`: HYBRID/REMOTE/ONSITE. Form và search cùng lấy khóa/nhãn từ **GET `/api/v1/jobs/metadata`**. Trường optional; khi sửa, null xóa giá trị. Không rewrite Job lịch sử hoặc suy dữ liệu từ tên công ty.
 
 Metadata lấy kỹ năng/ngành chuẩn hóa từ **toàn bộ OPEN** trong catalog live và lịch sử. Keyword, industry, seniority, location, work mode, skills kết hợp **AND**; nhiều skills cũng AND, tối đa 8. UI đưa kỹ năng đang chọn lên đầu, đổi bộ lọc reset cursor, query giữ lựa chọn khi reload/back, Xóa lọc xóa query/UI. Chỉ hiển thị số tin trên trang, không gọi đó là tổng toàn hệ thống.
 
@@ -76,7 +76,7 @@ Thống kê dùng reduce views theo khóa Candidate/Job thuộc Recruiter. `tota
 | Hồ sơ/duyệt | `features/applications/components/{ApplyModal,ApplicationAttempts,ApplicantDetailModal,WithdrawButton}.jsx`, `applicationPresentation.js`, `pages/Jobs/JobApplicantsPage.jsx`, `pages/Dashboard/JobSeekerDashboard.jsx` |
 | API/brand | `frontend/src/api/jobApplicationApi.js`, `services/{publicJobsApi,publicJobsModel}.js`, `components/Navbar.jsx`, `frontend/index.html`, `frontend/public/recruihub.svg` |
 | Regression | `backend/tests/recruitment/attempts-and-reopen.test.js`, `frontend/tests/catalog-lifecycle.test.jsx`, cập nhật tests cũ theo hợp đồng mới |
-| Browser thật | [verify-catalog-lifecycle.cjs](../scripts/ui/verify-catalog-lifecycle.cjs), [results.json](catalog-lifecycle-verification/results.json) |
+| Browser thật | [verify-catalog-lifecycle.cjs](../../../scripts/ui/verify-catalog-lifecycle.cjs), [results.json](../../catalog-lifecycle-verification/results.json) |
 
 Các file tài khoản local, public catalog sau merge và kiểm chứng trước đó vẫn được giữ trong working tree.
 
@@ -113,18 +113,18 @@ P1: validation/response references vẫn trước khi ghi, regression response/s
 
 | Đối chiếu tham khảo | Ảnh ứng dụng thật |
 |---|---|
-| Sidebar trắng, radio/checkbox/dropdown | [Jobs desktop](catalog-lifecycle-verification/jobs-filters-desktop.png), [Jobs mobile](catalog-lifecycle-verification/jobs-filters-mobile.png) |
-| Job Details dải màu, summary, hai cột | [Desktop](catalog-lifecycle-verification/job-details-before-reapply.png), [Mobile](catalog-lifecycle-verification/job-details-mobile.png) |
-| Thiếu field mới không tự gán | [Job lịch sử](catalog-lifecycle-verification/historical-missing-fields.png) |
-| Tìm kiếm / tạo tin | [Trang chủ](catalog-lifecycle-verification/home-search.png), [Form thật](catalog-lifecycle-verification/job-form-canonical-options.png) |
-| Lịch sử / xử lý | [Candidate](catalog-lifecycle-verification/candidate-applied-history.png), [Recruiter](catalog-lifecycle-verification/recruiter-screening-actions.png), [Mở lại](catalog-lifecycle-verification/reopen-job.png) |
+| Sidebar trắng, radio/checkbox/dropdown | Jobs desktop (jobs-filters-desktop.png không có trong checkout hiện tại), Jobs mobile (jobs-filters-mobile.png không có trong checkout hiện tại) |
+| Job Details dải màu, summary, hai cột | Desktop (job-details-before-reapply.png không có trong checkout hiện tại), Mobile (job-details-mobile.png không có trong checkout hiện tại) |
+| Thiếu field mới không tự gán | Job lịch sử (historical-missing-fields.png không có trong checkout hiện tại) |
+| Tìm kiếm / tạo tin | Trang chủ (home-search.png không có trong checkout hiện tại), Form thật (job-form-canonical-options.png không có trong checkout hiện tại) |
+| Lịch sử / xử lý | Candidate (candidate-applied-history.png không có trong checkout hiện tại), Recruiter (recruiter-screening-actions.png không có trong checkout hiện tại), Mở lại (reopen-job.png không có trong checkout hiện tại) |
 
 Bố cục theo ảnh, nội dung theo schema/API thật; không sao chép salary/benefits minh họa.
 
 ## 7. Tự kiểm tra và tích hợp
 
-1. Mở http://localhost:5173, Recruiter `recruiter.test@example.invalid`. Mật khẩu ở `LOCAL_TEST_RECRUITER_PASSWORD` trong [`.env` gốc](../.env), được Git ignore.
-2. Đăng tin có địa điểm/hình thức và deadline tương lai. Candidate `candidate.test@example.invalid`, mật khẩu tại `LOCAL_TEST_CANDIDATE_PASSWORD` cùng file `.env`.
+1. Mở http://localhost:5173, Recruiter `recruiter.test@example.invalid`. Mật khẩu ở biến `LOCAL_TEST_RECRUITER_PASSWORD` trong file `.env` local được Git ignore.
+2. Đăng tin có địa điểm/hình thức và deadline tương lai. Candidate `candidate.test@example.invalid`, mật khẩu ở biến `LOCAL_TEST_CANDIDATE_PASSWORD` trong cùng file `.env` local.
 3. Chọn tin nhãn “Đang nhận hồ sơ”; thử nộp, rút, nộp lại. Xem CV/lịch sử ở Job Details hoặc Dashboard.
 4. Recruiter → Bảng Điều Khiển → Xem ứng viên → Duyệt/Từ chối. Đóng rồi Mở lại để thử deadline.
 

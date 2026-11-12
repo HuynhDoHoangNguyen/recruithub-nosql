@@ -71,3 +71,19 @@ Kết quả trong các báo cáo trước là snapshot theo thời điểm chạ
 3. Khép kín chính sách membership/approval cho Recruiter trước khi ghi nhận public self-registration là hoàn chỉnh.
 4. Đồng bộ runtime backend/Vite theo cổng đã chốt và cập nhật kết quả GET/browser tương ứng; không đổi URL người dùng đang dùng nếu chưa cần.
 5. Phân loại các lỗi full-suite cũ ngoài phạm vi TV1/UC27/UC28.
+
+## 7. Cập nhật UC01 Recruiter — 2026-11-11
+
+- Giữ đúng contract chọn Company/Department có sẵn; không thêm Company mới, mã mời, OTP/email verification hay bước duyệt Admin. UC01 đặc tả hiện có không yêu cầu xác minh email.
+- Sửa bộ test Recruiter registration và route theo DTO hiện hành `email`, `password`, `company_id`, `department_id`; thêm test HTTP cho Company lookup và Department theo Company. UI bỏ các thông báo lỗi của contract tự tạo Company không còn được backend trả về.
+- Backend Auth Foundation: **54/54 PASS**; targeted route/registration/lookup: **15/15 PASS**. Frontend registration UI/component: **23/23 PASS**.
+- Sửa lỗi frontend chỉ nhận `AUTH_CONFIGURATION_ERROR` trong khi Auth backend trả `AUTH_DATABASE_CONFIGURATION_ERROR`/`DATABASE_CONFIGURATION_ERROR`; thêm thông báo lỗi cấu hình và test tương ứng.
+- Kiểm thử dùng in-memory/mock; không ghi vào CouchDB. Runtime `5178` và backend `5011` không phản hồi trong lượt kiểm tra, nên browser E2E chưa chạy và không có tài khoản test mới được tạo.
+- Báo cáo chi tiết và giới hạn xác minh: [UC01 registration audit](../integration/RP-UC01-recruiter-registration-organization-audit.md#h-cập-nhật-triển-khai-theo-nghiệp-vụ-uc01-hiện-hành--2026-11-11).
+
+## 8. Sửa cấu hình kết nối FE–BE local — 2026-11-11
+
+- Sửa `frontend/.env.local`: Axios API base trở về `/api`; proxy `/api` trỏ `http://127.0.0.1:5011`. Dòng env bị ghép trước đó làm request URL sai.
+- Đồng bộ root `.env` `PORT=5011` với proxy, tránh backend khởi động lại ở `5021` trong khi FE tiếp tục gọi `5011`.
+- Khởi động lại backend/Vite; GET backend health, health qua proxy, Company lookup và `/register` đều **200**. DB health vẫn là `recruitment_db`, 25.766 documents. Không gửi POST đăng ký và không ghi DB.
+- Báo cáo audit: [UC01 registration audit](../integration/RP-UC01-recruiter-registration-organization-audit.md#i-cập-nhật-cấu-hình-fe-be-local--2026-11-11).

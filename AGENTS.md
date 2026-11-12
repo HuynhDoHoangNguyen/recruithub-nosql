@@ -14,11 +14,11 @@ Bạn là Senior Full-stack NoSQL Engineer và AI Coding Agent đóng vai trò t
 
 ### 1.1. Phạm vi nghiệp vụ toàn hệ thống
 1. **Authentication & Identity**: Quản lý tài khoản 3 vai trò (`ADMIN`, `RECRUITER`, `CANDIDATE`), đăng ký, đăng nhập, bảo vệ tuyến đường (Route Guard), quản lý hồ sơ cá nhân.
-2. **Job Catalog**: Quản lý 2.500 tin tuyển dụng (200 `OPEN`, 2.300 `DRAFT`), phân cấp theo 3 Tiers, tìm kiếm toàn văn, lọc theo kỹ năng, mức lương, địa điểm.
+2. **Job Catalog**: Release dataset ban đầu ghi nhận 2.500 tin (200 `OPEN`, 2.300 `DRAFT`); đây là baseline lịch sử, cần xác minh trước khi dùng làm số liệu runtime. Tính năng tìm kiếm/lọc phụ thuộc schema và API hiện hành.
 3. **Application Lifecycle**: Quy trình nộp hồ sơ ứng tuyển kèm CV, quản lý tiến trình qua **7 stages nghiệp vụ chuẩn** (`APPLIED` → `SCREENING` → `INTERVIEWING` → `OFFERED` → `HIRED`, cùng 2 trạng thái kết thúc `REJECTED`, `WITHDRAWN`).
 4. **Interview Management**: Quản lý 350 biên bản phỏng vấn, lên lịch, ghi nhận bằng chứng đánh giá (Evidence) và kết quả (`PASSED` / `FAILED`).
 5. **Resume Scoring & AI Ranking Engine**: Thuật toán chấm điểm mức độ phù hợp (`recruithub-scoring-mvp-v1`) dựa trên Hard Skills Match, Experience Alignment, Domain Weights; xếp hạng ứng viên xác định (Deterministic Ranking).
-6. **Admin & Monitoring**: Giám sát 25.750 documents NoSQL, nhật ký hệ thống (`system_log`), vết kiểm toán (`audit_trail`), thống kê số liệu trực quan.
+6. **Admin & Monitoring**: Quản lý tài khoản và thống kê; phạm vi system log/audit trail là yêu cầu nghiệp vụ cần đối chiếu với source hiện hành, không giả định đã có chỉ vì xuất hiện trong đặc tả.
 
 ### 1.2. Nguyên tắc phát triển Vertical Slice
 Mỗi tính năng người dùng phải được triển khai xuyên suốt:
@@ -34,8 +34,8 @@ $$\text{CouchDB Document/View} \longrightarrow \text{Zod Schema} \longrightarrow
 ## 📋 2. Context (Bối cảnh dự án & Nguồn sự thật)
 
 ### 2.1. Ngăn xếp công nghệ chuẩn
-- **Database:** Apache CouchDB 3.5.2 (Dockerized), Database `recruitment_db`, 25.750 documents, Mango Query Indexes, MapReduce Views.
-- **Backend:** Node.js (v20+), Express.js 5, Zod Schema Validation, Native HTTP / Nano Driver cho CouchDB, JWT Authentication.
+- **Database:** Apache CouchDB 3.5.2 (Dockerized); release dataset ban đầu có 25.750 documents, không phải số lượng runtime hiện tại.
+- **Backend:** Node.js (v20+), Express.js 5, Zod 4 validation, native HTTP CouchDB client, JWT Authentication.
 - **Frontend:** React 19, Vite 8, Tailwind CSS, Lucide Icons, React Router DOM v7, React Toastify, Axios.
 - **Template giao diện tham khảo:** `docs/Job-Application-Portal-Frontend/`.
 - **Môi trường vận hành:** Windows PowerShell, Docker Desktop.
@@ -45,21 +45,21 @@ Khi có sự mâu thuẫn giữa các tài liệu hoặc mã nguồn, bắt bu�
 
 1. **Database CouchDB thực tế & Zod Schemas**: Dữ liệu thật trong `recruitment_db` và các schema trong `backend/src/schemas/` là tiêu chuẩn dữ liệu tối cao.
 2. **Backend API Contracts & Express Routes đang chạy**: Các endpoint, middleware và controller đã kiểm thử thành công.
-3. **Quy tắc nghiệp vụ chính thức**: [docs/recruitment-business-rules.md](file:///docs/recruitment-business-rules.md) và [docs/recruithub-usecase-system.md](file:///docs/recruithub-usecase-system.md).
-4. **Kiến trúc hệ thống**: [ARCHITECTURE.md](file:///ARCHITECTURE.md) và [docs/data-schema-contract.md](file:///docs/data-schema-contract.md).
-5. **Bản vẽ màn hình**: [docs/recruithub-screen-mockups.md](file:///docs/recruithub-screen-mockups.md).
+3. **Quy tắc nghiệp vụ chính thức**: [docs/recruitment-business-rules.md](docs/recruitment-business-rules.md) và [docs/recruithub-usecase-system.md](docs/recruithub-usecase-system.md).
+4. **Kiến trúc hệ thống**: [ARCHITECTURE.md](ARCHITECTURE.md) và [docs/data-schema-contract.md](docs/data-schema-contract.md).
+5. **Bản vẽ màn hình**: [docs/recruithub-screen-mockups.md](docs/recruithub-screen-mockups.md).
 6. **Template tham khảo**: `docs/Job-Application-Portal-Frontend/` (Chỉ dùng để tham khảo bố cục và tái sử dụng component; không xem là đặc tả nghiệp vụ của RecruiHub).
 
 ### 2.3. Tài liệu bắt buộc đọc trước khi thực hiện Task
-1. [ARCHITECTURE.md](file:///ARCHITECTURE.md)
-2. [README.md](file:///README.md)
-3. [docs/ai-frontend-development-guide.md](file:///docs/ai-frontend-development-guide.md)
-4. [docs/recruithub-usecase-system.md](file:///docs/recruithub-usecase-system.md)
-5. [docs/recruithub-screen-mockups.md](file:///docs/recruithub-screen-mockups.md)
-6. [docs/recruithub-team-work-assignment.md](file:///docs/recruithub-team-work-assignment.md)
-7. [docs/recruitment-business-rules.md](file:///docs/recruitment-business-rules.md)
-8. [docs/resume-scoring-design.md](file:///docs/resume-scoring-design.md)
-9. [docs/COUCHDB_IMPORT_GUIDE.md](file:///docs/COUCHDB_IMPORT_GUIDE.md)
+1. [ARCHITECTURE.md](ARCHITECTURE.md)
+2. [README.md](README.md)
+3. [docs/ai-frontend-development-guide.md](docs/ai-frontend-development-guide.md)
+4. [docs/recruithub-usecase-system.md](docs/recruithub-usecase-system.md)
+5. [docs/recruithub-screen-mockups.md](docs/recruithub-screen-mockups.md)
+6. [docs/recruithub-team-work-assignment.md](docs/recruithub-team-work-assignment.md)
+7. [docs/recruitment-business-rules.md](docs/recruitment-business-rules.md)
+8. [docs/resume-scoring-design.md](docs/resume-scoring-design.md)
+9. [docs/COUCHDB_IMPORT_GUIDE.md](docs/COUCHDB_IMPORT_GUIDE.md)
 
 ---
 
@@ -91,13 +91,13 @@ Dự án phân chia quyền sở hữu module rõ ràng cho 3 thành viên:
 
 ### 4.1. Được phép chỉnh sửa
 Chỉ sửa đổi các file được chỉ định rõ ràng trong Task Prompt hiện tại hoặc các file mới phục vụ trực tiếp cho tính năng đang làm:
-- **Backend:** `backend/src/routes/`, `backend/src/controllers/`, `backend/src/services/`, `backend/src/models/`, `backend/tests/`.
+- **Backend:** `backend/src/routes/`, `backend/src/controllers/`, `backend/src/services/`, `backend/src/repositories/`, `backend/tests/`.
 - **Frontend:** `frontend/src/features/`, `frontend/src/pages/`, `frontend/src/components/`, `frontend/src/api/`, `frontend/src/routes/`, `frontend/src/context/`.
 
 ### 4.2. Nghiêm cấm tuyệt đối
 1. **Không sửa đổi thư mục template `docs/Job-Application-Portal-Frontend/`**: Đây là tài liệu tham khảo read-only.
 2. **Không sửa đổi hoặc xóa các snapshot dữ liệu lịch sử**: `data/processed/` và `data/processed/manifests/`.
-3. **Không thực hiện drop/xóa database CouchDB `recruitment_db`**: Không được chạy lệnh phá hủy database chứa 25.750 documents đã xác minh.
+3. **Không thực hiện drop/xóa database CouchDB `recruitment_db`**: Không chạy lệnh phá hủy database chính. Con số 25.750 là baseline lịch sử, không phải số đếm hiện tại.
 4. **Không tự ý chạy lệnh Git phá hủy**: Tuyệt đối không tự ý `git commit`, `git push`, `git reset --hard` hoặc chuyển branch nếu chưa có yêu cầu rõ ràng từ người dùng.
 5. **Không hardcode thông tin nhạy cảm**: Không lưu mật khẩu, CouchDB credentials hoặc JWT secret vào mã nguồn.
 
@@ -140,7 +140,7 @@ Mỗi Task bắt buộc trải qua 7 bước:
 Một Task chỉ được xem là hoàn thành khi thỏa mãn toàn bộ các điều kiện:
 1. Triển khai đúng phạm vi được giao, không làm ảnh hưởng đến module của thành viên khác.
 2. Với các tính năng có giao diện, phải hoàn thành cả tầng API Backend và màn hình/component Frontend tương ứng.
-3. Không làm sai lệch 25.750 documents trong cơ sở dữ liệu `recruitment_db`.
+3. Không làm sai lệch dữ liệu hiện có trong `recruitment_db`; không dựa vào con số baseline 25.750 để suy ra số lượng hiện tại.
 4. Toàn bộ unit/integration tests liên quan đều PASS:
    ```bash
    # Kiểm tra Backend

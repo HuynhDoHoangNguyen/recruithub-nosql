@@ -123,11 +123,11 @@ flowchart TD
 - **Tiền điều kiện:** Chưa đăng nhập vào hệ thống.
 - **Luồng chính:**
   1. Người dùng chọn "Đăng ký" và chọn vai trò mong muốn (`CANDIDATE` hoặc `RECRUITER`).
-  2. Điền thông tin: Email, Mật khẩu, Họ và tên. (Nếu là Recruiter: bổ sung Tên công ty).
-  3. Hệ thống kiểm tra tính duy nhất của Email trên CouchDB (`doc_type: "user"`).
-  4. Hệ thống hash mật khẩu an toàn, tạo document `user` mới và tạo document `candidate` hoặc `recruiter` tương ứng.
-  5. Trả về thông báo thành công và chuyển sang màn hình Đăng nhập.
-- **Hậu điều kiện:** Document `user` mới được tạo với trạng thái `ACTIVE`.
+  2. Candidate nhập thông tin hồ sơ theo form. Recruiter nhập Email, Mật khẩu và chọn Company cùng Department đã có trong hệ thống.
+  3. Hệ thống kiểm tra Email chưa được đăng ký; với Recruiter, kiểm tra Company/Department tồn tại và Department thuộc Company đã chọn.
+  4. Backend hash mật khẩu, tạo document `user` và document hồ sơ tương ứng (`candidate` hoặc `recruiter`) theo schema (`type`, không dùng `doc_type`).
+  5. Khi tạo đủ hồ sơ và kiểm tra quan hệ thành công, tài khoản được kích hoạt và người dùng nhận kết quả đăng ký.
+- **Hậu điều kiện:** Tài khoản được tạo với trạng thái `ACTIVE`; Recruiter được gắn vào Company/Department có sẵn. Không tạo Company/Department mới, không yêu cầu mã mời, OTP, xác minh email hoặc bước duyệt Admin trong contract hiện hành.
 
 #### UC02: Đăng nhập / Đăng xuất
 - **Actor:** Candidate, Recruiter, Admin.
@@ -291,9 +291,11 @@ flowchart TD
   1. Admin mở Bảng điều khiển Quản trị (`/admin/dashboard`).
   2. Hệ thống gọi MapReduce View `_design/stats/_view/by_doc_type` trên CouchDB.
   3. Hiển thị biểu đồ và số liệu trực quan:
-     - Tổng số documents trong `recruitment_db` (25.750).
+     - Tổng số documents trong database đang cấu hình, lấy động từ CouchDB (không hard-code baseline 25.750).
      - Số lượng chi tiết theo 9 loại: Users, Candidates, Recruiters, Jobs, Applications, Interviews, Resume Analyses, Logs, Audit Trails.
      - Tỷ lệ phân bổ trạng thái tin tuyển dụng (`OPEN` vs `DRAFT`).
+
+> **Đối chiếu implementation:** Source hiện có `_design/tv1_admin_statistics` cho thống kê User/Candidate và `_design/job_application` cho Job; chưa có view tổng quát `by_doc_type` để trả đầy đủ các nhóm dữ liệu nêu trong đặc tả. Các document type lõi hiện khai báo ở `backend/src/constants/document.constants.js` gồm cả Company/Department. UC25 vì vậy vẫn là yêu cầu nghiệp vụ rộng hơn phần đã được chứng minh trong source; cần nghiệm thu riêng trước khi tuyên bố hoàn tất.
 
 #### UC26: Tra cứu Nhật ký & Vết kiểm toán
 - **Actor:** Admin.

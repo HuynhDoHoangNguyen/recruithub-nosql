@@ -34,16 +34,16 @@ Hai nguồn template đều được giữ nguyên; không import runtime từ `
 
 | Màn hình / trạng thái | Template đúng | Ứng dụng đã ghép |
 |---|---|---|
-| Landing / guest | [Reference](it-template-verification/reference-landing-desktop.png) | [Ứng dụng](it-template-verification/app-landing-desktop.png) |
-| Jobs / guest, cùng các Job thử | [Reference](it-template-verification/reference-jobs-desktop.png) | [Ứng dụng](it-template-verification/app-jobs-desktop.png) |
-| Tạo tin / Recruiter, form mới | [Reference](it-template-verification/reference-create-desktop.png) | [Ứng dụng](it-template-verification/app-create-desktop.png) |
-| Dashboard / Candidate, một đơn mới nộp | [Reference](it-template-verification/reference-candidate-desktop.png) | [Ứng dụng](it-template-verification/app-candidate-desktop.png) |
+| Landing / guest | [Reference](../../it-template-verification/reference-landing-desktop.png) | [Ứng dụng](../../it-template-verification/app-landing-desktop.png) |
+| Jobs / guest, cùng các Job thử | [Reference](../../it-template-verification/reference-jobs-desktop.png) | [Ứng dụng](../../it-template-verification/app-jobs-desktop.png) |
+| Tạo tin / Recruiter, form mới | [Reference](../../it-template-verification/reference-create-desktop.png) | [Ứng dụng](../../it-template-verification/app-create-desktop.png) |
+| Dashboard / Candidate, một đơn mới nộp | [Reference](../../it-template-verification/reference-candidate-desktop.png) | [Ứng dụng](../../it-template-verification/app-candidate-desktop.png) |
 
 Hai bản dùng font family `Plus Jakarta Sans, Inter, system-ui, sans-serif`; Navbar đo được **65px** ở cùng viewport. Giữ nền slate-50, card trắng border slate-200 bo 16–24px, nút gradient blue/indigo, form max-width 4xl và bố cục sidebar/cards.
 
 Không tuyên bố khớp từng pixel: ứng dụng có thêm trường nghiệp vụ canonical, đủ 7 stage, phân trang, dữ liệu thật không có salary/location/verified. Template chỉ có 3 trạng thái ứng tuyển; “pending” trong ảnh so sánh là trạng thái tham khảo tương đương đơn mới nộp, không được persist sang ứng dụng. Không dùng dữ liệu giả để tái tạo nguyên các con số quảng cáo trong ảnh.
 
-Profile hiện giữ route `/profile` và core của TV1. Chỉ chỉnh phần trình bày loading/error theo template, phân biệt Candidate/Recruiter; không bịa phần trăm hoàn thiện. **Chưa có dữ liệu profile thành công để so sánh cùng trạng thái với ảnh Profile.** Xem [trạng thái chưa tích hợp](it-template-verification/app-profile-unavailable.png).
+Profile hiện giữ route `/profile` và core của TV1. Chỉ chỉnh phần trình bày loading/error theo template, phân biệt Candidate/Recruiter; không bịa phần trăm hoàn thiện. **Chưa có dữ liệu profile thành công để so sánh cùng trạng thái với ảnh Profile.** Xem [trạng thái chưa tích hợp](../../it-template-verification/app-profile-unavailable.png).
 
 ## 3. Nguyên nhân header thiếu chức năng và sửa đường đi
 
@@ -118,7 +118,7 @@ Bản release thật có ngành Retail/Travel/Healthcare và các ngành khác; 
 
 ## 6. Dữ liệu live đã đọc lại
 
-[Bằng chứng JSON mới](it-template-verification/live-data.json), đọc đúng `recruitment_db` sau setup view, không thực hiện business write trong lượt kiểm tra này:
+[Bằng chứng JSON mới](../../it-template-verification/live-data.json), đọc đúng `recruitment_db` sau setup view, không thực hiện business write trong lượt kiểm tra này:
 
 | Đại lượng | Kết quả |
 |---|---:|
@@ -139,9 +139,9 @@ Giữ sửa `publicList`: sort/index dựa `created_at` bắt buộc và `_id` �
 
 Đã chạy `npm run db:job-application`: chỉ bổ sung/cập nhật index/design view, không sửa business documents. View mới `applications_by_candidate_stage` được đối chiếu với các Application đọc độc lập của một Candidate live: tổng 1, APPLIED 1, khớp. Đây là kiểm tra Repository/CouchDB, **không phải API private có xác thực thật**.
 
-Trên 5173 thật: list 20 tin → reload → mở chi tiết → reload, đều hiển thị cùng Job. [Kết quả browser thật](live-job-verification/browser-results.json), [Jobs desktop thật](live-job-verification/jobs-desktop.png), [mobile](live-job-verification/jobs-mobile.png), [detail](live-job-verification/job-detail-desktop.png). Không intercept API hoặc đặt token vào origin production.
+Trên 5173 thật: list 20 tin → reload → mở chi tiết → reload, đều hiển thị cùng Job. [Kết quả browser thật](../../live-job-verification/browser-results.json), [Jobs desktop thật](../../live-job-verification/jobs-desktop.png), [mobile](../../live-job-verification/jobs-mobile.png), [detail](../../live-job-verification/job-detail-desktop.png). Không intercept API hoặc đặt token vào origin production.
 
-Trong Chrome kiểm thử riêng, đã tạo Job DRAFT → sửa → OPEN; Candidate nộp CV/cover; Recruiter đọc lại CV → SCREENING → INTERVIEW; tab cũ nhận 409; Candidate rút → reload và CV/history vẫn tồn tại với chuỗi APPLIED→SCREENING→INTERVIEW→WITHDRAWN; apply lại 409. [Kết quả A](it-template-verification/results.json), [readback sau rút](it-template-verification/app-candidate-withdrawn-readback.png). Dữ liệu này chỉ nằm trong memory repository kiểm thử, không đưa vào CouchDB production.
+Trong Chrome kiểm thử riêng, đã tạo Job DRAFT → sửa → OPEN; Candidate nộp CV/cover; Recruiter đọc lại CV → SCREENING → INTERVIEW; tab cũ nhận 409; Candidate rút → reload và CV/history vẫn tồn tại với chuỗi APPLIED→SCREENING→INTERVIEW→WITHDRAWN; apply lại 409. [Kết quả A](../../it-template-verification/results.json), [readback sau rút](../../it-template-verification/app-candidate-withdrawn-readback.png). Dữ liệu này chỉ nằm trong memory repository kiểm thử, không đưa vào CouchDB production.
 
 ## 7. Hướng dẫn bấm và chạy
 
@@ -204,7 +204,7 @@ Browser scripts dùng Playwright đã cài ở OS temp `recruithub-browser-check
 | Public presentation | `pages/Jobs/JobList.jsx`, `features/jobs/components/PublicJobCard.jsx`, `pages/Landing.jsx` |
 | Minimal Profile wiring | `pages/Profile.jsx`: chỉ phần loading/error và nhãn theo vai trò; không triển khai lại core TV1 |
 | Axios và UI regression | `src/api/jobApplicationApi.js`; `tests/job-application-ui.test.jsx`, `tests/portal-navigation.test.jsx` |
-| Evidence | `scripts/ui/{verify-it-template.cjs,audit-live-recruitment.mjs}`, `docs/it-template-verification/`, báo cáo này |
+| Evidence | `scripts/ui/{verify-it-template.cjs,audit-live-recruitment.mjs}`, `docs/../../it-template-verification/`, báo cáo này |
 
 Working tree còn các sửa đổi từ lượt trước về proxy, error mapping, Apply/Applicant/Timeline, ProtectedRoute, Login/Register/Admin fallback và tài liệu. Đã giữ nguyên phần liên quan; không coi tất cả các file đó đều mới tạo trong lượt này.
 

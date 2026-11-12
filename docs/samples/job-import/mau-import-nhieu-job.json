@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "jobs": [
+    {"title":"Frontend Engineer - Mau nhieu 01","industry":"Công nghệ thông tin","seniority":"JUNIOR","description":"Phát triển giao diện web bằng React.","responsibilities":["Phát triển giao diện React","Phối hợp với nhóm thiết kế"],"general":["Chủ động học hỏi"],"required_skills":["JavaScript","React"],"optional_skills":["TypeScript"],"experience_status":"NO_MINIMUM","education_status":"NO_MINIMUM","project_status":"NO_REQUIREMENT","status":"DRAFT"},
+    {"title":"Backend Engineer - Mau nhieu 02","industry":"Công nghệ thông tin","seniority":"MID","description":"Xây dựng API và dịch vụ backend.","responsibilities":["Phát triển API REST","Viết kiểm thử dịch vụ"],"general":["Làm việc nhóm"],"required_skills":["Node.js","SQL"],"optional_skills":["Docker"],"experience_status":"REQUIRED","required_months":24,"education_status":"NO_MINIMUM","project_status":"NO_REQUIREMENT","status":"DRAFT"},
+    {"title":"Data Analyst - Mau nhieu 03","industry":"Phân tích dữ liệu","seniority":"JUNIOR","description":"Phân tích dữ liệu và trình bày kết quả.","responsibilities":["Làm sạch dữ liệu","Tạo báo cáo phân tích"],"general":["Tư duy logic"],"required_skills":["SQL","Excel"],"optional_skills":["Python"],"experience_status":"NO_MINIMUM","education_status":"NO_MINIMUM","project_status":"NO_REQUIREMENT","status":"DRAFT"}
+  ]
+}

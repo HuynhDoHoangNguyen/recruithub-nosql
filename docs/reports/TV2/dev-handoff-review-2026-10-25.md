@@ -19,16 +19,16 @@ Vì vậy summary đưa lên dev cần mô tả cả phần nghiệp vụ TV2 v�
 
 ### 1. Chi tiết tin CLOSED không khớp luồng lịch sử ứng tuyển
 
-- [JobService.publicDetail](../../../backend/src/services/job.service.js:189) chỉ cho đọc OPEN; dòng 192 trả 404 cho CLOSED, theo triển khai Public Portal hiện tại của dev.
-- [publicJobsApi](../../../frontend/src/services/publicJobsApi.js:24) và frontend test vẫn coi CLOSED là dữ liệu có thể đọc để xem lịch sử, đồng thời chặn Apply.
+- [JobService.publicDetail](../../../backend/src/services/job.service.js#L189) chỉ cho đọc OPEN; dòng 192 trả 404 cho CLOSED, theo triển khai Public Portal hiện tại của dev.
+- [publicJobsApi](../../../frontend/src/services/publicJobsApi.js#L24) và frontend test vẫn coi CLOSED là dữ liệu có thể đọc để xem lịch sử, đồng thời chặn Apply.
 - Candidate Dashboard dẫn nút “Xem việc làm” tới trang chi tiết public. Khi tin đóng, người dùng gặp trang không khả dụng. CV và lịch sử nằm trong Dashboard vẫn có luồng đọc riêng, không bị xóa.
 - Tái hiện: `backend/tests/recruitment/public-jobs.test.js:22`, kỳ vọng 200 nhưng nhận 404.
 - Hướng xử lý: thống nhất contract giữa TV1/TV2; giữ quy tắc public của dev và bổ sung đường đọc lịch sử theo quyền, hoặc chốt rõ contract CLOSED rồi đồng bộ Backend/Frontend/test. Không chỉ đổi assertion để bỏ qua hành vi người dùng.
 
 ### 2. DTO chi tiết public thiếu logo công ty
 
-- [JobService.publicDetail](../../../backend/src/services/job.service.js:218) trả `company` và `company_name`, nhưng thiếu `company_logo_url`.
-- Recruiter list/public list/applicants có nối logo; [JobDetails](../../../frontend/src/pages/Jobs/JobDetails.jsx:95) cần `company_logo_url` để hiển thị logo, nên chi tiết hiện rơi về icon mặc định.
+- [JobService.publicDetail](../../../backend/src/services/job.service.js#L218) trả `company` và `company_name`, nhưng thiếu `company_logo_url`.
+- Recruiter list/public list/applicants có nối logo; [JobDetails](../../../frontend/src/pages/Jobs/JobDetails.jsx#L95) cần `company_logo_url` để hiển thị logo, nên chi tiết hiện rơi về icon mặc định.
 - Tái hiện: `backend/tests/recruitment/recruiter-enhancements.test.js:56`, kỳ vọng logo đã lưu nhưng nhận `undefined`.
 - Hướng xử lý: bổ sung logo vào DTO theo helper/contract tài sản hiện có, giữ bố cục JobDetails và các trường company mới của dev; kiểm tra cả logo tải file và URL lịch sử.
 

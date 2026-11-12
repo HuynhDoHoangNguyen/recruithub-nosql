@@ -11,7 +11,7 @@ Có hai vấn đề độc lập:
 1. Database Backend thực sự sử dụng là `recruitment_db`, lúc đầu chỉ có **10 design documents, 0 Job**, chưa có dữ liệu nghiệp vụ. HTTP 200/items rỗng khi đó không chứng minh truy vấn đúng.
 2. `publicList()` còn yêu cầu `published_at >= ''`. Release lịch sử có Job hợp lệ thiếu trường optional này. Sau khi phục hồi nguồn hợp lệ, đo được **200 Job OPEN, cả 200 thiếu published_at**: selector cũ trả 0, selector mới trả đủ 200 ID khác nhau.
 
-Đây là kết quả live vừa đo, không dùng baseline 200 thay cho việc đếm. [Bằng chứng dữ liệu](live-job-verification/data-evidence.json), [kết quả browser không mock](live-job-verification/browser-results.json), [ảnh Jobs thật](live-job-verification/jobs-desktop.png).
+Đây là kết quả live vừa đo, không dùng baseline 200 thay cho việc đếm. [Bằng chứng dữ liệu](../../live-job-verification/data-evidence.json), [kết quả browser không mock](../../live-job-verification/browser-results.json), [ảnh Jobs thật](../../live-job-verification/jobs-desktop.png).
 
 ## 2. Đếm trước/sau trên đúng database
 
@@ -153,7 +153,7 @@ Landing/Login/Admin không được sửa lại trong lượt này vì không c�
 
 22 lỗi full suite không có tên mới so với log trước lượt sửa. Bằng chứng hiện tại vẫn là working-copy checksum khác manifest, thiếu pyarrow và release/staged lịch sử. Việc phục hồi **byte Git hợp lệ vào temp/CouchDB** không làm các assertion kiểm tra working-copy CRLF tự đổi kết quả. Không sửa manifest/checksum hoặc skip tests để lấy xanh.
 
-Ảnh live: [Jobs desktop](live-job-verification/jobs-desktop.png), [detail](live-job-verification/job-detail-desktop.png), [tablet](live-job-verification/jobs-tablet.png), [mobile](live-job-verification/jobs-mobile.png). Các ảnh này lấy từ server 5173 dùng CouchDB thật, không phải ảnh MemoryRepository. Browser private không chạy ở lượt này vì chưa có Identity thật.
+Ảnh live: [Jobs desktop](../../live-job-verification/jobs-desktop.png), [detail](../../live-job-verification/job-detail-desktop.png), [tablet](../../live-job-verification/jobs-tablet.png), [mobile](../../live-job-verification/jobs-mobile.png). Các ảnh này lấy từ server 5173 dùng CouchDB thật, không phải ảnh MemoryRepository. Browser private không chạy ở lượt này vì chưa có Identity thật.
 
 ## 10. Sử dụng và bàn giao
 

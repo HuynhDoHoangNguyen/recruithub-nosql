@@ -67,16 +67,16 @@ Khi chạy trên database private khác: `cd backend; npm run db:job-application
 - `git diff --check`: **PASS**.
 - Chrome thật, Identity/CouchDB thật, localhost:5173: hồ sơ lưu/đọc lại trên desktop và mobile; tạo tin Fresher/Full time/Hybrid/lương khoảng, sửa Intern/Part time/lương thỏa thuận, đăng tuyển, hiển thị logo và xóa từ trang ứng viên; CV/history/revision Application giữ nguyên. Không pageerror.
 
-Kết quả máy đọc được: [results.json](recruiter-enhancements-verification/results.json). Script: [verify-recruiter-enhancements.cjs](../scripts/ui/verify-recruiter-enhancements.cjs).
+Kết quả máy đọc được: results.json (results.json không có trong checkout hiện tại). Script: [verify-recruiter-enhancements.cjs](../../../scripts/ui/verify-recruiter-enhancements.cjs).
 
 Ảnh:
 
-- [Hồ sơ doanh nghiệp desktop](recruiter-enhancements-verification/recruiter-profile-desktop.png), [mobile](recruiter-enhancements-verification/recruiter-profile-mobile.png).
-- [Thông tin công ty và logo](recruiter-enhancements-verification/company-profile-logo.png).
-- [Form cấp bậc, loại hình, lương và viền](recruiter-enhancements-verification/create-job-salary-and-types.png).
-- [Card tin và cụm nút](recruiter-enhancements-verification/recruiter-job-card.png).
-- [Danh sách ứng viên và icon](recruiter-enhancements-verification/applicants-icons-and-actions.png).
-- [Chi tiết tin có lương/loại hình](recruiter-enhancements-verification/public-job-salary.png).
+- Hồ sơ doanh nghiệp desktop (recruiter-profile-desktop.png không có trong checkout hiện tại), mobile (recruiter-profile-mobile.png không có trong checkout hiện tại).
+- Thông tin công ty và logo (company-profile-logo.png không có trong checkout hiện tại).
+- Form cấp bậc, loại hình, lương và viền (create-job-salary-and-types.png không có trong checkout hiện tại).
+- Card tin và cụm nút (recruiter-job-card.png không có trong checkout hiện tại).
+- Danh sách ứng viên và icon (applicants-icons-and-actions.png không có trong checkout hiện tại).
+- Chi tiết tin có lương/loại hình (public-job-salary.png không có trong checkout hiện tại).
 
 ## Commit đề xuất
 

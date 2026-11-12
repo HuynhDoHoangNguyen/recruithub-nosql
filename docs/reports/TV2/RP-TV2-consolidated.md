@@ -4,10 +4,10 @@
 
 Ngày cập nhật phần lịch sử: 2026-10-24. Tài liệu này gom báo cáo hậu merge của TV2 và hướng dẫn kiểm thử chung TV1 + TV2. Các kết quả bên dưới được giữ theo thời điểm báo cáo. Tài liệu triển khai TV2 vẫn ở [job-application-implementation.md](../../job-application-implementation.md).
 
-## Danh m?c
+## Danh mục
 
-- [Review h?u merge TV2](#rp-tv2-post-merge-review)
-- [H??ng d?n t?i kho?n v? ki?m th? t?ch h?p TV1 + TV2](#rp-tv1-tv2-merge-test-guide)
+- [Review hậu merge TV2](#rp-tv2-post-merge-review)
+- [Hướng dẫn tài khoản và kiểm thử tích hợp TV1 + TV2](#rp-tv1-tv2-merge-test-guide)
 
 
 <a id="rp-tv2-post-merge-review"></a>

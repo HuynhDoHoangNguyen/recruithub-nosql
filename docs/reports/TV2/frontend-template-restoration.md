@@ -10,7 +10,7 @@ Ngày kiểm chứng: **24/10/2026 (Asia/Saigon)**. Branch: `feature/recruiter-m
 
 Đã đưa layout Job và Dashboard về cấu trúc của `docs/Job-Application-Portal-Frontend/`, giữ contract API/NoSQL và các bản sửa P1/P2/P3. Đã sửa navigation, thông báo lỗi/Retry, proxy phát triển, focus modal sau reload và một số chỗ template gọi API không tồn tại.
 
-Đã kiểm tra trực tiếp bằng Chrome: desktop 1440×1000, tablet 768×1024, mobile 390×844. [Kết quả máy đọc được](ui-verification/results.json) và 29 ảnh trong [ui-verification](ui-verification/) là bằng chứng. Script lặp lại: `scripts/ui/verify-template.cjs`.
+Đã kiểm tra trực tiếp bằng Chrome: desktop 1440×1000, tablet 768×1024, mobile 390×844. [Kết quả máy đọc được](../../ui-verification/results.json) và 29 ảnh trong [ui-verification](../../ui-verification/) là bằng chứng. Script lặp lại: `scripts/ui/verify-template.cjs`.
 
 **Hai mức bằng chứng khác nhau:**
 
@@ -103,15 +103,15 @@ Chống trùng suốt vòng đời được kiểm tra bằng API fixture trong 
 
 Chrome phát hiện một lỗi focus thực tế: bảng applicants reload thay thế nút đã mở modal, nên reference DOM cũ không còn gắn trên trang. Đã đặt ID ổn định cho nút và Modal tìm nút hiện tại khi đóng. Sau sửa, Escape đóng dialog và focus trở lại nút mở; Tab giữ focus trong native dialog. Native confirm rút đơn cũng được kiểm tra.
 
-Lỗi full Backend được kiểm tra theo output: nhóm DATA-04B V04/V15 còn lệch checksum users.jsonl; DATA-02B.3 N-01/N-02 thiếu pyarrow, N-14/N-15 thiếu release/staged; DATA-02B.2 thiếu staged candidates; DATA-03.2/DATA-03.3B thiếu release lịch sử; DATA-03.4B checksum candidates không khớp. Đối chiếu tên lỗi với log trước sửa không có tên lỗi mới. V05/V06 kết nối đã pass khi CouchDB chạy. Không gọi full suite là PASS. Log: `$env:TEMP/recruithub-template-backend-tests.log`; phân loại chi tiết nền tại mục 9 của [bàn giao Job/Application](job-application-implementation.md).
+Lỗi full Backend được kiểm tra theo output: nhóm DATA-04B V04/V15 còn lệch checksum users.jsonl; DATA-02B.3 N-01/N-02 thiếu pyarrow, N-14/N-15 thiếu release/staged; DATA-02B.2 thiếu staged candidates; DATA-03.2/DATA-03.3B thiếu release lịch sử; DATA-03.4B checksum candidates không khớp. Đối chiếu tên lỗi với log trước sửa không có tên lỗi mới. V05/V06 kết nối đã pass khi CouchDB chạy. Không gọi full suite là PASS. Log: `$env:TEMP/recruithub-template-backend-tests.log`; phân loại chi tiết nền tại mục 9 của [bàn giao Job/Application](../../job-application-implementation.md).
 
 Một số ảnh để xem nhanh:
 
-- [Jobs desktop](ui-verification/app-jobs-desktop.png) / [template Jobs](ui-verification/reference-jobs-desktop.png).
-- [Recruiter](ui-verification/app-recruiter-desktop.png) / [template Recruiter](ui-verification/reference-recruiter-desktop.png).
-- [Candidate desktop](ui-verification/app-candidate-desktop.png) / [Candidate mobile](ui-verification/app-candidate-mobile.png) / [template Candidate](ui-verification/reference-candidate-desktop.png).
-- [Form tạo tin](ui-verification/app-create-desktop.png) / [template form](ui-verification/reference-create-desktop.png).
-- [Apply modal](ui-verification/app-apply-modal-desktop.png), [xử lý ứng viên](ui-verification/app-applicant-modal-desktop.png), [Jobs khi lỗi](ui-verification/app-jobs-network-error.png).
+- [Jobs desktop](../../ui-verification/app-jobs-desktop.png) / [template Jobs](../../ui-verification/reference-jobs-desktop.png).
+- [Recruiter](../../ui-verification/app-recruiter-desktop.png) / [template Recruiter](../../ui-verification/reference-recruiter-desktop.png).
+- [Candidate desktop](../../ui-verification/app-candidate-desktop.png) / [Candidate mobile](../../ui-verification/app-candidate-mobile.png) / [template Candidate](../../ui-verification/reference-candidate-desktop.png).
+- [Form tạo tin](../../ui-verification/app-create-desktop.png) / [template form](../../ui-verification/reference-create-desktop.png).
+- [Apply modal](../../ui-verification/app-apply-modal-desktop.png), [xử lý ứng viên](../../ui-verification/app-applicant-modal-desktop.png), [Jobs khi lỗi](../../ui-verification/app-jobs-network-error.png).
 
 ## 7. Cách chạy và click sử dụng
 
@@ -181,6 +181,6 @@ Chưa commit/push. Template gốc giữ nguyên, chỉ sao chép tham chiếu đ
 
 Đã tách cache của portal tại `node_modules/.vite/portal-dev` và prebundle `lucide-react` trong `frontend/vite.config.js`. Vite nạp lại cấu hình và tạo cache mới; không xóa node_modules hoặc dữ liệu dự án. Server tham chiếu/fixture tiếp tục dùng cache riêng trong temp.
 
-Đã bổ sung `scripts/ui/verify-live.cjs`, kiểm tra **server thật cổng 5173**, không thay API bằng fixture. Chrome xác minh trang chủ, Jobs, Login, Register ở lượt tải đầu và reload, cùng menu mobile: **9/9 checks PASS**, không có runtime/module errors. Kết quả tại [live-results.json](ui-verification/live-results.json). Lint/build sau sửa PASS, còn 7 warnings đã ghi nhận. Checks này xác minh màn hình tải được, không xác nhận API đăng nhập đã được bổ sung.
+Đã bổ sung `scripts/ui/verify-live.cjs`, kiểm tra **server thật cổng 5173**, không thay API bằng fixture. Chrome xác minh trang chủ, Jobs, Login, Register ở lượt tải đầu và reload, cùng menu mobile: **9/9 checks PASS**, không có runtime/module errors. Kết quả tại [live-results.json](../../ui-verification/live-results.json). Lint/build sau sửa PASS, còn 7 warnings đã ghi nhận. Checks này xác minh màn hình tải được, không xác nhận API đăng nhập đã được bổ sung.
 
 Nếu một tab cũ còn giữ bundle trước sửa, dùng Ctrl+F5. Khi cần làm mới dependency cache thủ công, dừng Vite rồi chạy `npm run dev -- --force` từ frontend. Không chạy thêm Vite trên cùng cổng khi tiến trình hiện tại vẫn đang hoạt động.

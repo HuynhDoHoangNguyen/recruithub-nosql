@@ -19,11 +19,11 @@ Trong **Việc Làm IT**, chọn tin **“Tin để bạn tự thử nộp CV - 
 3. Header **Bảng Điều Khiển** → mở chi tiết đơn, CV và lịch sử.
 4. Có thể thử **Rút đơn ứng tuyển** rồi xác nhận. WITHDRAWN là kết thúc: không thể nộp lại cùng tin. Để thử lại từ đầu, đăng nhập Recruiter tạo một tin OPEN mới.
 
-[Tin mới để tự thử](local-candidate-verification/fresh-test-job.json) ghi ID/URL cụ thể, không chứa mật khẩu. Tin cũ đã CLOSED được giữ nguyên, không tự mở lại.
+[Tin mới để tự thử](../../local-candidate-verification/fresh-test-job.json) ghi ID/URL cụ thể, không chứa mật khẩu. Tin cũ đã CLOSED được giữ nguyên, không tự mở lại.
 
 ## Đã kiểm chứng
 
-[Kết quả browser](local-candidate-verification/results.json), [hồ sơ Candidate](local-candidate-verification/candidate-profile.png), [đơn và CV đã nộp](local-candidate-verification/candidate-submission.png), [Recruiter đọc CV](local-candidate-verification/recruiter-reads-candidate-cv.png).
+[Kết quả browser](../../local-candidate-verification/results.json), hồ sơ Candidate (candidate-profile.png không có trong checkout hiện tại), đơn và CV đã nộp (candidate-submission.png không có trong checkout hiện tại), Recruiter đọc CV (recruiter-reads-candidate-cv.png không có trong checkout hiện tại).
 
 - Tạo tài khoản Candidate qua `POST /api/v1/auth/register`, đăng nhập thật 200, role CANDIDATE, hồ sơ 200.
 - Candidate không có quyền đăng tin của Recruiter.

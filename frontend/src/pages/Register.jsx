@@ -72,19 +72,27 @@ const Register = () => {
       navigate('/login', { replace: true, state: { registered: true } });
     } catch (requestError) {
       const code = requestError.response?.data?.error?.code;
+      const serverMessage = requestError.response?.data?.error?.message;
+      const responseStatus = requestError.response?.status;
       const registrationReference = requestError.response?.data?.error?.details?.registration_ref;
       const messages = {
         EMAIL_ALREADY_REGISTERED: 'Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.',
-        COMPANY_ALREADY_EXISTS: 'Tên công ty đã tồn tại hoặc trùng sau chuẩn hóa. Không thể tự nhận quyền với công ty đó.',
         ORGANIZATION_NOT_SUPPORTED: 'Công ty hoặc phòng ban không còn khả dụng. Hãy tìm và chọn lại.',
         COMPANY_NOT_FOUND: 'Công ty không còn khả dụng. Hãy tìm và chọn lại.',
-        DEPARTMENT_ALREADY_EXISTS: 'Phòng ban đã tồn tại trong công ty này.',
         REGISTRATION_INCOMPLETE: `Đăng ký chưa hoàn tất. Không gửi lại; liên hệ quản trị viên và cung cấp mã tham chiếu${registrationReference ? ` ${registrationReference}` : ''}.`,
         RECRUITER_REGISTRATION_DISABLED: 'Đăng ký Recruiter hiện chưa được bật.',
         VALIDATION_ERROR: 'Thông tin chưa hợp lệ. Hãy kiểm tra lại các trường.',
+        AUTH_DATABASE_CONFIGURATION_ERROR: 'Cấu hình cơ sở dữ liệu xác thực chưa đúng. Vui lòng báo quản trị viên.',
+        DATABASE_CONFIGURATION_ERROR: 'Cấu hình cơ sở dữ liệu chưa đúng. Vui lòng báo quản trị viên.',
         AUTH_CONFIGURATION_ERROR: 'Dịch vụ đăng ký chưa được cấu hình. Vui lòng báo quản trị viên.',
+        AUTHENTICATION_ERROR: 'Backend không xác thực được quyền truy cập CouchDB. Vui lòng báo quản trị viên.',
+        AUTHORIZATION_ERROR: 'Backend chưa được cấp quyền truy cập CouchDB. Vui lòng báo quản trị viên.',
+        NETWORK_ERROR: 'Backend không kết nối được CouchDB. Vui lòng thử lại sau.',
+        TIMEOUT: 'CouchDB phản hồi quá thời gian. Vui lòng thử lại sau.',
       };
-      setError(messages[code] || (requestError.response ? 'Đăng ký thất bại. Vui lòng kiểm tra thông tin và thử lại.' : 'Không thể kết nối máy chủ. Vui lòng thử lại.'));
+      setError(messages[code] || (requestError.response
+        ? `Đăng ký thất bại${code ? ` (${code})` : ` (HTTP ${responseStatus ?? 'không rõ'})`}${serverMessage ? `: ${serverMessage}` : ''}. Vui lòng báo quản trị viên nếu lỗi tiếp tục.`
+        : 'Không thể kết nối máy chủ. Vui lòng thử lại.'));
     } finally {
       submitting.current = false;
       setLoading(false);

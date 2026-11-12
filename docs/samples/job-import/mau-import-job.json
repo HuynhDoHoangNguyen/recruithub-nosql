@@ -2,17 +2,17 @@
   "schema_version": 1,
   "jobs": [
     {
-      "title": "M?u ki?m th? Import UC27 20261026033306 - Frontend Engineer",
-      "industry": "C?ng ngh? th?ng tin",
+      "title": "Frontend Engineer - Mau import UC27",
+      "industry": "Công nghệ thông tin",
       "seniority": "JUNIOR",
-      "description": "Tin m?u ?? ki?m tra ch?c n?ng Import Job. C? th? ch?nh s?a tr??c khi nh?p.",
+      "description": "Tin mẫu để kiểm tra chức năng Import Job. Bạn có thể chỉnh sửa trước khi nhập.",
       "responsibilities": [
-        "Ph?t tri?n giao di?n web b?ng React.",
-        "Ph?i h?p v?i nh?m thi?t k? v? backend."
+        "Phát triển giao diện web bằng React.",
+        "Phối hợp với nhóm thiết kế và backend."
       ],
       "general": [
-        "C? tinh th?n h?c h?i.",
-        "L?m vi?c nh?m t?t."
+        "Có tinh thần học hỏi.",
+        "Làm việc nhóm tốt."
       ],
       "required_skills": [
         "JavaScript",

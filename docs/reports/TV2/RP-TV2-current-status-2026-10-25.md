@@ -292,6 +292,6 @@ and TV3 Interview/scoring integration. Full backend acceptance is not complete.
 | [dev-merge-repair-2026-10-25.md](dev-merge-repair-2026-10-25.md) | Sửa import/state/filter/CV sau merge; câu mô tả đọc CLOSED phải đối chiếu lỗi Backend hiện tại |
 | [dev-handoff-review-2026-10-25.md](dev-handoff-review-2026-10-25.md) | Nguồn kết quả test mới nhất tại HEAD `04e07a8`, hai lỗi tích hợp và điều kiện gộp dev |
 
-Tài liệu bổ sung đã đọc/đối chiếu: [triển khai Job/Application](../../job-application-implementation.md), [phân công nhóm](../../recruithub-team-work-assignment.md), [Foundation TV2/TV3](../../shared/TV2_TV3_FOUNDATION_HANDOFF.md), [contract tổ chức TV1/TV2](../../shared/TV1_TV2_RECRUITER_SCOPE_CONTRACT_DRAFT.md) và [UI navy/bằng chứng](../../surface-polish-verification/README.md).
+Tài liệu bổ sung đã đọc/đối chiếu: [triển khai Job/Application](../../job-application-implementation.md), [phân công nhóm](../../recruithub-team-work-assignment.md), [Foundation TV2/TV3](../../shared/TV2_TV3_FOUNDATION_HANDOFF.md), [contract tổ chức TV1/TV2](../../shared/TV1_TV2_RECRUITER_SCOPE_CONTRACT_DRAFT.md) và [UI navy/bằng chứng](../../ui-verification/results.json).
 
 Giữ nguyên các tài liệu nguồn để truy vết. Báo cáo này là bản tổng hợp hiện trạng; không thay thế bằng chứng kiểm thử hoặc xác nhận phê duyệt các quyết định liên thành viên còn đang chờ.

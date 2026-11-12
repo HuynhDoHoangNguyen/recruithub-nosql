@@ -28,7 +28,7 @@ Database `recruitment_db` lịch sử giữ nguyên doc_count/update_seq trong l
 
 ## Đã kiểm chứng bằng luồng thật
 
-[Kết quả browser](local-recruiter-verification/results.json), [Form sau đăng nhập](local-recruiter-verification/create-form.png), [Dashboard đọc lại tin OPEN](local-recruiter-verification/dashboard-open-readback.png).
+Kết quả browser (results.json không có trong checkout hiện tại), Form sau đăng nhập (create-form.png không có trong checkout hiện tại), Dashboard đọc lại tin OPEN (dashboard-open-readback.png không có trong checkout hiện tại).
 
 - `POST /api/v1/auth/login`: 200, role RECRUITER.
 - `GET /api/v1/auth/me`: 200, User được server xác minh.

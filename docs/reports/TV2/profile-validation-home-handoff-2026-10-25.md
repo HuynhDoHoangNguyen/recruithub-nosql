@@ -43,7 +43,7 @@ Ngày 25/10/2026. Thực hiện trên working tree hiện tại; không commit, 
 - Banner/thẻ việc làm dùng API thật; tìm kiếm đi đúng `/jobs?q=React`; màn hình 390px không tràn ngang; `runtime_errors: []`.
 - Database chính giữ nguyên **25.761 documents** và `update_seq` trước/sau kiểm chứng.
 
-[Kết quả JSON](../../profile-rules-home-verification/results.json) · [Trang chủ desktop](../../profile-rules-home-verification/home-desktop.png) · [Việc làm tiêu biểu](../../profile-rules-home-verification/featured-jobs.png) · [Trang chủ mobile](../../profile-rules-home-verification/home-mobile.png) · [Candidate báo lỗi điện thoại](../../profile-rules-home-verification/candidate-phone-validation.png) · [Recruiter báo lỗi điện thoại](../../profile-rules-home-verification/recruiter-phone-validation.png).
+[Kết quả JSON](../../profile-rules-home-verification/results.json) · Trang chủ desktop (home-desktop.png không có trong checkout hiện tại) · Việc làm tiêu biểu (featured-jobs.png không có trong checkout hiện tại) · Trang chủ mobile (home-mobile.png không có trong checkout hiện tại) · Candidate báo lỗi điện thoại (candidate-phone-validation.png không có trong checkout hiện tại) · Recruiter báo lỗi điện thoại (recruiter-phone-validation.png không có trong checkout hiện tại).
 
 Script kiểm chứng: `node scripts/ui/verify-profile-rules-home.cjs`. Dùng tài khoản test local trong `.env`, không in credentials. Chỉ gửi PATCH không hợp lệ và xác nhận bị từ chối; không thay đổi hồ sơ người dùng.
 

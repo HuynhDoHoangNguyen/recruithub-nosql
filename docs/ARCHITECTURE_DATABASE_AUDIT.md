@@ -5,6 +5,8 @@
 **Phương pháp:** đọc source/manifests/config và tài liệu; không sửa mã, không chạy ứng dụng, không kết nối CouchDB.  
 **Kết luận runtime:** **CHƯA XÁC MINH RUNTIME**. Các nhãn dưới đây: **VERIFIED FROM CODE**, **DECLARED ONLY**, **INFERRED**, **NOT FOUND**, **NOT VERIFIED**.
 
+> **Lưu ý thời điểm:** Đây là audit snapshot ngày 22/10/2026 về trạng thái bootstrap khi đó. Source và runtime đã được mở rộng sau ngày audit; các kết luận “chưa có” bên dưới không mô tả trạng thái hiện tại. Dùng audit mới và code hiện tại để đánh giá các luồng đã triển khai sau đó.
+
 ## 1. Executive Summary
 
 Repo là một bootstrap full-stack nhỏ, chưa phải hệ thống tuyển dụng đã triển khai nghiệp vụ. Frontend React/Vite có trang home và 404; backend Express cung cấp `GET /` và `GET /api/health`; không có mã kết nối CouchDB, document/repository, auth, nghiệp vụ, scoring hay audit. **VERIFIED FROM CODE** — `frontend/src/{App.jsx,routes/AppRouter.jsx,pages/HomePage.jsx}`, `backend/src/{app.js,server.js}`.

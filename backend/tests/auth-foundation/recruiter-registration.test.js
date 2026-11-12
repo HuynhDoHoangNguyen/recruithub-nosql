@@ -10,22 +10,31 @@ import { companyDocumentSchema } from '../../src/schemas/company.schema.js';
 import { departmentDocumentSchema } from '../../src/schemas/department.schema.js';
 import { recruiterDocumentSchema } from '../../src/schemas/recruiter.schema.js';
 import { userDocumentSchema } from '../../src/schemas/user.schema.js';
-import {
-  companyIdFromSelfRegistration, departmentIdFromSelfRegistration, departmentKeyFromName,
-  recruiterIdFromSelfRegistration,
-} from '../../src/utils/recruiter-registration-id.utils.js';
 import { userIdFromEmail } from '../../src/utils/id.utils.js';
 
 const secret = 'recruiter-registration-test-secret-32-bytes';
+const timestamp = '2026-10-01T00:00:00.000Z';
+const companyId = 'company:existing-acme';
+const departmentId = 'department:existing-engineering';
 const registration = {
   email: 'Recruiter@example.test', password: 'StrongPass1',
-  company: { name: '  Công ty Ánh Dương ', industry: ' Công nghệ ' },
-  department: { name: 'Nhân sự' },
+  company_id: companyId, department_id: departmentId,
+};
+const existingCompany = {
+  _id: companyId, type: 'company', name: 'Acme Technology', industry: 'Technology',
+  created_at: timestamp, updated_at: timestamp,
+  provenance: { classification: 'source', source_dataset: 'approved-company-directory' },
+};
+const existingDepartment = {
+  _id: departmentId, type: 'department', company_id: companyId, name: 'Engineering', key: 'engineering',
+  created_at: timestamp, updated_at: timestamp,
+  provenance: { classification: 'source', source_dataset: 'approved-company-directory' },
 };
 
 function createService({ failType } = {}) {
-  const docs = new Map();
+  const docs = new Map([[companyId, structuredClone(existingCompany)], [departmentId, structuredClone(existingDepartment)]]);
   const writes = [];
+  const updates = [];
   const client = {
     async getDocument(id) {
       const doc = docs.get(id);
@@ -48,7 +57,15 @@ function createService({ failType } = {}) {
       docs.set(doc._id, { ...structuredClone(doc), _rev: '1-test' });
       return { ok: true, id: doc._id, rev: '1-test' };
     },
-    async updateDocument() { throw new Error('not used'); },
+    async updateDocument(doc, expectedRev) {
+      updates.push({ type: doc.type, expectedRev });
+      if (failType === 'user-activation') throw new Error('fake user-activation write error');
+      const current = docs.get(doc._id);
+      if (!current || current._rev !== expectedRev) throw new CouchDbError('CONFLICT', 'Conflict', { status: 409 });
+      const rev = '2-test';
+      docs.set(doc._id, { ...structuredClone(doc), _rev: rev });
+      return { ok: true, id: doc._id, rev };
+    },
     async exists(id) { return docs.has(id); },
   };
   const users = new UserRepository({ client });
@@ -57,91 +74,96 @@ function createService({ failType } = {}) {
   const departments = new DepartmentRepository({ client });
   const recruiters = new RecruiterRepository({ client });
   return {
-    docs, writes,
+    docs, writes, updates,
     service: new AuthService({ userRepository: users, candidateRepository: candidates, companyRepository: companies,
       departmentRepository: departments, recruiterRepository: recruiters, jwtSecret: secret }),
   };
 }
 
-test('self-registration ID helpers use distinct user namespaces and deterministic canonical keys', () => {
-  const companyId = companyIdFromSelfRegistration(registration.company.name);
-  const canonicalCompanyId = companyIdFromSelfRegistration('CÔNG TY ÁNH DƯƠNG');
-  const departmentKey = departmentKeyFromName(registration.department.name);
-  const departmentId = departmentIdFromSelfRegistration(companyId, departmentKey);
-  const userId = userIdFromEmail(registration.email);
-  const recruiterId = recruiterIdFromSelfRegistration(userId, companyId, departmentId);
-  assert.equal(companyId, canonicalCompanyId);
-  assert.match(companyId, /^company:user:[a-f0-9]{64}$/);
-  assert.match(departmentId, /^department:user:[a-f0-9]{64}$/);
-  assert.match(recruiterId, /^recruiter:user:[a-f0-9]{64}$/);
-  assert.equal(departmentKey, 'nhan-su');
-});
-
-test('registration validates and writes Company, Department, Recruiter, then ACTIVE User', async () => {
-  const { service, docs, writes } = createService();
+test('registration only accepts existing Company and Department IDs', async () => {
+  const { service, docs, writes, updates } = createService();
   const result = await service.registerRecruiter(registration);
   const userId = userIdFromEmail(registration.email);
   const user = docs.get(userId);
   const recruiter = [...docs.values()].find(doc => doc.type === 'recruiter');
-  const company = docs.get(recruiter.company_id);
-  const department = docs.get(recruiter.department_id);
 
-  assert.deepEqual(writes, ['company', 'department', 'recruiter', 'user']);
+  assert.deepEqual(writes, ['user', 'recruiter']);
+  assert.deepEqual(updates, [{ type: 'user', expectedRev: '1-test' }]);
   assert.equal(result.user.role, 'RECRUITER');
   assert.equal(result.user.account_status, 'ACTIVE');
   assert.equal('password_hash' in result.user, false);
   assert.equal(userDocumentSchema.safeParse(user).success, true);
-  assert.equal(companyDocumentSchema.safeParse(company).success, true);
-  assert.equal(departmentDocumentSchema.safeParse(department).success, true);
+  assert.equal(companyDocumentSchema.safeParse(docs.get(companyId)).success, true);
+  assert.equal(departmentDocumentSchema.safeParse(docs.get(departmentId)).success, true);
   assert.equal(recruiterDocumentSchema.safeParse(recruiter).success, true);
-  assert.equal(company.name, 'Công ty Ánh Dương');
-  assert.equal(department.company_id, company._id);
   assert.equal(recruiter.user_id, user._id);
-  assert.equal(company.provenance.classification, 'mixed');
-  assert.equal(department.provenance.classification, 'mixed');
-  assert.equal(recruiter.provenance.classification, 'mixed');
-  assert.equal(companyIdFromSelfRegistration(company.name), company._id);
+  assert.equal(recruiter.company_id, companyId);
+  assert.equal(recruiter.department_id, departmentId);
+  assert.equal(docs.size, 4);
 });
 
-test('duplicate email and normalized Company are rejected without attaching to existing Company', async () => {
+test('registration rejects unknown Company/Department and cross-Company Department', async () => {
+  for (const input of [
+    { ...registration, company_id: 'company:missing' },
+    { ...registration, department_id: 'department:missing' },
+    { ...registration, company_id: 'company:other' },
+  ]) {
+    const { service, docs, writes } = createService();
+    await assert.rejects(() => service.registerRecruiter(input), error => (
+      error instanceof AuthServiceError && error.status === 400 && error.code === 'ORGANIZATION_NOT_SUPPORTED'
+    ));
+    assert.equal(writes.length, 0);
+    assert.equal(docs.size, 2);
+  }
+});
+
+test('duplicate email is rejected without modifying the existing organization', async () => {
   const { service, docs, writes } = createService();
   await service.registerRecruiter(registration);
   const originalWriteCount = writes.length;
-  await assert.rejects(() => service.registerRecruiter({ ...registration, email: 'other@example.test', company: { ...registration.company, name: 'CÔNG TY ÁNH DƯƠNG' } }),
-    error => error instanceof AuthServiceError && error.status === 409 && error.code === 'COMPANY_ALREADY_EXISTS');
   await assert.rejects(() => service.registerRecruiter(registration),
     error => error instanceof AuthServiceError && error.status === 409 && error.code === 'EMAIL_ALREADY_REGISTERED');
   assert.equal(writes.length, originalWriteCount);
-  assert.equal([...docs.values()].filter(doc => doc.type === 'company').length, 1);
-  assert.equal([...docs.values()].filter(doc => doc.type === 'user').length, 1);
+  assert.deepEqual(docs.get(companyId), existingCompany);
+  assert.deepEqual(docs.get(departmentId), existingDepartment);
+  assert.equal([...docs.values()].filter(doc => doc.type === 'recruiter').length, 1);
 });
 
-test('concurrent registrations for the same normalized Company never attach a second User', async () => {
+test('concurrent registration for the same email creates at most one account', async () => {
   const { service, docs } = createService();
   const outcomes = await Promise.allSettled([
     service.registerRecruiter(registration),
-    service.registerRecruiter({ ...registration, email: 'second@example.test', company: { ...registration.company, name: 'CÔNG TY ÁNH DƯƠNG' } }),
+    service.registerRecruiter(registration),
   ]);
   assert.equal(outcomes.filter(outcome => outcome.status === 'fulfilled').length, 1);
-  const failure = outcomes.find(outcome => outcome.status === 'rejected');
-  assert.equal(failure.reason.code, 'COMPANY_ALREADY_EXISTS');
-  assert.equal([...docs.values()].filter(doc => doc.type === 'company').length, 1);
   assert.equal([...docs.values()].filter(doc => doc.type === 'user').length, 1);
+  assert.equal([...docs.values()].filter(doc => doc.type === 'recruiter').length, 1);
 });
 
-test('partial write stops immediately, returns operator reference, and does not retry or compensate', async () => {
-  const { service, docs, writes } = createService({ failType: 'department' });
+test('partial Recruiter write returns an operator reference and does not retry or compensate', async () => {
+  const { service, docs, writes } = createService({ failType: 'recruiter' });
   await assert.rejects(() => service.registerRecruiter(registration), error => (
-    error.status === 503 && error.code === 'REGISTRATION_INCOMPLETE' && error.details.registration_ref === userIdFromEmail(registration.email)
+    error.status === 503 && error.code === 'REGISTRATION_INCOMPLETE'
+      && error.details.registration_ref === userIdFromEmail(registration.email)
   ));
-  assert.deepEqual(writes, ['company', 'department']);
-  assert.equal([...docs.values()].filter(doc => doc.type === 'company').length, 1);
-  assert.equal([...docs.values()].filter(doc => doc.type === 'user').length, 0);
-  await assert.rejects(() => service.registerRecruiter(registration), error => error.code === 'COMPANY_ALREADY_EXISTS');
-  assert.deepEqual(writes, ['company', 'department']);
+  assert.deepEqual(writes, ['user', 'recruiter']);
+  assert.equal([...docs.values()].filter(doc => doc.type === 'user').length, 1);
+  assert.equal([...docs.values()].filter(doc => doc.type === 'recruiter').length, 0);
 });
 
-test('Recruiter login and existing tokens require a complete valid organization scope', async () => {
+test('failed immediate activation leaves a recoverable incomplete registration', async () => {
+  const { service, docs, writes, updates } = createService({ failType: 'user-activation' });
+  await assert.rejects(() => service.registerRecruiter(registration), error => (
+    error.status === 503 && error.code === 'REGISTRATION_INCOMPLETE'
+      && error.details.registration_ref === userIdFromEmail(registration.email)
+  ));
+  assert.deepEqual(writes, ['user', 'recruiter']);
+  assert.deepEqual(updates, [{ type: 'user', expectedRev: '1-test' }]);
+  assert.equal(docs.get(userIdFromEmail(registration.email)).account_status, 'RESET_REQUIRED');
+  assert.equal([...docs.values()].filter(doc => doc.type === 'recruiter').length, 1);
+});
+
+test('new Recruiter can login immediately and token requires complete organization scope', async () => {
   const { service, docs } = createService();
   const registered = await service.registerRecruiter(registration);
   const login = await service.login({ email: registration.email, password: registration.password });
@@ -154,18 +176,25 @@ test('Recruiter login and existing tokens require a complete valid organization 
   await assert.rejects(() => service.authenticate(login.accessToken), error => error.code === 'RECRUITER_PROFILE_INCOMPLETE');
 });
 
-test('Recruiter login and existing tokens reject missing Company and mismatched Department ownership', async () => {
+test('login and existing tokens reject missing Company and mismatched Department ownership', async () => {
   for (const brokenReference of ['company', 'department-company']) {
     const { service, docs } = createService();
     await service.registerRecruiter(registration);
     const login = await service.login({ email: registration.email, password: registration.password });
     const recruiter = [...docs.values()].find(doc => doc.type === 'recruiter');
     if (brokenReference === 'company') docs.delete(recruiter.company_id);
-    else {
-      const department = docs.get(recruiter.department_id);
-      docs.set(department._id, { ...department, company_id: 'company:other' });
-    }
+    else docs.set(departmentId, { ...existingDepartment, company_id: 'company:other' });
     await assert.rejects(() => service.login({ email: registration.email, password: registration.password }), error => error.code === 'RECRUITER_PROFILE_INCOMPLETE');
     await assert.rejects(() => service.authenticate(login.accessToken), error => error.code === 'RECRUITER_PROFILE_INCOMPLETE');
   }
+});
+
+test('registration does not create an organization even when names are supplied', async () => {
+  const { service, docs, writes } = createService();
+  await assert.rejects(() => service.registerRecruiter({
+    email: registration.email, password: registration.password,
+    company: { name: 'New company', industry: 'Technology' }, department: { name: 'People' },
+  }), error => error.code === 'ORGANIZATION_NOT_SUPPORTED');
+  assert.deepEqual(writes, []);
+  assert.equal(docs.size, 2);
 });
