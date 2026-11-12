@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { requestCorrelation } from './middleware/request-correlation.js';
 import healthRoutes from './routes/health.routes.js';
 import { JobApplicationRepository } from './repositories/job-application.repository.js';
 import { JobService } from './services/job.service.js';
@@ -24,6 +25,7 @@ import { createUploadRoutes } from './routes/upload.routes.js';
 import { CandidateRankingService } from './services/scoring/candidate-ranking.service.js';
 import { createRecruiterJobImportExportRoutes } from './routes/recruiter-job-import-export.routes.js';
 import { RecruiterJobImportExportService } from './services/recruiter-job-import-export.service.js';
+import { createConfiguredSystemEventReporter } from './services/system-event.service.js';
 
 function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://127.0.0.1:5178') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
@@ -56,12 +58,15 @@ function createConfiguredRepository(environment, { readOnly = false } = {}) {
     .map(method => [method, (...args) => getRepository()[method](...args)]));
 }
 
-export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, ranking: suppliedRanking, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
+export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, ranking: suppliedRanking, systemEvents: suppliedSystemEvents, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
   const app = express();
   const origins = configuredFrontendOrigins(jwtEnv.FRONTEND_URL);
   const repository = suppliedRepository || createConfiguredRepository(jwtEnv);
   const publicRepository = suppliedPublicRepository || suppliedRepository || createConfiguredRepository(jwtEnv, { readOnly: true });
-  const jobs = new JobService(repository, now);
+  const systemEvents = suppliedSystemEvents || createConfiguredSystemEventReporter(jwtEnv, {
+    now: typeof now === 'function' ? now : () => (now ? new Date(now()) : new Date()),
+  });
+  const jobs = new JobService(repository, now, { systemEvents });
   const assets = suppliedAssetRepository || suppliedRepository || createAssetRepository(jwtEnv);
   const scoringClock = typeof now === 'function' ? now : () => (now ? new Date(now()) : new Date());
   const scoringService = new ResumeScoringService(repository, { now: scoringClock });
@@ -81,6 +86,7 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
       assets,
       scoringService,
       getAnalysisSummary: scoringService.getAnalysisSummary,
+      systemEvents,
     }),
     scoring: scoringService,
     interviews: createInterviewService(repository, { now: scoringClock }),
@@ -92,11 +98,12 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
     now: now || (() => new Date()),
   });
 
+  app.use(requestCorrelation);
   app.use(cors({
     origin: (origin, callback) => callback(null, !origin || origins.includes(origin)),
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'If-Match', 'X-File-Name'],
-    exposedHeaders: ['ETag'],
+    exposedHeaders: ['ETag', 'X-Request-Id'],
   }));
   app.use(express.json({ limit: '512kb' }));
   app.use('/api/health', healthRoutes);

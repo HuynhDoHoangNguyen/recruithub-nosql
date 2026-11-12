@@ -10,6 +10,7 @@
  */
 
 import { z } from 'zod';
+import { auditOutboxSchema } from './audit-outbox.schema.js';
 import { JOB_LOCATIONS, WORK_MODES, JOB_SENIORITY_VALUES, EMPLOYMENT_TYPES } from '../constants/job-catalog.constants.js';
 import { salarySchema } from './job-compensation.schema.js';
 import {
@@ -274,6 +275,7 @@ const jobBaseObject = {
 export const jobDocumentSchema = z
   .object({
     ...jobBaseObject,
+    audit_outbox: auditOutboxSchema.optional(),
     company_id: z
       .string()
       .regex(/^company:[a-z0-9_:-]+$/, 'Invalid company_id reference format'),
