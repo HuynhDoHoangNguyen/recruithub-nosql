@@ -2,9 +2,7 @@
 
 Tài liệu này mô tả chi tiết kiến trúc kỹ thuật của hệ thống **RecruiHub NoSQL**, ranh giới trách nhiệm giữa Frontend, Backend và Database, luồng dữ liệu nghiệp vụ, cấu trúc thư mục, quy tắc bảo mật và định hướng mở rộng hệ thống theo mô hình **Full-stack Vertical Slice**.
 
-> **Trạng thái tài liệu:**
-> - **Đã hoàn thành:** Hạ tầng NoSQL Apache CouchDB, cơ sở dữ liệu `recruitment_db` với 25.750 documents thuộc 9 loại tài liệu, bộ Zod schemas, Resume-Job scoring engine (`recruithub-scoring-mvp-v1`) và 246 automated tests PASS.
-> - **Đang triển khai:** Tầng REST API trên Express.js 5 và giao diện React 19 SPA dựa trên template tham khảo `docs/Job-Application-Portal-Frontend/`.
+> **Phạm vi tài liệu:** Đây là tài liệu kiến trúc/thiết kế được lập theo snapshot ban đầu. Số liệu 25.750 là baseline của release dataset, không phải số đếm live; các sơ đồ index, view và tầng phần mềm là mô hình mục tiêu, không tự chứng minh trạng thái đã triển khai. Đối chiếu implementation và test hiện hành với source, package scripts và các audit có ngày cập nhật.
 
 ---
 
@@ -14,7 +12,7 @@ RecruiHub NoSQL được xây dựng theo kiến trúc ba tầng phân lập (Th
 
 1. **Frontend (React SPA)**: Giao diện web đơn trang tương tác cao, tổ chức theo **Feature-Based Architecture**, quản lý trạng thái tập trung và kết nối Backend thông qua REST API.
 2. **Backend (Express REST API)**: Ứng dụng Node.js tổ chức theo **Layered Architecture**, đóng vai trò Gateway duy nhất kiểm soát Authentication, Authorization, Validation, Business Rules và điều phối dữ liệu với CouchDB.
-3. **Database (Apache CouchDB)**: Hệ quản trị cơ sở dữ liệu NoSQL hướng tài liệu (Document-Oriented Database), lưu trữ toàn bộ dữ liệu dưới dạng JSON Documents trong một database duy nhất `recruitment_db`, cung cấp khả năng truy vấn bằng Mango Query và MapReduce Views.
+3. **Database (Apache CouchDB)**: Hệ quản trị cơ sở dữ liệu NoSQL hướng tài liệu, lưu dữ liệu dạng JSON Documents và hỗ trợ Mango Query/MapReduce Views. Sơ đồ một database `recruitment_db` là giả định của thiết kế ban đầu; cấu hình Auth và Job hiện có thể tách database theo môi trường.
 
 ```mermaid
 flowchart TD
@@ -43,14 +41,14 @@ flowchart TD
         Ctrl["Controllers<br/>(Request Parsing & HTTP Response Formatting)"]
         Svc["Domain Services<br/>(Business Rules & Resume Scoring Engine)"]
         Repo["CouchDB Data Repositories<br/>(Mango Queries & View Executors)"]
-        CouchClient["CouchDB Nano / HTTP Driver<br/>(Connection Pooling, 409 Conflict Retry)"]
+        CouchClient["CouchDB HTTP Client<br/>(Native Fetch / REST)"]
         
         Routes --> MW --> Ctrl --> Svc --> Repo --> CouchClient
     end
 
     subgraph DatabaseLayer["4. TẦNG CƠ SỞ DỮ LIỆU (APACHE COUCHDB 3.5.2)"]
-        DB[("CouchDB Database: recruitment_db<br/>(25.750 Business JSON Documents)")]
-        MangoIdx["Mango Secondary Indexes<br/>(doc_type, status, candidate_id...)"]
+        DB[("CouchDB Database: recruitment_db<br/>(release baseline: 25.750 documents)")]
+        MangoIdx["Mango Secondary Indexes<br/>(type, status, candidate_id...)"]
         Views["MapReduce Design Documents<br/>(_design/applications, _design/interviews)"]
         
         DB --- MangoIdx
@@ -99,11 +97,11 @@ sequenceDiagram
     Repo->>DB: GET /recruitment_db/job_{id}
     DB-->>Repo: Document Job (Kiểm tra status == OPEN)
     AppSvc->>Repo: findExistingApplication(candidateId, jobId)
-    Repo->>DB: Mango Query: { doc_type: "application", candidate_id, job_id }
+    Repo->>DB: Mango Query: { type: "application", candidate_id, job_id }
     DB-->>Repo: Danh sách đơn hiện có
     Note over AppSvc: Business Rule: Không được nộp trùng nếu đơn cũ chưa CLOSED
     AppSvc->>Repo: insertDocument(newApplicationDoc)
-    Repo->>DB: POST /recruitment_db (doc_type: "application", stage: "APPLIED")
+    Repo->>DB: POST /recruitment_db (type: "application", stage: "APPLIED")
     DB-->>Repo: { ok: true, id: "app_...", rev: "1-..." }
     AppSvc-->>Route: Result Object (Đơn ứng tuyển khởi tạo thành công)
     Route-->>UI: HTTP 201 Created { success: true, data: application }
@@ -131,7 +129,7 @@ sequenceDiagram
     ScoreSvc->>ScoreSvc: Chạy Pure Scoring Engine (recruithub-scoring-mvp-v1)
     Note over ScoreSvc: 1. Tính Hard Skills Match (Jaccard / Weighted)<br/>2. Tính Experience Alignment<br/>3. Tính Domain Weights<br/>4. Tổng hợp Overall Match Score (0 - 100)
     ScoreSvc->>Repo: upsertResumeAnalysis(resumeAnalysisDoc)
-    Repo->>DB: POST/PUT /recruitment_db (doc_type: "resume_analysis")
+    Repo->>DB: POST/PUT /recruitment_db (type: "resume_analysis")
     DB-->>Repo: { ok: true, id: "ra_...", rev: "..." }
     ScoreSvc-->>Route: Kết quả phân tích chi tiết & Ranking
     Route-->>UI: HTTP 200 OK { match_score, breakdown, confidence }
@@ -178,7 +176,7 @@ backend/src/
 │       ├── skill-matcher.js
 │       ├── ranking-calculator.js
 │       └── scoring-fingerprint.js
-├── models/ / repositories/  # Tương tác với CouchDB qua HTTP Client / Nano
+├── repositories/           # Tương tác với CouchDB qua HTTP client
 │   ├── base.repository.js   # Các phương thức CRUD cơ sở, handle _rev conflict
 │   ├── job.repository.js    # Mango Query lọc Job theo filter/pagination
 │   ├── application.repository.js
@@ -272,13 +270,13 @@ frontend/src/
 ## 5. Chiến lược dữ liệu CouchDB NoSQL
 
 ### 5.1. Phân loại 9 Document Types
-Mỗi document trong `recruitment_db` đều chứa trường định danh bắt buộc: `doc_type`:
+Trong contract hiện hành, document lõi dùng trường phân loại `type`:
 
 ```json
 {
   "_id": "app_001_cand_042",
   "_rev": "1-a1b2c3d4...",
-  "doc_type": "application",
+  "type": "application",
   "candidate_id": "cand_042",
   "job_id": "job_001",
   "current_stage": "INTERVIEWING",
@@ -293,16 +291,16 @@ Mỗi document trong `recruitment_db` đều chứa trường định danh bắt
 ```
 
 ### 5.2. Chiến lược đánh chỉ mục Mango Query (Secondary Indexing)
-Để đảm bảo tốc độ truy vấn trên 25.750 documents, hệ thống thiết lập các chỉ mục Mango chuyên biệt:
-- **`idx_jobs_status_date`**: Phục vụ tìm kiếm việc làm công cộng (`doc_type: "job"`, `status: "OPEN"`, `created_at`).
-- **`idx_applications_job_stage`**: Phục vụ Recruiter xem ứng viên theo Job và Stage (`doc_type: "application"`, `job_id`, `current_stage`).
-- **`idx_applications_candidate`**: Phục vụ Candidate xem lịch sử ứng tuyển của mình (`doc_type: "application"`, `candidate_id`).
-- **`idx_interviews_application`**: Phục vụ theo dõi lịch phỏng vấn theo đơn nộp (`doc_type: "interview"`, `application_id`).
-- **`idx_scoring_application`**: Phục vụ truy xuất điểm số Resume Analysis (`doc_type: "resume_analysis"`, `application_id`).
+Thiết kế ban đầu dự kiến các chỉ mục Mango chuyên biệt cho những nhóm truy vấn sau; sự hiện diện của index trên một CouchDB cụ thể phải được xác minh trực tiếp:
+- **`idx_jobs_status_date`**: Phục vụ tìm kiếm việc làm công cộng (`type: "job"`, `status: "OPEN"`, `created_at`).
+- **`idx_applications_job_stage`**: Phục vụ Recruiter xem ứng viên theo Job và Stage (`type: "application"`, `job_id`, `current_stage`).
+- **`idx_applications_candidate`**: Phục vụ Candidate xem lịch sử ứng tuyển của mình (`type: "application"`, `candidate_id`).
+- **`idx_interviews_application`**: Phục vụ theo dõi lịch phỏng vấn theo đơn nộp (`type: "interview"`, `application_id`).
+- **`idx_scoring_application`**: Phục vụ truy xuất điểm số Resume Analysis (`type: "resume_analysis"`, `application_id`).
 
 ### 5.3. Chiến lược MapReduce Design Documents (Thống kê và Báo cáo)
 Các tác vụ tổng hợp dữ liệu nặng (như đếm số lượng document theo từng loại, thống kê số ứng viên đỗ theo từng Job) được giao cho MapReduce Views của CouchDB xử lý trước:
-- `_design/stats/_view/by_doc_type`: Sử dụng hàm map `emit(doc.doc_type, 1)` và reduce `_count` có sẵn của Erlang/CouchDB để cung cấp số liệu tức thì cho Admin Dashboard mà không cần quét toàn bộ bảng.
+- `_design/stats/_view/by_doc_type`: Thiết kế minh họa dùng `emit(doc.type, 1)` và reduce `_count`. Đây là mô hình đề xuất; view triển khai và tên design document cần xác minh trên đúng database trước khi bật UC25.
 
 ---
 
@@ -352,4 +350,4 @@ Dự án được phân chia thành các lát cắt dọc trọn vẹn (Vertical
 | **TV2** | Recruiter Job Management, Application Pipeline (7 stages) | `job.*`, `application.*` routes/services | `PostJobPage`, `JobDetails`, `ApplicationTimeline`, `JobApplicantsPage` |
 | **TV3** | Interview Management, Resume Scoring & AI Ranking, System Logs | `interview.*`, `scoring.*`, `log.*` routes/services | `InterviewModal`, `MatchScoreBadge`, `ScoreBreakdownDrawer`, `CandidateRankTable` |
 
-*Chi tiết phân công, kế hoạch nhánh Git và ma trận phụ thuộc: xem tại [docs/recruithub-team-work-assignment.md](file:///docs/recruithub-team-work-assignment.md).*
+*Chi tiết phân công, kế hoạch nhánh Git và ma trận phụ thuộc: xem tại [docs/recruithub-team-work-assignment.md](docs/recruithub-team-work-assignment.md).*

@@ -154,6 +154,15 @@ describe('Candidate registration UI', () => {
     });
   });
 
+  it('shows the backend Auth database configuration error instead of a generic failure', async () => {
+    const user = userEvent.setup();
+    api.post.mockRejectedValue({ response: { data: { error: { code: 'AUTH_DATABASE_CONFIGURATION_ERROR' } } } });
+    renderRegister();
+    await fillRegistration(user);
+    await user.click(screen.getByRole('button', { name: 'Tạo tài khoản Candidate' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Cấu hình cơ sở dữ liệu xác thực chưa đúng');
+  });
+
   it('submits custom text when Khác is selected for a suggestion field', async () => {
     const user = userEvent.setup();
     api.post.mockResolvedValue({ data: { success: true } });
@@ -201,17 +210,18 @@ describe('Candidate registration UI', () => {
 
   it('shows the Recruiter form and submits only selected IDs when the explicit UI flag is enabled', async () => {
     vi.stubEnv('VITE_RECRUITER_REGISTRATION_ENABLED', 'true');
-    const user = userEvent.setup();
     api.post.mockResolvedValue({ data: { success: true } });
     renderRegister();
-    await user.click(screen.getByRole('radio', { name: 'Nhà tuyển dụng' }));
-    await user.type(screen.getByLabelText('Email'), 'r@example.com');
-    await user.type(screen.getByLabelText('Mật khẩu', { selector: '#recruiter-password' }), 'StrongPass1');
-    await user.type(screen.getByLabelText('Xác nhận mật khẩu', { selector: '#recruiter-confirm-password' }), 'StrongPass1');
-    await user.type(screen.getByLabelText('Tìm công ty'), 'Acme');
-    await user.click(await screen.findByRole('option', { name: /Acme Technology.*Technology/i }));
-    await user.selectOptions(await screen.findByLabelText('Phòng ban'), 'department:engineering');
-    await user.click(screen.getByRole('button', { name: 'Tạo tài khoản Recruiter' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Nhà tuyển dụng' }));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'r@example.com' } });
+    fireEvent.change(screen.getByLabelText('Mật khẩu', { selector: '#recruiter-password' }), { target: { value: 'StrongPass1' } });
+    fireEvent.change(screen.getByLabelText('Xác nhận mật khẩu', { selector: '#recruiter-confirm-password' }), { target: { value: 'StrongPass1' } });
+    fireEvent.change(screen.getByLabelText('Tìm công ty'), { target: { value: 'Acme' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Acme Technology.*Technology/i }));
+    const departmentSelect = await screen.findByLabelText('Phòng ban');
+    await waitFor(() => expect(departmentSelect.disabled).toBe(false));
+    fireEvent.change(departmentSelect, { target: { value: 'department:engineering' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo tài khoản Recruiter' }));
     expect(await screen.findByText('Sign in page')).toBeTruthy();
     expect(api.post).toHaveBeenCalledWith('/v1/auth/register/recruiter', {
       email: 'r@example.com', password: 'StrongPass1', company_id: 'company:acme', department_id: 'department:engineering',

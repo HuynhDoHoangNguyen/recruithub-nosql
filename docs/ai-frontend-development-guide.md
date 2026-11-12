@@ -109,7 +109,7 @@ Thứ tự trên không cho phép bỏ qua template khi làm UI. Với dữ li�
 Trước mỗi phần việc trên Frontend, AI bắt buộc phải:
 0. Hoàn tất cổng kiểm tra ở mục 0: đọc file style/khung ứng dụng và màn hình template liên quan, báo bằng chứng cùng mapping trong Mini Plan.
 1. Đọc component hoặc trang hiện có trong `frontend/src/`.
-2. Đối chiếu màn hình tương ứng trong [docs/recruithub-screen-mockups.md](file:///docs/recruithub-screen-mockups.md).
+2. Đối chiếu màn hình tương ứng trong [docs/recruithub-screen-mockups.md](recruithub-screen-mockups.md).
 3. Đọc Use Case và Business Rules liên quan.
 4. Kiểm tra endpoint REST API thật ở `backend/` trước khi gọi Axios.
 5. Nếu Backend endpoint chưa hoàn thành:

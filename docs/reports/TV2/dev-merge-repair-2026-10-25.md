@@ -25,7 +25,7 @@ Merge đã giữ lẫn hai phần triển khai trong JobList/JobDetails: import 
 - Mobile danh sách/chi tiết 390px không tràn ngang, `runtime_errors: []`.
 - Database chính không thay đổi document count/update sequence: **25.761 documents** trước/sau. Tin kiểm chứng chỉ tạo trong database ghi cô lập và được xóa mềm sau test; không sửa hồ sơ người dùng.
 
-[JSON kết quả](../../dev-merge-repair-verification/results.json) · [Danh sách theo giao diện dev](../../dev-merge-repair-verification/dev-job-list-filters.png) · [Chi tiết/lịch sử](../../dev-merge-repair-verification/dev-detail-current-attempt.png) · [Word preview](../../dev-merge-repair-verification/dev-detail-word-preview.png) · [PDF lần trước](../../dev-merge-repair-verification/dev-detail-archived-pdf.png).
+JSON kết quả (results.json không có trong checkout hiện tại) · Danh sách theo giao diện dev (dev-job-list-filters.png không có trong checkout hiện tại) · Chi tiết/lịch sử (dev-detail-current-attempt.png không có trong checkout hiện tại) · Word preview (dev-detail-word-preview.png không có trong checkout hiện tại) · PDF lần trước (dev-detail-archived-pdf.png không có trong checkout hiện tại).
 
 Script kiểm chứng: `node scripts/ui/verify-dev-merge-repair.cjs`. Script cần Playwright/Chrome và tài khoản local trong `.env`, có tạo dữ liệu thử trong database cô lập; không in credentials.
 

@@ -7,6 +7,7 @@ import { ApplicationService } from '../../src/services/application.service.js';
 import { CandidateProfileService } from '../../src/services/candidate-profile.service.js';
 import { RecruiterProfileService } from '../../src/services/recruiter-profile.service.js';
 import { validateUpload } from '../../src/utils/upload-validation.js';
+import { readDocument } from '../../src/utils/document-reader.js';
 import { MAX_UPLOAD_BYTES } from '../../src/schemas/upload.schema.js';
 import { docxFixture, pdfFixture, pngFixture, zipFixture } from '../helpers/upload-fixtures.js';
 import { PDFDocument } from 'pdf-lib';
@@ -114,6 +115,20 @@ test('Word preview is authenticated, scoped to the matching application and retu
     assert.match((await response.json()).data.text, /RecruiHub upload test/);
   }
   for (const who of ['otherCandidate', 'otherRecruiter', 'admin']) assert.equal((await fetch(route, { headers: headers(who) })).status, 403);
+});
+
+test('document reader reports a missing or crashed worker as a service error, not a bad PDF', async () => {
+  class FailedWorker {
+    handlers = new Map();
+    constructor() { queueMicrotask(() => this.handlers.get('error')?.(new Error('worker dependency unavailable'))); }
+    once(event, callback) { this.handlers.set(event, callback); return this; }
+    terminate() { return Promise.resolve(0); }
+  }
+  await assert.rejects(readDocument(Buffer.from('%PDF-1.4'), 'validate-pdf', FailedWorker), error =>
+    error.status === 503 && error.code === 'DOCUMENT_READER_UNAVAILABLE');
+  class UnavailableWorker { constructor() { throw new Error('worker runtime unavailable'); } }
+  await assert.rejects(readDocument(Buffer.from('%PDF-1.4'), 'validate-pdf', UnavailableWorker), error =>
+    error.status === 503 && error.code === 'DOCUMENT_READER_UNAVAILABLE');
 });
 
 test('Candidate contact/languages persist with ETag and do not alter scoring fields', async () => {

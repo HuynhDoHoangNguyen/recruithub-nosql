@@ -1,6 +1,8 @@
 # RecruiHub NoSQL
 
-> Tinh chỉnh UI: [nền navy có chiều sâu, đồng bộ bảy trang và hồ sơ ứng viên, ảnh trước/sau và kiểm thử](docs/surface-polish-verification/README.md).
+> Trạng thái phần việc TV1 được tóm tắt tại [báo cáo tổng hợp TV1](docs/reports/TV1/RP-TV1-status-summary-2026-11-12.md). Các report có ngày 25/10 bên dưới là snapshot lịch sử của từng lượt kiểm tra, không mặc nhiên là cấu hình/runtime mới nhất.
+
+> UI verification evidence: [kết quả kiểm tra giao diện](docs/ui-verification/results.json).
 
 > Sửa sau merge dev: [giữ giao diện mới, sửa import/state/filter và nối lại CV/nộp lại hồ sơ](docs/reports/TV2/dev-merge-repair-2026-10-25.md).
 
@@ -37,33 +39,37 @@
 
 ## 2. Công nghệ sử dụng
 
+> Các số liệu về dữ liệu và test trong những báo cáo gắn ở đầu README là snapshot theo ngày ghi trên từng báo cáo. Chúng không phải trạng thái runtime hiện tại; hãy chạy health/checks tương ứng trước khi dùng số liệu vận hành.
+
 | Tầng / Thành phần | Công nghệ | Chi tiết |
 | :--- | :--- | :--- |
 | **Database** | Apache CouchDB 3.5.2 | Database `recruitment_db`, JSON Documents, Mango Query, MapReduce Views |
 | **Backend** | Node.js (v20+), Express.js 5 | Layered Architecture (Route → Middleware → Controller → Service → Repository → CouchDB Client) |
-| **Database Driver** | Native HTTP Client / Nano | Hỗ trợ retry cấp số nhân, tự động phân batch 500 documents, xử lý HTTP 409 conflict |
-| **Validation & Schema** | Zod 3.24 | Schema contract kiểm soát chặt chẽ 9 business document types |
+| **Database Driver** | CouchDB HTTP client nội bộ | Backend gọi CouchDB qua HTTP; không dùng package `nano` |
+| **Validation & Schema** | Zod 4 | Schema và request validation nằm trong `backend/src/schemas/` |
 | **Scoring Engine** | Pure JavaScript | Thuật toán `recruithub-scoring-mvp-v1`: Skill Matching, Experience Scoring, Domain Weights |
 | **Frontend** | React 19, Vite 8 | Feature-Based Architecture, React Router DOM v7, Axios Client |
 | **Styling & UI** | Tailwind CSS, Lucide Icons | Kế thừa giao diện từ template `Job-Application-Portal-Frontend` |
 | **Notifications** | React Toastify | Thông báo tương tác thời gian thực |
-| **Testing** | Node.js Test Runner / Jest / Supertest | 246 unit và integration tests PASS |
+| **Testing** | Node.js Test Runner, Vitest | Lệnh và kết quả hiện tại được quản lý qua `backend/package.json`, `frontend/package.json`; không dùng Jest/Supertest trong các manifest hiện tại |
 
 ---
 
-## 3. Kiến trúc dữ liệu NoSQL (9 Business Document Types)
+## 3. Kiến trúc dữ liệu NoSQL
 
-Database `recruitment_db` lưu trữ trọn vẹn **25.750 documents** thuộc 9 loại tài liệu nghiệp vụ, không sử dụng foreign key vật lý mà liên kết qua trường định danh `doc_type` và reference IDs:
+Release dataset lịch sử có snapshot **25.750 documents**. Số lượng trong database đang chạy có thể khác. Các document type lõi được khai báo trong `backend/src/constants/document.constants.js`; quan hệ được biểu diễn bằng các ID tham chiếu, không dùng foreign key vật lý:
 
-1. `user`: 10.050 tài khoản người dùng (`ADMIN`, `RECRUITER`, `CANDIDATE`).
-2. `candidate`: 10.000 hồ sơ ứng viên chi tiết (kỹ năng, kinh nghiệm, học vấn, resume text).
-3. `recruiter`: 50 thông tin nhà tuyển dụng và công ty.
-4. `job`: 2.500 tin tuyển dụng (200 `OPEN`, 2.300 `DRAFT`).
-5. `application`: 1.200 hồ sơ ứng tuyển trải dài trên 7 stages nghiệp vụ.
-6. `interview`: 350 biên bản phỏng vấn với bằng chứng đánh giá (Evidence).
-7. `resume_analysis`: 1.200 kết quả phân tích mức độ phù hợp kèm AI Match Score và xếp hạng.
-8. `system_log`: 200 nhật ký hệ thống ghi nhận hoạt động.
-9. `audit_trail`: 200 bản ghi vết kiểm toán nghiệp vụ an toàn.
+1. `user`: tài khoản (`ADMIN`, `RECRUITER`, `CANDIDATE`).
+2. `candidate`: hồ sơ ứng viên.
+3. `recruiter`: hồ sơ nhà tuyển dụng.
+4. `company`: thông tin doanh nghiệp.
+5. `department`: phòng ban thuộc doanh nghiệp.
+6. `job`: tin tuyển dụng.
+7. `application`: hồ sơ ứng tuyển.
+8. `interview`: biên bản phỏng vấn.
+9. `resume_analysis`: kết quả phân tích mức độ phù hợp và xếp hạng.
+
+Các con số phân bố dữ liệu trong những báo cáo seed cũ không được xem là số liệu live hiện tại; schema và mã nguồn là căn cứ cho contract hiện hành.
 
 ---
 
@@ -108,7 +114,7 @@ recruithub-nosql/
 │   │   ├── config/                    # Cấu hình CouchDB, port, JWT secrets
 │   │   ├── controllers/               # Điều phối HTTP request / response
 │   │   ├── middleware/                # Auth, Role Guard, Zod Request Validation
-│   │   ├── models/                    # Data Access / CouchDB Nano Client
+│   │   ├── repositories/              # Truy cập tài liệu và truy vấn CouchDB
 │   │   ├── routes/                    # Khai báo Express REST API routes
 │   │   ├── schemas/                   # Zod schemas cho 9 document types
 │   │   ├── services/                  # Business Logic & Pure Scoring Engine
@@ -134,7 +140,7 @@ recruithub-nosql/
 ├── docs/                              # Tài liệu kỹ thuật dự án
 │   ├── COUCHDB_IMPORT_GUIDE.md        # Hướng dẫn chi tiết import CouchDB cho thành viên mới
 │   ├── ai-frontend-development-guide.md # Hướng dẫn AI phát triển Frontend
-│   ├── recruithub-usecase-system.md   # Đặc tả hệ thống Use Cases (UC01-UC30)
+│   ├── recruithub-usecase-system.md   # Đặc tả UC01–UC26; UC27/UC28 là phần mở rộng
 │   ├── recruithub-screen-mockups.md   # Wireframe & Mockup giao diện các màn hình
 │   ├── recruithub-team-work-assignment.md # Phân công công việc nhóm 3 thành viên
 │   ├── data-schema-contract.md        # Hợp đồng cấu trúc 9 loại tài liệu NoSQL
@@ -174,19 +180,19 @@ NODE_ENV=development
 ```
 
 ### 6.4. Bước 3: Import dữ liệu NoSQL vào CouchDB
-Dự án đã chuẩn bị sẵn bộ script import tự động xử lý 25.750 documents:
+Dự án có script nạp release dataset ban đầu (snapshot 25.750 documents):
 ```bash
 # Cài đặt dependencies backend (nếu chưa có)
 cd backend
 npm install
 
-# Thực hiện import 25.750 documents
+# Nạp release dataset theo hướng dẫn và xác nhận an toàn trước khi chạy
 npm run db:import
 
 # Kiểm tra tính toàn vẹn sau import
 npm run db:verify
 ```
-> Chi tiết hướng dẫn dành cho thành viên nhóm mới clone repo xem tại: [docs/COUCHDB_IMPORT_GUIDE.md](file:///docs/COUCHDB_IMPORT_GUIDE.md).
+> Chi tiết hướng dẫn dành cho thành viên nhóm mới clone repo xem tại: [docs/COUCHDB_IMPORT_GUIDE.md](docs/COUCHDB_IMPORT_GUIDE.md).
 
 ### 6.5. Bước 4: Chạy kiểm thử Backend
 ```bash
@@ -207,7 +213,7 @@ npm run dev
 ```
 Giao diện ứng dụng sẽ hoạt động tại: [http://127.0.0.1:5178](http://127.0.0.1:5178).
 
-Frontend dùng proxy `/api` tới Backend trong development. Hướng dẫn cấu hình và menu nằm ở [frontend/README.md](frontend/README.md). Việc import dữ liệu là bước chuẩn bị riêng, không chạy lại mỗi lần khởi động. Luồng đăng nhập cần API Identity, hiện chưa được tích hợp trên nhánh này.
+Frontend dùng proxy `/api` tới Backend trong development. Hướng dẫn cấu hình và menu nằm ở [frontend/README.md](frontend/README.md). Việc nạp release dataset là bước chuẩn bị riêng, không chạy lại mỗi lần khởi động. Auth routes và giao diện đăng ký/đăng nhập đã có trong source; trạng thái runtime phụ thuộc cấu hình CouchDB/Auth hiện hành.
 
 ---
 
@@ -219,14 +225,14 @@ Dự án áp dụng mô hình **Full-stack Vertical Slice**, mỗi thành viên 
 - **Thành viên 2 (TV2)**: Phụ trách Module Recruiter Job Management (Post, Edit, Close), Candidate Application Submission, 7-Stage Application Lifecycle Tracking.
 - **Thành viên 3 (TV3)**: Phụ trách Module Interview Management & Evidence, AI Resume Matching Engine Integration & Candidate Ranking View, System Audit & Logs.
 
-Chi tiết phân công nhiệm vụ và kế hoạch sprint: xem tại [docs/recruithub-team-work-assignment.md](file:///docs/recruithub-team-work-assignment.md).
+Chi tiết phân công nhiệm vụ và kế hoạch sprint: xem tại [docs/recruithub-team-work-assignment.md](docs/recruithub-team-work-assignment.md).
 
 ---
 
 ## 8. Hướng dẫn làm việc với AI Coding Agent
 
 Khi cộng tác với AI Agent (Antigravity, Cursor, Claude...), bắt buộc tuân thủ:
-1. Đọc kỹ [AGENTS.md](file:///AGENTS.md) trước mọi phiên làm việc.
+1. Đọc kỹ [AGENTS.md](AGENTS.md) trước mọi phiên làm việc.
 2. Tuân thủ thứ tự ưu tiên Nguồn sự thật (Source of Truth).
 3. Triển khai theo vòng lặp chuẩn: **Kiểm tra mã nguồn → Đề xuất Mini Plan → Chờ duyệt → Viết code → Chạy kiểm thử tự động → Báo cáo nghiệm thu**.
 4. Không tự ý chỉnh sửa module ngoài phạm vi được giao.

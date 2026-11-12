@@ -19,7 +19,7 @@ Không sửa core Auth, không bật đăng ký Recruiter, không sửa `.env`, 
 
 ## Bằng chứng live mới
 
-[Kết quả JSON không mock](public-jobs-after-merge/results.json), [Landing](public-jobs-after-merge/landing.png), [Jobs](public-jobs-after-merge/jobs.png), [Detail](public-jobs-after-merge/detail.png), [Mobile](public-jobs-after-merge/jobs-mobile.png).
+[Kết quả JSON không mock](../../public-jobs-after-merge/results.json), [Landing](../../public-jobs-after-merge/landing.png), [Jobs](../../public-jobs-after-merge/jobs.png), [Detail](../../public-jobs-after-merge/detail.png), [Mobile](../../public-jobs-after-merge/jobs-mobile.png).
 
 - Database `recruitment_db`: **25.761 documents**, gồm **25.750 business documents + 11 design docs**.
 - Job: **2.500**, trong đó **200 OPEN, 2.300 DRAFT**, CLOSED = 0.

@@ -1,8 +1,8 @@
 # React + Vite
 
-> [Đã sửa Public Jobs sau merge](../docs/public-jobs-after-merge-fix.md): GET public đã đọc lại dataset thật mà không cần Auth database. Nếu tab giữ lỗi cũ, bấm Thử lại hoặc reload; không import lại dữ liệu.
+> [Đã sửa Public Jobs sau merge](../docs/reports/TV2/public-jobs-after-merge-fix.md): GET public đã đọc lại dataset thật mà không cần Auth database. Nếu tab giữ lỗi cũ, bấm Thử lại hoặc reload; không import lại dữ liệu.
 
-> Sau merge dev: [xem mốc tích hợp hiện tại](../docs/merge-dev-review-2026-10-25.md). Auth dùng User đã được server xác minh và token memory-only; reload cần đăng nhập lại. API client dùng root `/api`, service nối `/v1`; `VITE_PUBLIC_JOBS_MODE=fixtures` chỉ dành cho opt-in development, mặc định gọi API thật. Jobs có thể trả 503 cho đến khi cấu hình database riêng theo contract dev.
+> Sau merge dev: [xem mốc tích hợp hiện tại](../docs/reports/TV2/merge-dev-review-2026-10-25.md). Auth dùng User đã được server xác minh và token memory-only; reload cần đăng nhập lại. API client dùng root `/api`, service nối `/v1`; `VITE_PUBLIC_JOBS_MODE=fixtures` chỉ dành cho opt-in development, mặc định gọi API thật. Jobs có thể trả 503 cho đến khi cấu hình database riêng theo contract dev.
 
 ## Chạy RecruiHub Frontend
 
@@ -22,7 +22,7 @@ npm run lint
 npm run build
 ```
 
-Login/Register cần API Identity thật; giao diện không tạo tài khoản demo hoặc bỏ qua phân quyền. Xem [bàn giao JobPortal IT mới nhất, ảnh đối chiếu và hướng dẫn click](../docs/recruitment-it-template-handoff.md).
+Login/Register cần API Identity thật; giao diện không tạo tài khoản demo hoặc bỏ qua phân quyền. Xem [bàn giao JobPortal IT mới nhất, ảnh đối chiếu và hướng dẫn click](../docs/reports/TV2/recruitment-it-template-handoff.md).
 
 Theme mới dùng Plus Jakarta Sans và bố cục của đúng source đang phục vụ template 5174. Nếu đổi Tailwind config trong khi Vite đang chạy lâu và CSS báo unknown utility/500, dừng Vite rồi chạy lại `npm run dev`. Sau cập nhật backend, chạy `cd backend; npm run db:job-application` để cài view thống kê Candidate; lệnh chỉ cập nhật design/index.
 

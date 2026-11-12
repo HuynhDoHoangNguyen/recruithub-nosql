@@ -95,7 +95,7 @@ test('Recruiter registration endpoint stays disabled by default and validates a 
   const disabledServer = disabledApp.listen(0);
   await new Promise(resolve => disabledServer.once('listening', resolve));
   t.after(() => disabledServer.close());
-  const body = { email: 'r@example.test', password: 'StrongPass1', company: { name: 'New Company', industry: 'Technology' }, department: { name: 'People' } };
+  const body = { email: 'r@example.test', password: 'StrongPass1', company_id: 'company:existing-acme', department_id: 'department:existing-engineering' };
   const disabled = await fetch(`http://127.0.0.1:${disabledServer.address().port}/api/v1/auth/register/recruiter`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   });
@@ -117,16 +117,18 @@ test('Recruiter registration endpoint stays disabled by default and validates a 
   });
   assert.equal(enabled.status, 400);
   assert.equal((await enabled.json()).error.code, 'VALIDATION_ERROR');
-  const unsupportedWebsite = await fetch(`http://127.0.0.1:${enabledServer.address().port}/api/v1/auth/register/recruiter`, {
+  const invalidOrganizationShape = await fetch(`http://127.0.0.1:${enabledServer.address().port}/api/v1/auth/register/recruiter`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...body, company: { ...body.company, website: 'ftp://company.example' } }),
+    body: JSON.stringify({ ...body, company: { name: 'Untrusted company' } }),
   });
-  assert.equal(unsupportedWebsite.status, 400);
+  assert.equal(invalidOrganizationShape.status, 400);
+  assert.equal((await invalidOrganizationShape.json()).error.code, 'VALIDATION_ERROR');
   const valid = await fetch(`http://127.0.0.1:${enabledServer.address().port}/api/v1/auth/register/recruiter`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   });
   assert.equal(valid.status, 201);
-  assert.equal(received.role, undefined);
+  assert.equal(received.company_id, body.company_id);
+  assert.equal(received.department_id, body.department_id);
   assert.equal(received.email, body.email);
 });
 

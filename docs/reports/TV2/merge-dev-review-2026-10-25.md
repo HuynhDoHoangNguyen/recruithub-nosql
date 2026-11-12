@@ -57,7 +57,7 @@ Baseline dev được lấy trực tiếp bằng `git archive MERGE_HEAD` vào t
 
 Frontend đã khởi động lại tại **http://localhost:5173**, backend đang trả health ở **http://localhost:5000**.
 
-[Bằng chứng browser không mock](merge-dev-verification/smoke-results.json), [Landing](merge-dev-verification/landing.png), [Jobs](merge-dev-verification/jobs.png), [Login mới từ dev](merge-dev-verification/login.png).
+[Bằng chứng browser không mock](../../merge-dev-verification/smoke-results.json), [Landing](../../merge-dev-verification/landing.png), [Jobs](../../merge-dev-verification/jobs.png), [Login mới từ dev](../../merge-dev-verification/login.png).
 
 | Endpoint thật | Kết quả |
 |---|---|

@@ -42,8 +42,8 @@ Ngày: 25/10/2026. Thực hiện tiếp trên working tree hiện tại, giữ c
 
 Kết quả và ảnh:
 
-- [CV/hồ sơ: JSON kiểm chứng](../../cv-preview-profile-verification/results.json), [hồ sơ chung](../../cv-preview-profile-verification/candidate-profile-general.png), [PDF Recruiter](../../cv-preview-profile-verification/recruiter-pdf-preview.png), [Word Recruiter](../../cv-preview-profile-verification/recruiter-word-preview.png).
-- [Phân trang: JSON kiểm chứng](../../dashboard-pagination-verification/results.json), [ứng viên trang 1](../../dashboard-pagination-verification/candidate-page-1.png), [trang 2](../../dashboard-pagination-verification/candidate-page-2.png), [Recruiter trang 1](../../dashboard-pagination-verification/recruiter-page-1.png), [trang 2](../../dashboard-pagination-verification/recruiter-page-2.png).
+- [CV/hồ sơ: JSON kiểm chứng](../../cv-preview-profile-verification/results.json), hồ sơ chung (candidate-profile-general.png không có trong checkout hiện tại), PDF Recruiter (recruiter-pdf-preview.png không có trong checkout hiện tại), Word Recruiter (recruiter-word-preview.png không có trong checkout hiện tại).
+- [Phân trang: JSON kiểm chứng](../../dashboard-pagination-verification/results.json), ứng viên trang 1 (candidate-page-1.png không có trong checkout hiện tại), trang 2 (candidate-page-2.png không có trong checkout hiện tại), Recruiter trang 1 (recruiter-page-1.png không có trong checkout hiện tại), trang 2 (recruiter-page-2.png không có trong checkout hiện tại).
 
 ## Cách kiểm tra trên máy
 

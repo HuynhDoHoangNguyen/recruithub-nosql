@@ -2,9 +2,11 @@
 
 Ngày cập nhật: 2026-10-25. Đây là bản đọc hợp nhất duy nhất cho hồ sơ TV1; nội dung đầy đủ của các RP UC/Auth và audit ba nhánh được đặt trong cùng tài liệu. Các trạng thái lịch sử giữ nguyên theo thời điểm từng báo cáo; trạng thái tích hợp hiện tại được ghi theo từng phần. Full backend suite chưa PASS; các subset test không thay thế kết quả full suite.
 
+> Bản theo dõi ngắn gọn mới nhất: [RP-TV1-status-summary-2026-11-12.md](RP-TV1-status-summary-2026-11-12.md). Tài liệu hiện tại là hồ sơ lưu trữ lịch sử; ngày, test và trạng thái bên dưới thuộc các lượt audit cũ.
+
 Báo cáo TV1 + TV2 và hướng dẫn kiểm thử được chuyển sang [báo cáo tổng hợp TV2](../TV2/RP-TV2-consolidated.md#rp-tv1-tv2-merge-test-guide). Contract hiện hành: [TV1 Auth contract](../../shared/TV1_AUTH_MODULE_CONTRACT.md), [CouchDB Foundation guide](../../shared/COUCHDB_FOUNDATION_GUIDE.md).
 
-## Danh m?c ph? l?c
+## Danh mục phụ lục
 
 1. [RP-TV1-couchdb-client-repository.md](#rp-tv1-couchdb-client-repository)
 2. [RP-TV1-database-schema-api-contract.md](#rp-tv1-database-schema-api-contract)
@@ -2459,9 +2461,9 @@ Cross-branch implementation, test, data-source and Git provenance audit is inclu
 
 ---
 
-# Ph? l?c: To?n v?n c?c b?o c?o Use Case TV1
+# Phụ lục: Toàn văn các báo cáo Use Case TV1
 
-C?c b?o c?o UC ri?ng d??i ??y ???c ch?p nguy?n v?n ?? b?n t?ng h?p c? th? ??c ??c l?p. File ngu?n ri?ng v?n ???c gi? nguy?n. UC07 ???c l?y t? commit `5107bd2` c?a `feature/job-listing-and-detail-pages`, do file n?y ch?a c? trong working tree c?a nh?nh hi?n t?i.
+Các báo cáo UC riêng dưới đây được chép vào phụ lục để tài liệu có thể đọc độc lập; file nguồn riêng vẫn được giữ. UC07 trong phần này là snapshot từ commit `5107bd2`; xem [báo cáo UC07 riêng](RP-TV1-UC07-job-detail.md) để tra nội dung hiện có.
 
 
 ---

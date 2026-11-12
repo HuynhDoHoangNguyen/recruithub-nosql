@@ -69,7 +69,7 @@ Trình duyệt thật đã chọn file qua input: lưu CV/ảnh rồi reload/đ�
 
 Kết quả: [results.json](../../file-upload-verification/results.json). Script: [verify-local-file-uploads.cjs](../../../scripts/ui/verify-local-file-uploads.cjs).
 
-Ảnh: [Form ứng tuyển](../../file-upload-verification/apply-file-upload.png), [Hồ sơ Candidate](../../file-upload-verification/candidate-profile-files.png), [Mobile](../../file-upload-verification/candidate-upload-mobile.png), [Tải logo](../../file-upload-verification/company-logo-upload.png), [Recruiter tải CV từng lần](../../file-upload-verification/recruiter-downloads-attempts.png), [Logo trên tin](../../file-upload-verification/uploaded-logo-job-card.png).
+Ảnh: Form ứng tuyển (apply-file-upload.png không có trong checkout hiện tại), Hồ sơ Candidate (candidate-profile-files.png không có trong checkout hiện tại), Mobile (candidate-upload-mobile.png không có trong checkout hiện tại), Tải logo (company-logo-upload.png không có trong checkout hiện tại), Recruiter tải CV từng lần (recruiter-downloads-attempts.png không có trong checkout hiện tại), Logo trên tin (uploaded-logo-job-card.png không có trong checkout hiện tại).
 
 Commit đề xuất:
 
