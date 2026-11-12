@@ -20,9 +20,18 @@ const safeUser = {
   account_status: 'ACTIVE',
 };
 
-test('auth persistence requires a separate database and refuses recruitment_db', () => {
+test('auth persistence requires an explicit database and opts into recruitment_db explicitly', () => {
   assert.throws(() => getAuthDatabaseConfig({}), (error) => error.code === 'AUTH_DATABASE_CONFIGURATION_ERROR');
   assert.throws(() => getAuthDatabaseConfig({ AUTH_COUCHDB_DATABASE: 'recruitment_db' }), (error) => error.code === 'AUTH_DATABASE_CONFIGURATION_ERROR');
+  assert.equal(getAuthDatabaseConfig({
+    AUTH_COUCHDB_DATABASE: 'recruitment_db',
+    AUTH_ALLOW_PRIMARY_DATABASE: 'true',
+    COUCHDB_URL: 'http://127.0.0.1:5984',
+  }).database, 'recruitment_db');
+  assert.throws(() => getAuthDatabaseConfig({
+    AUTH_COUCHDB_DATABASE: 'recruitment_auth_demo',
+    COUCHDB_DATABASE: 'recruitment_db',
+  }), (error) => error.code === 'DATABASE_CONFIGURATION_MISMATCH');
   const config = getAuthDatabaseConfig({
     AUTH_COUCHDB_DATABASE: 'recruitment_auth_test',
     COUCHDB_URL: 'http://127.0.0.1:5984',

@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Landing from "../pages/Landing";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
+import ResetPassword from "../pages/ResetPassword";
 import Profile from "../pages/Profile";
 import ProtectedRoute from "../components/ProtectedRoute";
 import AdminDashboard from "../pages/Dashboard/AdminDashboard";
@@ -20,6 +21,7 @@ const AppRoutes = () => {
 			<Route path="/" element={<Landing />} />
 			<Route path="/login" element={<Login />} />
 			<Route path="/register" element={<Register />} />
+			<Route path="/reset-password" element={<ResetPassword />} />
 			<Route path="/jobs" element={<JobList />} />
 			<Route path="/jobs/:id" element={<JobDetails />} />
 

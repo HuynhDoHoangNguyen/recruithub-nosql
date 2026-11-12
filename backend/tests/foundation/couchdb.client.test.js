@@ -38,6 +38,21 @@ test('readiness and database metadata only issue GET requests', async () => {
   assert.equal(calls[0].options.headers.Authorization.startsWith('Basic '), true);
 });
 
+test('queryView uses a read-only GET and supports MapReduce group/group_level parameters', async () => {
+  const calls = [];
+  const client = new CouchDbClient({ config, fetchImpl: async (url, options) => {
+    calls.push({ url: new URL(url), options });
+    return response(200, { rows: [{ key: ['recruiter:one', 'OPEN'], value: 3 }] });
+  } });
+  const result = await client.queryView('job_application', 'jobs_by_recruiter', { group_level: 2 });
+  assert.equal(calls[0].options.method, 'GET');
+  assert.equal(calls[0].url.pathname, '/recruitment_db/_design/job_application/_view/jobs_by_recruiter');
+  assert.equal(calls[0].url.searchParams.get('group_level'), '2');
+  assert.deepEqual(result.rows[0], { key: ['recruiter:one', 'OPEN'], value: 3 });
+  await assert.rejects(() => client.queryView('_design/unsafe', 'jobs'), TypeError);
+  await assert.rejects(() => client.queryView('job_application', 'jobs', { limit: 100 }), TypeError);
+});
+
 test('ID-prefix document scan uses CouchDB built-in all_docs read endpoint', async () => {
   const calls = [];
   const client = new CouchDbClient({

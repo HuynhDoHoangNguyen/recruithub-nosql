@@ -147,7 +147,7 @@ test('login, token authentication, invalid signatures, and expired tokens are en
   await assert.rejects(() => service.authenticate(session.accessToken), (error) => error.status === 401);
 });
 
-test('locked accounts cannot log in or use a previously issued access token', async () => {
+test('locked accounts reject an issued access token; unlocking can restore it until its 15-minute expiry', async () => {
   const { service, documents } = createInMemoryService();
   await service.register(registration);
   const session = await service.login({ email: registration.email, password: registration.password });
@@ -157,6 +157,11 @@ test('locked accounts cannot log in or use a previously issued access token', as
 
   await assert.rejects(() => service.login({ email: registration.email, password: registration.password }), (error) => error.status === 401);
   await assert.rejects(() => service.authenticate(session.accessToken), (error) => error.status === 401);
+
+  user.account_status = USER_ACCOUNT_STATUSES.ACTIVE;
+  documents.set(user._id, user);
+  const afterUnlock = await service.authenticate(session.accessToken);
+  assert.equal(afterUnlock.principal.sub, user._id);
 });
 
 test('RESET_REQUIRED users are rejected without activation or modification', async () => {

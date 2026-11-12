@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { startFixture } from './fixtures.js';
 
-test('public list includes historical and new OPEN jobs without exposing DRAFT/CLOSED', async t => {
+test('public list/detail exposes OPEN jobs only and detail includes an approved company logo', async t => {
   const f = await startFixture(t);
   for (const [id, doc] of f.repo.docs) if (doc.type === 'job') f.repo.docs.delete(id);
+  f.repo.docs.get(f.job.company_id).logo_url = 'https://example.test/company-logo.png';
   const jobs = [
     ['job:historic', 'OPEN', false], ['job:modern', 'OPEN', true],
     ['job:draft', 'DRAFT', false], ['job:closed', 'CLOSED', true],
@@ -18,9 +19,12 @@ test('public list includes historical and new OPEN jobs without exposing DRAFT/C
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.data.items.map(j => j._id).sort(), ['job:historic', 'job:modern']);
   assert.equal((await f.request('GET', '/jobs/job:draft', undefined, null)).status, 404);
-  const closed = await f.request('GET', '/jobs/job:closed', undefined, null);
-  assert.equal(closed.status, 200);
-  assert.equal(closed.body.data.status, 'CLOSED');
+  assert.equal((await f.request('GET', '/jobs/job:closed', undefined, null)).status, 404);
+  const detail = await f.request('GET', '/jobs/job:historic', undefined, null);
+  assert.equal(detail.status, 200);
+  assert.equal(detail.body.data.company_logo_url, 'https://example.test/company-logo.png');
+  const metadata = await f.request('GET', '/jobs/metadata', undefined, null);
+  assert.equal(metadata.status, 200);
 });
 
 test('public pagination uses required created_at with unique id tie-breaker', async t => {

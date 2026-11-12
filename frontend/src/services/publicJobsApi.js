@@ -21,7 +21,8 @@ export async function listPublicJobs({ search = '', skills = '', industry = '', 
 export async function getPublicJob(id) {
   if (developmentFixturesEnabled) return findOpenJob(publicJobFixtures, id);
   const job = await jobApi.publicDetail(id);
-  // The public API also exposes CLOSED jobs for application history. Keep them
-  // readable; JobDetails separately prevents new applications to closed jobs.
-  return job && ['OPEN', 'CLOSED'].includes(job.status) ? { ...job, ...normalizeJob(job) } : null;
+  // Public detail follows the public catalog contract: only OPEN jobs resolve.
+  // A Candidate's CLOSED application history is loaded through their own
+  // authenticated application record in JobDetails.
+  return job?.status === 'OPEN' ? { ...job, ...normalizeJob(job) } : null;
 }

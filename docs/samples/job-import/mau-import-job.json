@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "jobs": [
+    {
+      "title": "M?u ki?m th? Import UC27 20261026033306 - Frontend Engineer",
+      "industry": "C?ng ngh? th?ng tin",
+      "seniority": "JUNIOR",
+      "description": "Tin m?u ?? ki?m tra ch?c n?ng Import Job. C? th? ch?nh s?a tr??c khi nh?p.",
+      "responsibilities": [
+        "Ph?t tri?n giao di?n web b?ng React.",
+        "Ph?i h?p v?i nh?m thi?t k? v? backend."
+      ],
+      "general": [
+        "C? tinh th?n h?c h?i.",
+        "L?m vi?c nh?m t?t."
+      ],
+      "required_skills": [
+        "JavaScript",
+        "React"
+      ],
+      "optional_skills": [
+        "TypeScript"
+      ],
+      "experience_status": "NO_MINIMUM",
+      "education_status": "NO_MINIMUM",
+      "project_status": "NO_REQUIREMENT",
+      "status": "DRAFT"
+    }
+  ]
+}

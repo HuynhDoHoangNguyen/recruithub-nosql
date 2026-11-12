@@ -11,6 +11,7 @@ import {
 } from '../utils/recruiter-registration-id.utils.js';
 import { toSafeUserDto } from './user.dto.js';
 import { issueAccessToken, verifyAccessToken } from './jwt-access-token.js';
+import { parsePasswordResetHash } from './password-reset.js';
 
 export { toSafeUserDto };
 
@@ -297,6 +298,53 @@ export class AuthService {
     }, { secret: this.jwtSecret, nowMs: this.now() });
 
     return { accessToken, user: toSafeUserDto(user) };
+  }
+
+  async completePasswordReset({ email, temporaryPassword, newPassword }) {
+    const user = await this.#getExistingUser(email);
+    const resetCredential = parsePasswordResetHash(user?.password_hash);
+    if (!user || user.account_status !== USER_ACCOUNT_STATUSES.RESET_REQUIRED ||
+        ![USER_ROLES.CANDIDATE, USER_ROLES.RECRUITER].includes(user.role) ||
+        !resetCredential || resetCredential.expiresAt <= this.now()) {
+      throw new AuthServiceError(400, 'PASSWORD_RESET_INVALID', 'The reset credential is invalid or expired. Ask an administrator for a new one.');
+    }
+
+    let isValid = false;
+    try { isValid = await argon2.verify(resetCredential.passwordHash, temporaryPassword); }
+    catch { isValid = false; }
+    if (!isValid) {
+      throw new AuthServiceError(400, 'PASSWORD_RESET_INVALID', 'The reset credential is invalid or expired. Ask an administrator for a new one.');
+    }
+
+    try {
+      if (user.role === USER_ROLES.CANDIDATE) {
+        const candidateResult = await this.candidates.findByUserId(user._id);
+        if (candidateResult.docs?.length !== 1) throw Object.assign(new Error('Candidate profile is missing or ambiguous.'), { code: 'PROFILE_INCOMPLETE' });
+      } else {
+        await this.#assertRecruiterReady({ ...user, account_status: USER_ACCOUNT_STATUSES.ACTIVE });
+      }
+    } catch (error) {
+      if (error?.code === 'PROFILE_INCOMPLETE' || error?.code === 'NOT_FOUND' || error?.code === 'DOCUMENT_VALIDATION_FAILED' || error?.code === 'RECRUITER_PROFILE_INCOMPLETE') {
+        throw new AuthServiceError(409, 'PASSWORD_RESET_PROFILE_INCOMPLETE', 'The linked profile is incomplete. Contact an administrator before resetting this account.');
+      }
+      throw error;
+    }
+
+    const updated = {
+      ...user,
+      password_hash: await argon2.hash(newPassword, PASSWORD_HASH_OPTIONS),
+      account_status: USER_ACCOUNT_STATUSES.ACTIVE,
+      updated_at: new Date(this.now()).toISOString(),
+    };
+    try {
+      await this.users.update(updated, user._rev);
+    } catch (error) {
+      if (error?.code === 'CONFLICT') {
+        throw new AuthServiceError(409, 'PASSWORD_RESET_CONFLICT', 'The account changed during reset. Ask an administrator for a new reset credential.');
+      }
+      throw error;
+    }
+    return { user: toSafeUserDto(updated) };
   }
 
   async authenticate(token) {

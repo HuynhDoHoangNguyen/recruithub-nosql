@@ -26,10 +26,11 @@ function LoginDestination() {
   return <output data-testid="login-destination">{location.state?.from || ''}</output>;
 }
 
-function renderDetail({ role = null, job = openJob, entry = '/jobs/job%3Acms%3AJ_000001' } = {}) {
+function renderDetail({ role = null, job = openJob, entry = '/jobs/job%3Acms%3AJ_000001', publicJobError, historyApplication } = {}) {
   useAuth.mockReturnValue({ user: role ? { role } : null });
-  getPublicJob.mockResolvedValue(job);
-  applicationApi.mine.mockResolvedValue({ items: [] });
+  if (publicJobError) getPublicJob.mockRejectedValue(publicJobError);
+  else getPublicJob.mockResolvedValue(job);
+  applicationApi.mine.mockResolvedValue({ items: historyApplication ? [historyApplication] : [] });
   return render(<MemoryRouter initialEntries={[entry]}><Routes>
     <Route path="/jobs/:id" element={<JobDetails />} />
     <Route path="/login" element={<LoginDestination />} />
@@ -68,6 +69,16 @@ describe('Public Job Detail', () => {
       expect(await screen.findByText('Chỉ tài khoản ứng viên mới có thể nộp hồ sơ.')).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Nộp hồ sơ ứng tuyển' })).toBeNull();
     }
+  });
+
+  it('loads a CLOSED Job from the signed-in Candidate application history only', async () => {
+    const closedJob = { ...openJob, status: 'CLOSED', application_available: false };
+    const historyApplication = { _id: 'application:pair:history', job_id: closedJob._id, job: closedJob, current_stage: 'REJECTED' };
+    renderDetail({ role: 'CANDIDATE', job: null, publicJobError: Object.assign(new Error(), { status: 404 }), historyApplication });
+    expect(await screen.findByRole('heading', { name: closedJob.title })).toBeTruthy();
+    expect(screen.getByText(/đã đóng tin/i)).toBeTruthy();
+    expect(applicationApi.mine).toHaveBeenCalledWith({ job_id: closedJob._id, limit: 20 });
+    expect(screen.queryByRole('button', { name: 'Ná»™p há»“ sÆ¡ á»©ng tuyá»ƒn' })).toBeNull();
   });
 
   it('shows unavailable state for missing Job and retry for network errors', async () => {

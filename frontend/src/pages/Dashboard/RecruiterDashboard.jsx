@@ -12,12 +12,14 @@ import AccountHeader from '../../components/AccountHeader';
 import { formatDate, jobStatusLabels, recruiterJobUrl } from '../../features/applications/applicationPresentation';
 import { Button, ErrorMessage, Pagination, Resource } from '../../features/applications/components/ApplicationUI';
 import { useApiResource, useBookmarkPage } from '../../features/applications/useApiResource';
+import JobImportExportModal from '../../features/jobs/components/JobImportExportModal';
 
 export default function RecruiterDashboard() {
   const [reopenJob, setReopenJob] = useState(null);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [showImportExport, setShowImportExport] = useState(false);
   const pager = useBookmarkPage();
   const { bookmark } = pager;
   const resource = useApiResource(useCallback(() => jobApi.list({ ...(status ? { status } : {}), bookmark, limit: 5 }), [status, bookmark]));
@@ -32,7 +34,7 @@ export default function RecruiterDashboard() {
   }
   const values = stats.data;
   return <main className="rh-surface-page rh-recruiter-dashboard max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-slate-50 min-h-screen relative space-y-6">
-    <AccountHeader id="organization" title="Quản lý tuyển dụng" organization={organization.data} action={<Link to="/recruiter/jobs/create" className="btn-primary inline-flex items-center"><Plus className="w-4 h-4 mr-2" />Tạo tin tuyển dụng</Link>} />
+    <AccountHeader id="organization" title="Quản lý tuyển dụng" organization={organization.data} action={<div className="flex flex-wrap gap-2"><button type="button" onClick={() => setShowImportExport(true)} className="inline-flex items-center rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50">Nhập / xuất</button><Link to="/recruiter/jobs/create" className="btn-primary inline-flex items-center"><Plus className="w-4 h-4 mr-2" />Tạo tin tuyển dụng</Link></div>} />
     <ErrorMessage error={organization.error} retry={organization.reload} />
     <Resource resource={stats}><div className="grid grid-cols-2 lg:grid-cols-4 gap-6">{[
       ['Tin đang tuyển', values?.jobs.OPEN || 0, BriefcaseBusiness], ['Tổng hồ sơ', values?.total_applications || 0, Users],
@@ -59,5 +61,6 @@ export default function RecruiterDashboard() {
       </article>)}</div>
     </Resource><Pagination pager={pager} data={resource.data} loading={resource.loading || busy} pageSize={5} itemCount={resource.data?.items.length || 0} />
     {reopenJob && <ReopenJobModal job={reopenJob} onClose={() => setReopenJob(null)} onChanged={() => Promise.all([resource.reload(), stats.reload()])} />}
+    {showImportExport && <JobImportExportModal onClose={() => setShowImportExport(false)} onImported={() => { pager.reset(); return Promise.all([resource.reload(), stats.reload()]); }} />}
   </main>;
 }

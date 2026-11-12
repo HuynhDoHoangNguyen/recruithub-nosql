@@ -27,6 +27,10 @@ export const jobApi = {
   status: (id, status, expected_rev, deadline) => unwrap(client.patch(`/v1/jobs/${idPath(id)}/status`, { status, expected_rev, ...(deadline ? { deadline } : {}) })),
   publicList: (params, { signal } = {}) => unwrap(client.get('/v1/jobs', { params, signal })),
   publicDetail: id => unwrap(client.get(`/v1/jobs/${idPath(id)}`)),
+  importPreview: payload => unwrap(client.post('/v1/recruiter/jobs/import/preview', payload)),
+  importConfirm: payload => unwrap(client.post('/v1/recruiter/jobs/import/confirm', payload)),
+  importTemplate: format => client.get('/v1/recruiter/jobs/import/template', { params: { format }, responseType: 'blob' }),
+  exportJobs: params => client.get('/v1/recruiter/jobs/export', { params, responseType: 'blob' }),
 };
 export const recruiterProfileApi = {
   get: () => unwrap(client.get('/v1/recruiter/profile')),

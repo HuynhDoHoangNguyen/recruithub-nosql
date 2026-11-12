@@ -7,6 +7,9 @@ import { AdminUserService } from '../services/admin-user.service.js';
 import { errorResponse, successResponse } from '../utils/api-response.js';
 import { sendApiError } from '../utils/send-api-error.js';
 import { createOrganizationDirectoryRepositories } from '../services/organization-lookup.service.js';
+import { createCouchDbClient } from '../services/couchdb.client.js';
+import { getDatabaseConfig } from '../config/database.config.js';
+import { AdminStatisticsRepository } from '../repositories/admin-statistics.repository.js';
 
 const statusBodySchema = z.object({ account_status: z.enum(['ACTIVE', 'LOCKED']) }).strict();
 const idSchema = z.string().regex(/^user:[a-f0-9]{64}$/);
@@ -15,11 +18,13 @@ function createDefaultServices() {
   const repositories = createAuthRepositories();
   const organizations = createOrganizationDirectoryRepositories();
   const { users, candidates } = repositories;
+  const jobsClient = createCouchDbClient({ config: getDatabaseConfig() });
   return {
     auth: new AuthService({ userRepository: users, candidateRepository: candidates,
       companyRepository: organizations.companies, departmentRepository: organizations.departments,
       recruiterRepository: repositories.recruiters, jwtSecret: process.env.JWT_ACCESS_SECRET }),
     admin: new AdminUserService({ userRepository: users, candidateRepository: candidates }),
+    statistics: new AdminStatisticsRepository({ usersClient: repositories.client, jobsClient }),
   };
 }
 
@@ -58,9 +63,19 @@ export function createAdminUserRouter({ servicesFactory = createDefaultServices 
     } catch (error) { return sendApiError(res, error); }
   });
 
+  router.post('/users/:id/password-reset', async (req, res) => {
+    try {
+      if (!idSchema.safeParse(req.params.id).success) return res.status(400).json(errorResponse('VALIDATION_ERROR', 'User ID is invalid.', null));
+      const revision = (req.get('if-match') ?? '').replace(/^"|"$/g, '');
+      const result = await getServices().admin.issuePasswordReset(req.params.id, revision);
+      if (result.revision) res.set('ETag', `"${result.revision}"`);
+      return res.json(successResponse({ user: result.user, temporaryPassword: result.temporaryPassword, expiresAt: result.expiresAt }, 'One-time reset credential issued.'));
+    } catch (error) { return sendApiError(res, error); }
+  });
+
   router.get('/stats', async (_req, res) => {
     try {
-      const stats = await getServices().admin.getStatistics();
+      const stats = await getServices().statistics.getStatistics();
       return res.json(successResponse(stats, 'Account statistics loaded.'));
     } catch (error) { return sendApiError(res, error); }
   });
