@@ -133,29 +133,45 @@ function createValidJobFixture(overrides = {}) {
 }
 
 test('Zod Schemas - Task D Acceptance Tests', async (t) => {
-  await t.test('8. Candidate and Job schemas reject duplicate normalized skills', () => {
-    // Duplicate in Candidate skills
+  await t.test('8. Candidate and Job schemas enforce canonical skill consistency and uniqueness', () => {
+    // Alias-equivalent duplicate in Candidate skills
     const candidateDuplicate = createValidCandidateFixture({
       skills: [
-        { name: 'Python', normalized: 'python' },
-        { name: 'Python 3', normalized: 'python' },
+        { name: 'NodeJS', normalized: 'node.js' },
+        { name: 'node.js', normalized: 'node.js' },
       ],
     });
     const candResult = candidateDocumentSchema.safeParse(candidateDuplicate);
     assert.equal(candResult.success, false);
-    assert.match(candResult.error.issues[0].message, /Duplicate normalized skill detected/);
+    assert.match(candResult.error.issues[0].message, /Duplicate normalized skill detected \(canonical collision\)/);
 
-    // Duplicate in Job required_skills
+    // Supplied normalized value must match the canonical value derived from name
+    const candidateMismatch = createValidCandidateFixture({
+      skills: [{ name: 'Python', normalized: 'java' }],
+    });
+    const mismatchResult = candidateDocumentSchema.safeParse(candidateMismatch);
+    assert.equal(mismatchResult.success, false);
+    assert.match(mismatchResult.error.issues[0].message, /must equal canonical value "python"/);
+
+    const candidateDistinct = createValidCandidateFixture({
+      skills: [
+        { name: 'NodeJS', normalized: 'node.js' },
+        { name: 'Python', normalized: 'python' },
+      ],
+    });
+    assert.equal(candidateDocumentSchema.safeParse(candidateDistinct).success, true);
+
+    // Alias-equivalent duplicate in Job required_skills
     const jobDuplicateReq = createValidJobFixture({
-      required_skills: ['python', 'python'],
+      required_skills: ['React', 'reactjs'],
     });
     const jobReqResult = jobDocumentSchema.safeParse(jobDuplicateReq);
     assert.equal(jobReqResult.success, false);
     assert.match(jobReqResult.error.issues[0].message, /Duplicate skill in required_skills/);
 
-    // Duplicate in Job optional_skills
+    // Alias-equivalent duplicate in Job optional_skills
     const jobDuplicateOpt = createValidJobFixture({
-      optional_skills: ['redis', 'redis'],
+      optional_skills: ['Node', 'nodejs'],
     });
     const jobOptResult = jobDocumentSchema.safeParse(jobDuplicateOpt);
     assert.equal(jobOptResult.success, false);
@@ -164,12 +180,50 @@ test('Zod Schemas - Task D Acceptance Tests', async (t) => {
 
   await t.test('9. Job schema rejects overlap between required_skills and optional_skills', () => {
     const jobOverlap = createValidJobFixture({
-      required_skills: ['node.js', 'docker', 'couchdb'],
-      optional_skills: ['docker', 'redis'], // 'docker' overlaps with required_skills
+      required_skills: ['NodeJS', 'docker', 'couchdb'],
+      optional_skills: ['node.js', 'redis'], // alias-equivalent overlap
     });
     const result = jobDocumentSchema.safeParse(jobOverlap);
     assert.equal(result.success, false);
     assert.match(result.error.issues[0].message, /cannot be present in both required_skills and optional_skills/);
+
+    const validDistinctJob = createValidJobFixture({
+      required_skills: ['NodeJS', 'docker'],
+      optional_skills: ['reactjs', 'redis'],
+    });
+    assert.equal(jobDocumentSchema.safeParse(validDistinctJob).success, true);
+  });
+
+  await t.test('TV3-UC19-007: Job project technologies enforce canonical uniqueness without mutating input', () => {
+    for (const technologies of [['React', 'reactjs'], ['NodeJS', 'node.js']]) {
+      const job = createValidJobFixture({
+        requirements: {
+          general: ['General requirement.'],
+          experience: { status: REQUIREMENT_STATUSES.EXPERIENCE.NO_MINIMUM },
+          education: { status: REQUIREMENT_STATUSES.EDUCATION.NO_MINIMUM },
+          project: { status: REQUIREMENT_STATUSES.PROJECT.REQUIRED, required_technologies: technologies },
+        },
+      });
+      const original = structuredClone(job);
+      const result = jobDocumentSchema.safeParse(job);
+
+      assert.equal(result.success, false);
+      const duplicateIssue = result.error.issues.find(issue => issue.message.includes('Duplicate technology'));
+      assert.deepEqual(duplicateIssue?.path, ['requirements', 'project', 'required_technologies', 1]);
+      assert.deepEqual(job, original);
+    }
+
+    const distinctJob = createValidJobFixture({
+      requirements: {
+        general: ['General requirement.'],
+        experience: { status: REQUIREMENT_STATUSES.EXPERIENCE.NO_MINIMUM },
+        education: { status: REQUIREMENT_STATUSES.EDUCATION.NO_MINIMUM },
+        project: { status: REQUIREMENT_STATUSES.PROJECT.REQUIRED, required_technologies: ['React', 'Python'] },
+      },
+    });
+    const originalDistinctJob = structuredClone(distinctJob);
+    assert.equal(jobDocumentSchema.safeParse(distinctJob).success, true);
+    assert.deepEqual(distinctJob, originalDistinctJob);
   });
 
   await t.test('10. Candidate partial profile is valid with partial education and summary bullets', () => {

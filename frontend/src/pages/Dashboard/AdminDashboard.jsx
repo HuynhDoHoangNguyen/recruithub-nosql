@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useInRouterContext, useSearchParams } from 'react-router-dom';
 import { FaUsers, FaUserTie, FaUserCheck, FaUserLock, FaSearch, FaFilter, FaEye, FaSyncAlt, FaChevronLeft, FaChevronRight, FaTimes, FaShieldAlt, FaBriefcase } from 'react-icons/fa';
 import api from '../../services/api';
+import AdminLogViewer from '../../features/admin/AdminLogViewer';
 
 const statCards = [
   { key: 'totalUsers', label: 'Tổng người dùng', icon: FaUsers, tone: 'blue' },
@@ -140,12 +141,17 @@ function UserActionSelect({ user, onView, onStatusChange, onPasswordReset, disab
   );
 }
 
-const AdminDashboard = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+const emptySearchParams = new URLSearchParams();
+const ignoreSearchParams = () => {};
+
+const AdminOverviewContent = ({ searchParams = emptySearchParams, setSearchParams = ignoreSearchParams }) => {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [totalCount, setTotalCount] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [etag, setEtag] = useState('');
+  const [detailNotice, setDetailNotice] = useState('');
+  const detailGeneration = useRef(0);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [role, setRole] = useState(searchParams.get('role') || '');
@@ -163,7 +169,7 @@ const AdminDashboard = () => {
   const [pendingStatusChange, setPendingStatusChange] = useState(null);
   const [pendingPasswordReset, setPendingPasswordReset] = useState(null);
   const [issuedResetCredential, setIssuedResetCredential] = useState(null);
-  const [resetCredentialCopied, setResetCredentialCopied] = useState(false);
+  const [working, setWorking] = useState(false);
 
   const load = useCallback(async (next = null) => {
     setLoading(true);
@@ -213,12 +219,26 @@ const AdminDashboard = () => {
     load();
   }, [load]);
 
+  const closeUser = () => {
+    detailGeneration.current++;
+    setSelectedUser(null);
+    setEtag('');
+    setDetailNotice('');
+  };
+
   const viewUser = async (id) => {
+    const generation = ++detailGeneration.current;
+    setSelectedUser(null);
+    setEtag('');
+    setDetailNotice('');
     setError('');
     try {
       const response = await api.get(`/v1/admin/users/${encodeURIComponent(id)}`);
+      if (generation !== detailGeneration.current) return;
       setSelectedUser(response.data?.data?.user);
+      setEtag(response.headers?.etag || response.headers?.ETag || '');
     } catch (requestError) {
+      if (generation !== detailGeneration.current) return;
       setError(requestError.response?.data?.error?.message || 'Không tải được chi tiết tài khoản.');
     }
   };
@@ -311,7 +331,6 @@ const AdminDashboard = () => {
       setSelectedUser((current) => current?.id === user.id ? result.user : current);
       setPendingPasswordReset(null);
       setIssuedResetCredential({ email: result.user.email, temporaryPassword: result.temporaryPassword, expiresAt: result.expiresAt });
-      setResetCredentialCopied(false);
       await load(cursor);
     } catch (requestError) {
       const conflict = requestError.response?.status === 409 || requestError.response?.data?.error?.code === 'REVISION_CONFLICT';
@@ -324,13 +343,57 @@ const AdminDashboard = () => {
     }
   };
 
+  const changeStatus = async () => {
+    if (!selectedUser || !etag) return;
+    const generation = detailGeneration.current;
+    const id = selectedUser.id;
+    const userPath = `/v1/admin/users/${encodeURIComponent(id)}`;
+    const nextStatus = selectedUser.account_status === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
+    const action = nextStatus === 'LOCKED' ? 'khóa' : 'mở khóa';
+    if (!window.confirm(`Bạn có chắc muốn ${action} tài khoản ${selectedUser.email}?`)) return;
+    setWorking(true);
+    setError('');
+    setDetailNotice('');
+    try {
+      await api.patch(`${userPath}/status`, { account_status: nextStatus }, { headers: { 'If-Match': etag } });
+      if (generation === detailGeneration.current) closeUser();
+      await load(cursor);
+    } catch (requestError) {
+      if (generation !== detailGeneration.current) return;
+      const error = requestError.response?.data?.error;
+      if (requestError.response?.status !== 409 || error?.code !== 'REVISION_CONFLICT') {
+        setDetailNotice(error?.message || 'Không thể thay đổi trạng thái tài khoản.');
+        return;
+      }
+      setEtag('');
+      try {
+        const response = await api.get(userPath);
+        if (generation !== detailGeneration.current) return;
+        const user = response.data?.data?.user;
+        const revision = response.headers.etag;
+        if (user?.id !== id || !revision) {
+          setDetailNotice('Không tải lại được tài khoản. Hãy đóng chi tiết và mở lại để tiếp tục.');
+          return;
+        }
+        setSelectedUser(user);
+        setEtag(revision);
+        setDetailNotice('Tài khoản đã được cập nhật. Hãy kiểm tra trạng thái mới và xác nhận lại nếu cần.');
+      } catch {
+        if (generation === detailGeneration.current) {
+          setDetailNotice('Không tải lại được tài khoản. Hãy đóng chi tiết và mở lại để tiếp tục.');
+        }
+      }
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const resetFilters = () => { setSearch(''); setRole(''); setStatus(''); };
   const totalPages = totalCount === null ? null : Math.ceil(totalCount / 20);
   const currentPage = users.length ? cursorHistory.length + 1 : totalCount === 0 ? 0 : cursorHistory.length + 1;
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] border-t-4 border-blue-600 bg-white px-4 py-8 text-left sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div className="space-y-6">
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"><FaShieldAlt aria-hidden="true" />Khu vực quản trị</div>
@@ -389,7 +452,7 @@ const AdminDashboard = () => {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1060px] table-fixed text-left text-sm"><colgroup><col style={{ width: "40%" }} /><col style={{ width: "14%" }} /><col style={{ width: "19%" }} /><col style={{ width: "11%" }} /><col style={{ width: "200px" }} /></colgroup>
                 <thead className="bg-blue-50/80 text-xs uppercase tracking-wide text-blue-800"><tr><th className="px-5 py-4 font-semibold">Tài khoản</th><th className="px-5 py-4 font-semibold">Vai trò</th><th className="px-5 py-4 font-semibold">Trạng thái</th><th className="px-5 py-4 font-semibold">Ngày tạo</th><th className="px-5 py-4 text-right font-semibold">Thao tác</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{users.map((item) => <tr key={item.id} className="transition hover:bg-blue-50/40"><td className="px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold uppercase text-blue-700">{(item.email || '?').charAt(0)}</span><div className="min-w-0"><p className="truncate font-semibold text-slate-800">{item.email}</p><p className="mt-0.5 truncate text-xs text-slate-400">{item.id}</p></div></div></td><td className="px-5 py-4"><RoleBadge role={item.role} /></td><td className="px-5 py-4"><StatusBadge status={item.account_status} /></td><td className="whitespace-nowrap px-5 py-4 text-slate-500">{item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '—'}</td><td className="px-5 py-4"><div className="flex justify-end"><UserActionSelect user={item} onView={viewUser} onStatusChange={beginStatusChange} onPasswordReset={beginPasswordReset} disabled={Boolean(statusUpdatingId)} /></div></td></tr>)}</tbody>
+                <tbody className="divide-y divide-slate-100">{users.map((item) => <tr key={item.id} className="transition hover:bg-blue-50/40"><td className="px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold uppercase text-blue-700">{(item.email || '?').charAt(0)}</span><div className="min-w-0"><p className="truncate font-semibold text-slate-800">{item.email}</p><p className="mt-0.5 truncate text-xs text-slate-400">{item.id}</p></div></div></td><td className="px-5 py-4"><RoleBadge role={item.role} /></td><td className="px-5 py-4"><StatusBadge status={item.account_status} /></td><td className="whitespace-nowrap px-5 py-4 text-slate-500">{item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '—'}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-semibold text-blue-700 transition hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-100" type="button" onClick={() => viewUser(item.id)}><FaEye aria-hidden="true" />Chi tiết</button><UserActionSelect user={item} onView={viewUser} onStatusChange={beginStatusChange} onPasswordReset={beginPasswordReset} disabled={Boolean(statusUpdatingId)} /></div></td></tr>)}</tbody>
               </table>
             </div>
           )}
@@ -399,17 +462,15 @@ const AdminDashboard = () => {
             <nav className="flex items-center gap-2" aria-label="Phân trang danh sách người dùng"><button className="btn-secondary !rounded-lg !px-3 !py-2" type="button" aria-label="Trang trước" disabled={!cursorHistory.length || loading} onClick={() => { const previous = cursorHistory.at(-1) ?? null; setCursorHistory((history) => history.slice(0, -1)); load(previous); }}><FaChevronLeft aria-hidden="true" /></button><span className="min-w-20 text-center text-sm font-semibold text-slate-700" aria-current="page">{currentPage} / {totalPages ?? '…'}</span><button className="btn-secondary !rounded-lg !px-3 !py-2" type="button" aria-label="Trang tiếp" disabled={!nextCursor || loading} onClick={() => { setCursorHistory((history) => [...history, cursor]); load(nextCursor); }}><FaChevronRight aria-hidden="true" /></button></nav>
           </footer>
         </section>
-      </div>
-
-      {selectedUser && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setSelectedUser(null)}>
+      {selectedUser && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeUser()}>
         <section role="dialog" aria-modal="true" aria-labelledby="admin-user-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-white/50 bg-white p-6 shadow-2xl sm:p-8">
-          <header className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Thông tin tài khoản</p><h2 id="admin-user-title" className="mt-2 break-all text-xl font-bold text-slate-900">{selectedUser.email}</h2><p className="mt-1 text-sm text-slate-500">Chi tiết người dùng trong hệ thống</p></div><button className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" type="button" aria-label="Đóng chi tiết" onClick={() => setSelectedUser(null)}><FaTimes aria-hidden="true" /></button></header>
+          <header className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Thông tin tài khoản</p><h2 id="admin-user-title" className="mt-2 break-all text-xl font-bold text-slate-900">{selectedUser.email}</h2><p className="mt-1 text-sm text-slate-500">Chi tiết người dùng trong hệ thống</p></div><button className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" type="button" aria-label="Đóng chi tiết" onClick={closeUser}><FaTimes aria-hidden="true" /></button></header>
           <div className="mt-6 grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vai trò</p><div className="mt-2"><RoleBadge role={selectedUser.role} /></div></div><div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</p><div className="mt-2"><StatusBadge status={selectedUser.account_status} /></div></div><div className="rounded-xl bg-slate-50 p-4 sm:col-span-2"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ngày tạo</p><p className="mt-2 font-medium text-slate-800">{selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleString('vi-VN') : '—'}</p></div></div>
-          {["CANDIDATE", "RECRUITER"].includes(selectedUser.role) && selectedUser.account_status === "RESET_REQUIRED" && <button className="mt-5 btn-primary" type="button" disabled={Boolean(statusUpdatingId)} onClick={() => beginPasswordReset(selectedUser)}>Reset mật khẩu</button>}
+          {detailNotice && <p role="alert" className="mt-4 text-sm text-slate-700">{detailNotice}</p>}
           {selectedUser.role === 'ADMIN' && <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-900"><FaShieldAlt className="mr-2 inline" aria-hidden="true" />Trạng thái và khôi phục tài khoản Admin do operator quản lý ngoài MVP.</div>}
-
-
-          <footer className="mt-7 flex flex-col-reverse justify-end gap-2 border-t border-slate-100 pt-5 sm:flex-row"><button className="btn-secondary" type="button" onClick={() => setSelectedUser(null)}>Đóng</button><UserActionSelect user={selectedUser} onView={viewUser} onStatusChange={beginStatusChange} onPasswordReset={beginPasswordReset} disabled={Boolean(statusUpdatingId)} /></footer>
+          {["CANDIDATE", "RECRUITER"].includes(selectedUser.role) && selectedUser.account_status === 'RESET_REQUIRED' && <button className="mt-5 btn-primary" type="button" disabled={Boolean(statusUpdatingId)} onClick={() => beginPasswordReset(selectedUser)}>Reset mật khẩu</button>}
+          {["CANDIDATE", "RECRUITER"].includes(selectedUser.role) && ['ACTIVE', 'LOCKED'].includes(selectedUser.account_status) && <button className="btn-primary mt-6" type="button" disabled={working || !etag} onClick={changeStatus}>{working ? 'Đang cập nhật…' : selectedUser.account_status === 'LOCKED' ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}</button>}
+          <footer className="mt-7 flex flex-col-reverse justify-end gap-2 border-t border-slate-100 pt-5 sm:flex-row"><button className="btn-secondary" type="button" onClick={closeUser}>Đóng</button><UserActionSelect user={selectedUser} onView={viewUser} onStatusChange={beginStatusChange} onPasswordReset={beginPasswordReset} disabled={Boolean(statusUpdatingId) || working} /></footer>
         </section>
       </div>}
       {pendingStatusChange && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" role="presentation">
@@ -446,8 +507,35 @@ const AdminDashboard = () => {
           </footer>
         </section>
       </div>}
-    </main>
+    </div>
   );
+};
+
+const RoutedAdminOverview = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  return <AdminOverviewContent searchParams={searchParams} setSearchParams={setSearchParams} />;
+};
+
+const AdminOverview = () => useInRouterContext()
+  ? <RoutedAdminOverview />
+  : <AdminOverviewContent />;
+
+const tabs = [
+  ['overview', 'Tổng quan'],
+  ['audit_trail', 'Vết kiểm toán'],
+  ['system_log', 'Nhật ký hệ thống'],
+];
+
+const AdminDashboard = () => {
+  const [activeTab, setActiveTab] = useState('overview');
+  return <main className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-8 text-left sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-6">
+      <nav aria-label="Khu vực quản trị" role="tablist" className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        {tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeTab === value} className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${activeTab === value ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`} onClick={() => setActiveTab(value)}>{label}</button>)}
+      </nav>
+      {activeTab === 'overview' ? <AdminOverview /> : <AdminLogViewer key={activeTab} kind={activeTab} />}
+    </div>
+  </main>;
 };
 
 export default AdminDashboard;

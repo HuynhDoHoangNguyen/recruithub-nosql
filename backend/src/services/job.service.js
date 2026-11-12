@@ -6,6 +6,8 @@ import { ApiError } from '../middleware/job-application.middleware.js';
 import { descendingSort, ownedJob, parseStored, publicJobDto, recruiterScope, requireDocument, runtimeProvenance } from './job-application-scope.service.js';
 import { normalizeSkill } from '../utils/normalization.utils.js';
 import { companyLogoUrl } from '../schemas/upload.schema.js';
+import { appendJobApplicationAudit, withoutAuditOutbox } from './job-application-audit.service.js';
+import { reportDependencyWriteFailure } from './system-event.service.js';
 
 const publicFilterKey = query => createHash('sha256').update(JSON.stringify({
   q: query.q.toLocaleLowerCase(), industry: query.industry.toLocaleLowerCase(), seniority: query.seniority || '', skills: query.skills, location: query.location || '', work_mode: query.work_mode || '',
@@ -51,7 +53,11 @@ export function validateWrite(schema, value, { allowLegacyUnavailable = false } 
 }
 
 export class JobService {
-  constructor(repository, now = () => new Date()) { this.repo = repository; this.now = now; }
+  constructor(repository, now = () => new Date(), { systemEvents } = {}) {
+    this.repo = repository;
+    this.now = now;
+    this.systemEvents = systemEvents;
+  }
   async context(user) {
     const recruiter = await recruiterScope(this.repo, user);
     const company = await requireDocument(this.repo, recruiter.company_id, 'company');
@@ -65,7 +71,10 @@ export class JobService {
       throw new ApiError(400, 'INVALID_DEADLINE', 'Hạn nộp hồ sơ phải sau thời điểm hiện tại.', [{ field: 'deadline', message: 'Chọn hạn nộp trong tương lai.' }]);
     }
   }
-  async create(user, payload, { documentId } = {}) {
+  async create(user, payload, options = {}) {
+    const { documentId, correlationId } = typeof options === 'string'
+      ? { correlationId: options }
+      : options;
     const recruiter = await recruiterScope(this.repo, user);
     const timestamp = this.now().toISOString();
     const document = { ...payload, _id: documentId || `job:${randomUUID()}`, type: 'job',
@@ -74,7 +83,13 @@ export class JobService {
       provenance: runtimeProvenance(Object.keys(payload)),
     };
     this.checkOpen(document);
-    return this.repo.put(validateWrite(jobDocumentSchema, document));
+    try { return withoutAuditOutbox(await this.repo.put(validateWrite(jobDocumentSchema, document))); }
+    catch (error) {
+      await reportDependencyWriteFailure(this.systemEvents, error, {
+        actor: user, component: 'job', correlationId,
+      });
+      throw error;
+    }
   }
   async list(user, query) {
     const recruiter = await recruiterScope(this.repo, user);
@@ -82,12 +97,12 @@ export class JobService {
     const page = await this.repo.find({ type: 'job', recruiter_id: recruiter._id, deleted_at: { $exists: false }, ...(query.status ? { status: query.status } : {}) },
       { ...query, index: query.status ? 'recruiter_jobs_status' : 'recruiter_jobs', sort: descendingSort(fields) });
     const company = await requireDocument(this.repo, recruiter.company_id, 'company');
-    return { ...page, items: page.items.map(job => ({ ...job, location_label: JOB_LOCATIONS.find(option => option.value === job.location)?.label,
+    return { ...page, items: page.items.map(job => ({ ...withoutAuditOutbox(job), location_label: JOB_LOCATIONS.find(option => option.value === job.location)?.label,
       work_mode_label: WORK_MODES.find(option => option.value === job.work_mode)?.label, company_name: company.name, company_logo_url: companyLogoUrl(company) })) };
   }
-  async detail(user, id) { return (await ownedJob(this.repo, user, id)).job; }
+  async detail(user, id) { return withoutAuditOutbox((await ownedJob(this.repo, user, id)).job); }
   async stats(user) { return this.repo.stats((await recruiterScope(this.repo, user))._id); }
-  async update(user, id, payload, statusOnly = false) {
+  async update(user, id, payload, statusOnly = false, correlationId) {
     const { job } = await ownedJob(this.repo, user, id);
     if (job.deleted_at) throw new ApiError(409, 'JOB_DELETED', 'Tin đã xóa không thể sửa hoặc mở lại.');
     if (job._rev !== payload.expected_rev) throw new ApiError(409, 'CONFLICT', 'Tin tuyển dụng đã thay đổi. Vui lòng tải lại.');
@@ -104,24 +119,41 @@ export class JobService {
         field_origins: { ...job.provenance.field_origins, ...runtimeProvenance(Object.keys(changes)).field_origins } },
     };
     this.checkOpen(document);
+    const audited = appendJobApplicationAudit(document, user, correlationId, {
+      field: 'status', from: job.status, to: document.status, operation: 'STATUS_UPDATE',
+    });
     try {
-      return await this.repo.put(validateWrite(jobDocumentSchema, document, {
+      const saved = await this.repo.put(validateWrite(jobDocumentSchema, audited, {
         allowLegacyUnavailable: job.provenance?.classification === 'unavailable',
       }), { allowLegacyUnavailable: job.provenance?.classification === 'unavailable' });
+      return withoutAuditOutbox(saved);
     }
     catch (error) {
       if (error.status === 409) await ownedJob(this.repo, user, id);
+      else await reportDependencyWriteFailure(this.systemEvents, error, {
+        actor: user, component: 'job', correlationId,
+      });
       throw error;
     }
   }
-  async remove(user, id, payload) {
+  async remove(user, id, payload, correlationId) {
     const { job } = await ownedJob(this.repo, user, id);
     if (job.deleted_at) return { _id: id, _rev: job._rev, deleted: true };
     if (job._rev !== payload.expected_rev) throw new ApiError(409, 'CONFLICT', 'Tin đã thay đổi. Vui lòng tải lại trước khi xóa.');
     const timestamp = new Date(Math.max(this.now().getTime(), Date.parse(job.updated_at) + 1)).toISOString();
     const options = { allowLegacyUnavailable: job.provenance?.classification === 'unavailable' };
-    const document = validateWrite(jobDocumentSchema, { ...job, status: 'CLOSED', deleted_at: timestamp, updated_at: timestamp }, options);
-    const saved = await this.repo.put(document, options);
+    const audited = appendJobApplicationAudit({ ...job, status: 'CLOSED', deleted_at: timestamp, updated_at: timestamp }, user, correlationId, {
+      field: 'status', from: job.status, to: 'CLOSED', operation: 'SOFT_DELETE',
+    });
+    const document = validateWrite(jobDocumentSchema, audited, options);
+    let saved;
+    try { saved = await this.repo.put(document, options); }
+    catch (error) {
+      await reportDependencyWriteFailure(this.systemEvents, error, {
+        actor: user, component: 'job', correlationId,
+      });
+      throw error;
+    }
     return { _id: saved._id, _rev: saved._rev, deleted: true };
   }
   async publicList(query) {

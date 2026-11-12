@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { AdminUserService } from '../../src/services/admin-user.service.js';
 
 const userId = `user:${'a'.repeat(64)}`;
 function user(overrides = {}) {
   return { _id: userId, _rev: '1-rev', type: 'user', email: 'admin@example.invalid', email_normalized: 'admin@example.invalid', role: 'ADMIN', account_status: 'ACTIVE', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', password_hash: 'secret-hash-never-return', ...overrides };
 }
-function makeService({ users = [user()], candidates = [{ _id: 'candidate:1', type: 'candidate' }] } = {}) {
+function makeService({ users = [user()], candidates = [{ _id: 'candidate:1', type: 'candidate' }], systemEvents } = {}) {
   const repo = {
     users, scans: [],
     async listByIdPrefix({ afterId, limit }) {
@@ -20,7 +21,7 @@ function makeService({ users = [user()], candidates = [{ _id: 'candidate:1', typ
     async update(document, revision) { const index = this.users.findIndex((item) => item._id === document._id); if (this.users[index]._rev !== revision) throw Object.assign(new Error('conflict'), { code: 'CONFLICT' }); this.users[index] = { ...document, _rev: '2-rev' }; return { rev: '2-rev' }; },
   };
   const candidateRepo = { async listByIdPrefix({ afterId, limit }) { const all = candidates.filter((item) => item.type === 'candidate').sort((a, b) => a._id.localeCompare(b._id)); const offset = afterId ? all.findIndex((item) => item._id === afterId) + 1 : 0; const docs = all.slice(offset, offset + limit); return { docs, lastId: docs.at(-1)?._id ?? afterId ?? null, hasMore: offset + docs.length < all.length }; } };
-  return { service: new AdminUserService({ userRepository: repo, candidateRepository: candidateRepo }), repo };
+  return { service: new AdminUserService({ userRepository: repo, candidateRepository: candidateRepo, systemEvents }), repo };
 }
 
 test('Admin user listing applies owned filters, paging, and safe DTO projection', async () => {
@@ -104,9 +105,38 @@ test('Admin status changes keep ETag preconditions and update eligible accounts 
   const accounts = makeService({ users: [user({ role: 'CANDIDATE', account_status: 'ACTIVE' }), user({ _id: `user:${'b'.repeat(64)}`, role: 'RECRUITER', account_status: 'ACTIVE' })] });
   await assert.rejects(() => accounts.service.setAccountStatus(userId, 'LOCKED', undefined), { code: 'PRECONDITION_REQUIRED' });
   await assert.rejects(() => accounts.service.setAccountStatus(userId, 'LOCKED', 'stale-rev'), { code: 'REVISION_CONFLICT' });
-  const result = await accounts.service.setAccountStatus(`user:${'b'.repeat(64)}`, 'LOCKED', '1-rev');
+  const target = `user:${'b'.repeat(64)}`;
+  const context = { actor: { sub: userId, role: 'ADMIN' }, correlationId: randomUUID() };
+  const result = await accounts.service.setAccountStatus(target, 'LOCKED', '1-rev', context);
   assert.equal(result.user.account_status, 'LOCKED');
   assert.equal(result.revision, '2-rev');
+  assert.equal(result.user.audit_outbox, undefined);
+  const locked = accounts.repo.users[1].audit_outbox[0];
+  assert.equal(locked.event.correlation_id, context.correlationId);
+  assert.deepEqual(locked.event.actor, { type: 'USER', id: userId, role: 'ADMIN' });
+  assert.deepEqual(locked.event.subject, { type: 'USER', id: target });
+  await accounts.service.setAccountStatus(target, 'LOCKED', '2-rev', context);
+  assert.equal(accounts.repo.users[1].audit_outbox.length, 1);
+  await accounts.service.setAccountStatus(target, 'ACTIVE', '2-rev', context);
+  assert.deepEqual(accounts.repo.users[1].audit_outbox.map(entry => entry.event.change.to), ['LOCKED', 'ACTIVE']);
+  accounts.repo.users[1].audit_outbox = Array.from({ length: 32 }, () => locked);
+  await assert.rejects(() => accounts.service.setAccountStatus(target, 'LOCKED', '2-rev', context), { code: 'AUDIT_BACKLOG_FULL', status: 503 });
+  assert.equal(accounts.repo.users[1].account_status, 'ACTIVE');
+});
+
+test('Admin status write outage reports a dependency event and preserves the original storage error', async () => {
+  const calls = [];
+  const target = `user:${'b'.repeat(64)}`;
+  const accounts = makeService({
+    users: [user({ role: 'ADMIN' }), user({ _id: target, role: 'CANDIDATE', account_status: 'ACTIVE' })],
+    systemEvents: { async dependencyWriteFailed(context) { calls.push(structuredClone(context)); } },
+  });
+  const storageError = Object.assign(new Error('private CouchDB detail'), { code: 'NETWORK_ERROR', status: 503 });
+  accounts.repo.update = async () => { throw storageError; };
+  const context = { actor: { sub: userId, role: 'ADMIN' }, correlationId: randomUUID() };
+  await assert.rejects(() => accounts.service.setAccountStatus(target, 'LOCKED', '1-rev', context), error => error === storageError);
+  assert.deepEqual(calls, [{ actor: context.actor, component: 'admin-user', correlationId: context.correlationId }]);
+  assert.equal(accounts.repo.users[1].account_status, 'ACTIVE');
 });
 
 test('UC24 permits only ACTIVE to LOCKED and LOCKED to ACTIVE, with no automatic retry', async () => {

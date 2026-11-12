@@ -13,6 +13,7 @@ import {
   DOCUMENT_TYPES,
 } from '../constants/document.constants.js';
 import {
+  availabilityStateSchema,
   isoDateTimeSchema,
   provenanceSchema,
 } from './common.schema.js';
@@ -53,6 +54,28 @@ export const missingInputItemSchema = z
   })
   .strict();
 
+const componentInputContextSchema = z
+  .object({
+    candidate_availability: availabilityStateSchema.nullable(),
+    candidate_provenance: provenanceSchema.nullable(),
+    job_provenance: provenanceSchema.nullable(),
+  })
+  .strict();
+
+const projectEvidenceContextSchema = z
+  .object({
+    technologies: z.array(z.string().trim().min(1)),
+    is_synthetic: z.boolean().nullable(),
+    provenance: provenanceSchema.nullable(),
+  })
+  .strict();
+
+const projectInputContextSchema = componentInputContextSchema
+  .extend({
+    candidate_project_evidence: z.array(projectEvidenceContextSchema),
+  })
+  .strict();
+
 /**
  * Component score details bounded schema
  */
@@ -66,6 +89,7 @@ export const componentDetailsSchema = z
         matched_skills: z.array(z.string().trim().min(1)),
         missing_skills: z.array(z.string().trim().min(1)),
         unrounded_score: z.number().min(0).max(100).nullable(),
+        input_context: componentInputContextSchema.optional(),
       })
       .strict(),
     experience: z
@@ -75,6 +99,7 @@ export const componentDetailsSchema = z
         required_months: z.number().int().positive().nullable(),
         requirement_status: z.string().trim().min(1),
         unrounded_score: z.number().min(0).max(100).nullable(),
+        input_context: componentInputContextSchema.optional(),
       })
       .strict(),
     education: z
@@ -86,6 +111,7 @@ export const componentDetailsSchema = z
         minimum_rank: z.number().int().positive().nullable(),
         requirement_status: z.string().trim().min(1),
         unrounded_score: z.number().min(0).max(100).nullable(),
+        input_context: componentInputContextSchema.optional(),
       })
       .strict(),
     project: z
@@ -97,10 +123,32 @@ export const componentDetailsSchema = z
         missing_technologies: z.array(z.string().trim().min(1)),
         requirement_status: z.string().trim().min(1),
         unrounded_score: z.number().min(0).max(100).nullable(),
+        input_context: projectInputContextSchema.optional(),
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((details, ctx) => {
+    const componentNames = ['skill', 'experience', 'education', 'project'];
+    const contextCount = componentNames.reduce(
+      (count, component) => count + (details[component].input_context === undefined ? 0 : 1),
+      0,
+    );
+
+    // Stored legacy analyses may omit all four contexts. Any metadata-bearing
+    // analysis must carry the complete set so consumers never see a partial view.
+    if (contextCount !== 0 && contextCount !== componentNames.length) {
+      for (const component of componentNames) {
+        if (details[component].input_context === undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Component input_context must be present for all four components or omitted for all legacy components',
+            path: [component, 'input_context'],
+          });
+        }
+      }
+    }
+  });
 
 /**
  * Resume Analysis Business Document Schema

@@ -2418,9 +2418,11 @@ Company/Department lookup đọc từ `COUCHDB_DATABASE`; User/Recruiter ghi và
 
 TV1/TV2 cần thống nhất cách Job/Application đọc Company/Department từ directory database hoặc chọn cấu hình database tích hợp phù hợp. Không copy/ghi tổ chức vào `recruitment_db` để né khác biệt. Feature flags mặc định vẫn `false`; lượt E2E dùng cờ bật theo process riêng.
 
-### Báo cáo gốc và files chính
+### File chính và tài liệu phối hợp
 
-Báo cáo đầy đủ: [RP-TV1-auth-recruiter-registration-login-ui.md](#auth-recruiter-full-report). Files UI chính: `frontend/src/components/auth/AuthLayout.jsx`, `frontend/src/pages/Login.jsx`, `frontend/src/pages/Register.jsx`, `frontend/src/components/auth/RecruiterRegistrationFields.jsx`, `frontend/src/utils/recruiterRegistration.js` và hai test file Auth liên quan.
+Báo cáo đầy đủ đã được gộp tại [phụ lục Auth & Recruiter Registration](#auth-recruiter-full-report). UI và payload nằm ở `frontend/src/components/auth/AuthLayout.jsx`, `frontend/src/pages/Login.jsx`, `frontend/src/pages/Register.jsx`, `frontend/src/components/auth/RecruiterRegistrationFields.jsx` và `frontend/src/utils/recruiterRegistration.js`. Các ca kiểm thử nằm ở `frontend/tests/auth/auth-ui.test.jsx` và `frontend/tests/auth/recruiter-registration-preview.test.jsx`.
+
+Xem [hợp đồng scope Recruiter TV1–TV2](../../shared/TV1_TV2_RECRUITER_SCOPE_CONTRACT_DRAFT.md) và [kiểm thử Recruiter local](../TV2/RP-TV2-consolidated.md#local-recruiter).
 
 ---
 

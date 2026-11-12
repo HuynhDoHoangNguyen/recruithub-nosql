@@ -206,10 +206,11 @@ export function validateInterviewCreationScope({ interview, application, job, re
     if (!isAuthorized) {
       errors.push(`Interviewer "${interview.interviewer_id}" does not match assigned recruiter ("${recruiter._id}")`);
     }
+  }
 
+  // 4. Attempt integrity: always enforced, independent of optional recruiter arg
   if ((interview.application_attempt || 1) !== (application.attempt_number || 1)) {
     errors.push('Interview must belong to the current application attempt.');
-  }
   }
 
   return {

@@ -1,4 +1,5 @@
 import { applicationDocumentSchema } from '../schemas/application.schema.js';
+import { appendJobApplicationAudit } from './job-application-audit.service.js';
 import { candidateDocumentSchema } from '../schemas/candidate.schema.js';
 import { interviewDocumentSchema } from '../schemas/interview.schema.js';
 import { ApiError } from '../middleware/job-application.middleware.js';
@@ -8,8 +9,10 @@ import { validateInterviewEvidenceForOffer, validateInterviewTimeline } from '..
 import { acceptanceSchema } from '../schemas/job-application-request.schema.js';
 import { candidateDto, candidateScope, descendingSort, ownedJob, parseStored, publicJobDto, requireDocument, runtimeProvenance, validateJobReferences } from './job-application-scope.service.js';
 import { validateWrite } from './job.service.js';
+import { ResumeScoringService } from './scoring/resume-scoring.service.js';
 import { resolveOwnedAsset } from './upload.service.js';
 import { companyLogoUrl } from '../schemas/upload.schema.js';
+import { reportDependencyWriteFailure } from './system-event.service.js';
 
 const archiveAttempt = application => ({
   attempt_number: application.attempt_number || 1,
@@ -20,8 +23,19 @@ const submissionIntent = submission => JSON.stringify({ resume_text: submission?
   resume_file_id: submission?.resume_file_id || submission?.resume_file?.asset_id });
 
 export class ApplicationService {
-  constructor(repository, { now = () => new Date(), analyzeApplication, assets = repository } = {}) {
-    this.repo = repository; this.now = now; this.analyzeApplication = analyzeApplication; this.assets = assets;
+  constructor(repository, { now = () => new Date(), analyzeApplication, assets = repository, scoringService, getAnalysisSummary, systemEvents } = {}) {
+    this.repo = repository;
+    this.now = typeof now === 'function' ? now : () => (now ? new Date(now()) : new Date());
+    this.analyzeApplication = analyzeApplication;
+    this.assets = assets;
+    this.scoringService = scoringService;
+    this.systemEvents = systemEvents;
+    this.getAnalysisSummary = getAnalysisSummary || (scoringService ? scoringService.getAnalysisSummary : undefined);
+    if (!this.getAnalysisSummary && repository) {
+      const defaultScoring = this.scoringService || new ResumeScoringService(repository, { now: this.now });
+      this.getAnalysisSummary = defaultScoring.getAnalysisSummary;
+      if (!this.analyzeApplication) this.analyzeApplication = defaultScoring.analyzeApplication;
+    }
   }
   async context(user) {
     return { candidate: candidateDto(await candidateScope(this.repo, user)), email: user.email };
@@ -30,7 +44,7 @@ export class ApplicationService {
     const candidate = await candidateScope(this.repo, user);
     return this.repo.candidateStats(candidate._id);
   }
-  async create(user, payload) {
+  async create(user, payload, correlationId) {
     const candidate = await candidateScope(this.repo, user);
     const id = applicationIdFromPair(candidate._id, payload.job_id);
     const existingValue = await this.repo.get(id);
@@ -53,15 +67,19 @@ export class ApplicationService {
     if (!check.valid) throw new ApiError(400, 'JOB_NOT_ELIGIBLE', 'Tin chưa mở, đã đóng hoặc đã quá hạn nộp hồ sơ.');
     const { resume_file_id, ...submission } = payload.submission;
     if (resume_file_id) submission.resume_file = await resolveOwnedAsset(this.assets, resume_file_id, user._id, 'resume');
-    const document = validateWrite(applicationDocumentSchema, {
+    const draft = {
       _id: id, type: 'application', candidate_id: candidate._id, job_id: job._id,
       current_stage: 'APPLIED', applied_at: appliedAt, updated_at: appliedAt, submission,
       stage_history: [{ from_stage: null, to_stage: 'APPLIED', timestamp: appliedAt, actor_role: 'CANDIDATE', actor_id: user._id }],
       provenance: runtimeProvenance(['submission']),
       ...(payload.request_id ? { request_id: payload.request_id } : {}),
       ...(existing ? { _rev: existing._rev, attempt_number: (existing.attempt_number || 1) + 1,
-        previous_attempts: [...(existing.previous_attempts || []), archiveAttempt(existing)] } : {}),
-    });
+        previous_attempts: [...(existing.previous_attempts || []), archiveAttempt(existing)],
+        audit_outbox: existing.audit_outbox } : {}),
+    };
+    const document = validateWrite(applicationDocumentSchema, existing
+      ? appendJobApplicationAudit(draft, user, correlationId, { field: 'current_stage', from: existing.current_stage, to: 'APPLIED' })
+      : draft);
     const response = await this.dto(document, 'CANDIDATE');
     let saved;
     try { saved = await this.repo.put(document); }
@@ -71,14 +89,35 @@ export class ApplicationService {
         if (payload.request_id && winner?.request_id === payload.request_id && submissionIntent(winner.submission) === submissionIntent(payload.submission)) return this.dto(parseStored(applicationDocumentSchema, winner), 'CANDIDATE');
         throw new ApiError(409, 'DUPLICATE_APPLICATION', 'Hồ sơ đã được cập nhật bởi một yêu cầu khác. Vui lòng tải lại.');
       }
+      await reportDependencyWriteFailure(this.systemEvents, error, {
+        actor: user, component: 'application', correlationId,
+      });
       throw error;
     }
     let analysisStatus = 'NOT_ANALYZED';
+    let analysisFresh = false;
     if (this.analyzeApplication) {
-      try { await this.analyzeApplication(saved._id, { attempt_number: document.attempt_number || 1, submission: document.submission }); analysisStatus = 'REQUESTED'; }
-      catch { analysisStatus = 'PENDING_RETRY'; }
+      try {
+        await this.analyzeApplication(saved._id, { attempt_number: document.attempt_number || 1, submission: document.submission });
+        if (this.getAnalysisSummary) {
+          const summary = await this.getAnalysisSummary(saved._id);
+          if (summary.analysis_status === 'COMPLETE' || summary.analysis_status === 'INCOMPLETE') {
+            analysisStatus = summary.analysis_status;
+            analysisFresh = summary.analysis_fresh;
+          } else {
+            analysisStatus = 'REQUESTED';
+            analysisFresh = false;
+          }
+        } else {
+          analysisStatus = 'REQUESTED';
+          analysisFresh = false;
+        }
+      } catch {
+        analysisStatus = 'PENDING_RETRY';
+        analysisFresh = false;
+      }
     }
-    return { ...response, _rev: saved._rev, analysis_status: analysisStatus };
+    return { ...response, _rev: saved._rev, analysis_status: analysisStatus, analysis_fresh: analysisFresh };
   }
   async authorize(user, id) {
     const application = parseStored(applicationDocumentSchema, await requireDocument(this.repo, id, 'application'));
@@ -134,7 +173,6 @@ export class ApplicationService {
       }),
     }));
     result.allowed_transitions = APPROVED_TRANSITIONS.filter(rule => rule.from === application.current_stage && rule.actors.includes(role)).map(rule => rule.to);
-    result.analysis_status = 'NOT_ANALYZED'; // Scoring service integration is deliberately explicit.
     if (role === 'RECRUITER') {
       const candidate = parseStored(candidateDocumentSchema, await requireDocument(this.repo, application.candidate_id, 'candidate'));
       const user = await requireDocument(this.repo, candidate.user_id, 'user');
@@ -148,6 +186,18 @@ export class ApplicationService {
         result.offer_eligible = valid;
         if (!valid) result.offer_blocker = 'Cần hoàn tất các vòng phỏng vấn hợp lệ của lần ứng tuyển hiện tại trước khi gửi đề nghị.';
       }
+    }
+    if (this.getAnalysisSummary && application._rev) {
+      const summary = await this.getAnalysisSummary(application._id);
+      result.analysis_status = summary.analysis_status;
+      result.analysis_fresh = summary.analysis_fresh;
+      if (role === 'RECRUITER' && summary.analysis_total_score !== undefined) {
+        result.analysis_total_score = summary.analysis_total_score;
+        result.analysis_recommendation = summary.analysis_recommendation;
+      }
+    } else {
+      result.analysis_status = 'NOT_ANALYZED';
+      result.analysis_fresh = false;
     }
     return result;
   }
@@ -164,7 +214,7 @@ export class ApplicationService {
       validateInterviewTimeline({ scheduledAt: interview.scheduled_at, completedAt: interview.completed_at, interviewStageAt: enteredAt }).valid);
     return { interviews, valid };
   }
-  async transition(user, id, payload, withdraw = false) {
+  async transition(user, id, payload, withdraw = false, correlationId) {
     const { application, recruiter } = await this.authorize(user, id);
     if ((withdraw && user.role !== 'CANDIDATE') || (!withdraw && user.role !== 'RECRUITER')) throw new ApiError(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này.');
     if (application._rev !== payload.expected_rev || application.current_stage !== payload.expected_stage) {
@@ -199,7 +249,10 @@ export class ApplicationService {
     };
     const document = { ...application, current_stage: toStage, updated_at: timestamp, stage_history: [...application.stage_history, event] };
     if (!validateStageHistory(document.stage_history, document.applied_at, document.current_stage, timestamp).valid) throw new ApiError(409, 'INVALID_HISTORY', 'Lịch sử hồ sơ không hợp lệ.');
-    const validated = validateWrite(applicationDocumentSchema, document, {
+    const audited = appendJobApplicationAudit(document, user, correlationId, {
+      field: 'current_stage', from: application.current_stage, to: toStage,
+    });
+    const validated = validateWrite(applicationDocumentSchema, audited, {
       allowLegacyUnavailable: application.provenance?.classification === 'unavailable',
     });
     // Resolve response references before committing; a successful write must not
@@ -213,6 +266,9 @@ export class ApplicationService {
     }
     catch (error) {
       if (error.status === 409) await this.authorize(user, id); // Re-read scope; never overwrite the winning history.
+      else await reportDependencyWriteFailure(this.systemEvents, error, {
+        actor: user, component: 'application', correlationId,
+      });
       throw error;
     }
     return { ...response, _rev: saved._rev };

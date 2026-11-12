@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { requestCorrelation } from './middleware/request-correlation.js';
 import healthRoutes from './routes/health.routes.js';
 import { JobApplicationRepository } from './repositories/job-application.repository.js';
 import { JobService } from './services/job.service.js';
@@ -10,6 +11,10 @@ import { createApplicationRoutes } from './routes/application.routes.js';
 import databaseHealthRoutes from './routes/database-health.routes.js';
 import apiV1Routes from './routes/api-v1.routes.js';
 import { getAuthDatabaseConfig } from './config/auth-database.config.js';
+import { ResumeScoringService } from './services/scoring/resume-scoring.service.js';
+import { createScoringRoutes } from './routes/scoring.routes.js';
+import { createInterviewRoutes } from './routes/interview.routes.js';
+import { createInterviewService } from './services/interview.service.js';
 import { getDatabaseConfig } from './config/database.config.js';
 import { PublicJobCatalogService } from './services/public-job-catalog.service.js';
 import { RecruiterProfileService } from './services/recruiter-profile.service.js';
@@ -17,8 +22,10 @@ import { createRecruiterProfileRoutes } from './routes/recruiter-profile.routes.
 import { createAssetRepository } from './repositories/asset.repository.js';
 import { UploadService } from './services/upload.service.js';
 import { createUploadRoutes } from './routes/upload.routes.js';
+import { CandidateRankingService } from './services/scoring/candidate-ranking.service.js';
 import { createRecruiterJobImportExportRoutes } from './routes/recruiter-job-import-export.routes.js';
 import { RecruiterJobImportExportService } from './services/recruiter-job-import-export.service.js';
+import { createConfiguredSystemEventReporter } from './services/system-event.service.js';
 
 function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://127.0.0.1:5178') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
@@ -46,18 +53,24 @@ function createConfiguredRepository(environment, { readOnly = false } = {}) {
   // The public catalog can read the existing dataset without granting any
   // mutation or identity capability on that database.
   const methods = readOnly ? ['get', 'find', 'scanPublicJobs']
-    : ['get', 'put', 'find', 'scanPublicJobs', 'profile', 'allInterviews', 'view', 'stats', 'candidateStats', 'initialize'];
+    : ['get', 'put', 'find', 'scanPublicJobs', 'profile', 'allInterviews', 'view', 'stats', 'candidateStats', 'initialize', 'allApplicationsForJob', 'getMany'];
   return Object.fromEntries(methods
     .map(method => [method, (...args) => getRepository()[method](...args)]));
 }
 
-export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
+export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, ranking: suppliedRanking, systemEvents: suppliedSystemEvents, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
   const app = express();
   const origins = configuredFrontendOrigins(jwtEnv.FRONTEND_URL);
   const repository = suppliedRepository || createConfiguredRepository(jwtEnv);
   const publicRepository = suppliedPublicRepository || suppliedRepository || createConfiguredRepository(jwtEnv, { readOnly: true });
-  const jobs = new JobService(repository, now);
+  const systemEvents = suppliedSystemEvents || createConfiguredSystemEventReporter(jwtEnv, {
+    now: typeof now === 'function' ? now : () => (now ? new Date(now()) : new Date()),
+  });
+  const jobs = new JobService(repository, now, { systemEvents });
   const assets = suppliedAssetRepository || suppliedRepository || createAssetRepository(jwtEnv);
+  const scoringClock = typeof now === 'function' ? now : () => (now ? new Date(now()) : new Date());
+  const scoringService = new ResumeScoringService(repository, { now: scoringClock });
+  const effectiveAnalyzeApplication = analyzeApplication || scoringService.analyzeApplication;
   let liveCatalog = null;
   try { getAuthDatabaseConfig(jwtEnv); liveCatalog = jobs; } catch { /* Public dataset remains available before local Auth setup. */ }
   const dependencies = {
@@ -67,7 +80,17 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
     uploads: new UploadService(assets, repository, now),
     publicJobs: suppliedRepository || suppliedPublicRepository ? new JobService(publicRepository, now)
       : new PublicJobCatalogService({ live: liveCatalog, dataset: new JobService(publicRepository, now) }),
-    applications: new ApplicationService(repository, { now, analyzeApplication, assets }),
+    applications: new ApplicationService(repository, {
+      now,
+      analyzeApplication: effectiveAnalyzeApplication,
+      assets,
+      scoringService,
+      getAnalysisSummary: scoringService.getAnalysisSummary,
+      systemEvents,
+    }),
+    scoring: scoringService,
+    interviews: createInterviewService(repository, { now: scoringClock }),
+    ranking: suppliedRanking || new CandidateRankingService(repository),
   };
   dependencies.jobImportExport = new RecruiterJobImportExportService(jobs, {
     env: jwtEnv,
@@ -75,11 +98,12 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
     now: now || (() => new Date()),
   });
 
+  app.use(requestCorrelation);
   app.use(cors({
     origin: (origin, callback) => callback(null, !origin || origins.includes(origin)),
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'If-Match', 'X-File-Name'],
-    exposedHeaders: ['ETag'],
+    exposedHeaders: ['ETag', 'X-Request-Id'],
   }));
   app.use(express.json({ limit: '512kb' }));
   app.use('/api/health', healthRoutes);
@@ -93,6 +117,8 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
   app.use('/api/v1', createRecruiterProfileRoutes(dependencies));
   app.use('/api/v1', createUploadRoutes(dependencies));
   app.use('/api/v1/applications', createApplicationRoutes(dependencies));
+  app.use('/api/v1/resume-analysis', createScoringRoutes(dependencies));
+  app.use('/api/v1/interviews', createInterviewRoutes(dependencies));
   app.get('/', (req, res) => res.json({ message: 'Welcome to RecruiHub API' }));
   app.use('/api/v1', (req, res, next) => next(new ApiError(404, 'NOT_FOUND', 'Không tìm thấy API.')));
   app.use(jobApplicationErrorHandler);

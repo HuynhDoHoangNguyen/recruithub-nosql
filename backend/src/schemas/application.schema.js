@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { auditOutboxSchema } from './audit-outbox.schema.js';
 import { assetReferenceSchema } from './upload.schema.js';
 import {
   APPLICATION_STAGES,
@@ -119,6 +120,7 @@ export const applicationDocumentSchema = z
     attempt_number: z.number().int().positive().optional(),
     request_id: z.string().uuid().optional(),
     previous_attempts: z.array(previousAttemptSchema).optional(),
+    audit_outbox: auditOutboxSchema.optional(),
     provenance: provenanceSchema,
   })
   .strict()

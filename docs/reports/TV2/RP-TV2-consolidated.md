@@ -259,7 +259,7 @@ Trường **Desired role** là nghề/chức danh mong muốn của Candidate, k
 
 ### 3.2. Recruiter và Admin
 
-Recruiter và Admin không có public registration. Dùng tài khoản synthetic đã được người quản lý môi trường cấp và provision sẵn trong database tích hợp. Không tự nâng role cho Candidate bằng UI, request hoặc sửa document trực tiếp. Nếu môi trường mới chưa có hai loại tài khoản này, cần người quản lý cấp/provision theo schema và quy trình dự án trước khi kiểm thử các màn hình tương ứng.
+Trong cấu hình kiểm thử local này, đăng ký Recruiter công khai tắt và Admin do operator cấp. Dùng tài khoản synthetic đã được cấp trong database tích hợp. Nếu kiểm thử riêng luồng Recruiter tự đăng ký, đối chiếu [cờ tính năng và điều kiện scope](../TV1/RP-TV1-consolidated.md#rp-tv1-auth-recruiter-registration-login-ui).
 
 Thông tin đăng nhập chỉ chia sẻ trực tiếp với người được phép, không ghi vào tài liệu này. Status `RESET_REQUIRED` không đăng nhập được cho tới khi được xử lý theo quy trình operator.
 
@@ -287,7 +287,7 @@ Thực hiện trên database tích hợp riêng và dùng dữ liệu synthetic.
 2. Nộp CV text thực tế của tài khoản synthetic; không nhập dữ liệu cá nhân thật khi không cần thiết.
 3. Kiểm tra Application xuất hiện trong “Đơn ứng tuyển của tôi”, stage ban đầu là `APPLIED`.
 4. Thử Apply lại cùng Candidate–Job; xác nhận bị từ chối như duplicate.
-5. Rút đơn khi stage cho phép; xác nhận lịch sử stage được giữ và không thể nộp lại cùng cặp Candidate–Job.
+5. Rút đơn khi stage cho phép. Nếu Job vẫn đủ điều kiện, nộp lại với yêu cầu và revision mới, rồi kiểm tra lần cũ còn trong lịch sử. Mốc kiểm thử local bên dưới dùng phiên bản cũ hơn quy tắc nộp lại hiện tại.
 6. Job `DRAFT`, `CLOSED` hoặc hết hạn không nhận Apply.
 
 ### 4.3. Recruiter — Job và Application lifecycle
@@ -300,6 +300,40 @@ Thực hiện trên database tích hợp riêng và dùng dữ liệu synthetic.
 6. Chuyển stage theo `allowed_transitions` do API trả về; thử stale revision và transition bị cấm.
 7. Đóng Job; xác nhận Apply mới bị chặn nhưng Application đã có vẫn còn xem/quản lý theo policy.
 8. Nếu có Recruiter thứ hai được cấp, thử mở/sửa Job/Application thuộc Recruiter đầu; yêu cầu bị từ chối và dữ liệu không đổi.
+
+### Kiểm thử local với Identity và CouchDB thật
+
+Mốc kiểm chứng **25/10/2026** dùng frontend cổng **5173** và backend cổng **5000**. Mở `http://localhost:5173/login`. Email và mật khẩu lấy từ `.env` ở root, được Git ignore. Sau reload, đăng nhập lại vì token chỉ nằm trong bộ nhớ. Dữ liệu đã ghi vẫn được đọc lại từ CouchDB.
+
+Môi trường lịch sử dùng `recruithub_auth_local_test` qua `AUTH_COUCHDB_DATABASE`, JWT secret riêng và index/view Job/Application. Recruiter `ACTIVE` được provision với hash Argon2id, có liên kết User → Recruiter → Company/Department. Hai document tổ chức được sao chép vào database test để kiểm tra scope. Đối soát lúc thiết lập và chạy browser ghi nhận `doc_count` và `update_seq` của `recruitment_db` giữ nguyên.
+
+<a id="local-candidate"></a>
+
+**Candidate — nộp CV và đọc lại hồ sơ**
+
+1. Đăng nhập bằng `LOCAL_TEST_CANDIDATE_EMAIL` và `LOCAL_TEST_CANDIDATE_PASSWORD`. Qua **Việc Làm IT**, chọn tin đang nhận hồ sơ của môi trường test. Tin mẫu ở mốc nghiệm thu có tên **Tin để bạn tự thử nộp CV - JavaScript và CouchDB**.
+2. Mở tin, nộp CV văn bản và thư giới thiệu tùy chọn, rồi mở đơn trong **Bảng Điều Khiển**. Reload, đăng nhập lại và kiểm tra CV, stage và lịch sử vẫn đọc được. Candidate bị từ chối khi truy cập chức năng đăng tin Recruiter.
+3. Đăng nhập Recruiter sở hữu Job và đọc đúng CV vừa nộp. Lần kiểm thử đã tạo một đơn mẫu và để lại một Job OPEN khác cho người dùng tự thử. Quy tắc rút rồi nộp lại áp dụng theo checklist hiện hành ở mục 4.2.
+
+Catalog tích hợp ưu tiên Job OPEN từ database ứng dụng để có thể Apply. Job lịch sử từ `recruitment_db` vẫn xem được với nhãn **Tin tham khảo từ bộ dữ liệu**. DTO public dùng `catalog_source` và `application_available` để phân biệt nguồn và quyền nộp. Kiểm thử bao phủ cursor qua hai nguồn, trang cuối, filter mismatch, lỗi database và UI vô hiệu hóa Apply cho tin tham khảo.
+
+Tại mốc Candidate, Foundation + Recruitment đạt **83/83**, frontend đạt **75 Vitest + 7 Node**, lint 0 lỗi và 1 cảnh báo, build đạt với cảnh báo bundle. Full backend có **291 PASS / 22 FAIL** thuộc baseline dataset/ETL. Xem bằng chứng JSON trong Git bằng `git show bf2891c:docs/local-candidate-verification/results.json` và ID/URL tin mẫu tại `docs/local-candidate-verification/fresh-test-job.json` trong cùng commit. Các ảnh được dẫn ở báo cáo cũ không có trong cây Git tại mốc đó.
+
+Công cụ gồm `node scripts/database/provision-local-candidate.mjs` để đăng ký thật hoặc xác minh tài khoản đã tồn tại, và `node scripts/ui/verify-local-candidate.cjs` để chạy browser thật. Lệnh browser phát sinh đơn kiểm thử.
+
+<a id="local-recruiter"></a>
+
+**Recruiter — tạo nháp, sửa, đăng và đọc lại**
+
+1. Đăng nhập bằng `LOCAL_TEST_RECRUITER_EMAIL` và `LOCAL_TEST_RECRUITER_PASSWORD`. Có thể mở thẳng `/recruiter/jobs/create` để kiểm tra chuyển sang Login rồi quay lại form.
+2. Kiểm tra context Company/Department. Nhập tiêu đề, ngành nghề, mô tả và kỹ năng. Tạo DRAFT, sửa, rồi đăng OPEN với hạn nộp tương lai.
+3. Reload và đăng nhập lại. Kiểm tra Dashboard đọc đúng tin đã sửa, chỉ hiển thị tin thuộc scope tài khoản, và nút **Đăng Tin Tuyển Dụng** mở đúng form.
+
+Browser Chrome đã chạy qua Identity thật. Login, `/auth/me`, context, danh sách và stats trả **200**. Luồng nháp → sửa → OPEN → đọc lại đạt, không có browser runtime error. Tin mẫu được giữ trong database test. Lượt này chưa nghiệm thu Interview. Xem JSON bằng `git show bf2891c:docs/local-recruiter-verification/results.json`.
+
+Công cụ gồm `node scripts/database/provision-local-recruiter.mjs` cho database local riêng và `node scripts/ui/verify-local-recruiter.cjs` để chạy browser thật. Provision kiểm tra tài khoản đã có và yêu cầu operator xử lý nếu cấu hình lệch. Browser tạo một tin test mỗi lần chạy. Có thể đăng nhập lại hằng ngày bằng tài khoản đã provision.
+
+Bản gốc của hai hướng dẫn đọc được ở `bf2891c`, theo đường dẫn `docs/reports/TV2/local-candidate-testing.md` và `docs/reports/TV2/local-recruiter-testing.md`.
 
 ### 4.4. Admin và phân quyền
 
