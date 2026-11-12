@@ -1,0 +1,32 @@
+{
+  "fixture": "production build + real AuthService/JWT + isolated CouchDB/API",
+  "checks": [
+    "Guest route guard redirects to real login screen",
+    "No horizontal overflow at 375",
+    "No horizontal overflow at 768",
+    "No horizontal overflow at 1440",
+    "Authenticated Admin downloaded signed archive",
+    "Confirmation dialog fits mobile viewport",
+    "Dialog traps backward Tab focus",
+    "Escape closes confirmation dialog",
+    "Real restore result rendered after authenticated API flow",
+    "Success has no horizontal overflow at 375",
+    "Success has no horizontal overflow at 768",
+    "Success has no horizontal overflow at 1440",
+    "Reload requires real login and restores tracked job",
+    "Session storage has neither token nor archive content",
+    "No uncaught page errors"
+  ],
+  "screenshots": [
+    "empty-375.png",
+    "empty-768.png",
+    "empty-1440.png",
+    "confirm-375.png",
+    "success-375.png",
+    "success-768.png",
+    "success-1440.png"
+  ],
+  "errors": [],
+  "status": "PASS",
+  "target": "recruithub_restore_browser_mwdj38n4"
+}

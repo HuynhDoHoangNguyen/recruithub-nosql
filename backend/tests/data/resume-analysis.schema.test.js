@@ -167,6 +167,37 @@ function createValidIncompleteAnalysisFixture(overrides = {}) {
   };
 }
 
+function withCompleteInputContexts(analysis) {
+  const contextual = structuredClone(analysis);
+  const candidateProvenance = {
+    classification: 'mixed',
+    field_origins: { skills: 'source' },
+  };
+  const jobProvenance = {
+    classification: 'mixed',
+    generator_seed: 'schema-test-seed',
+    generator_version: 'schema-test-v1',
+  };
+
+  for (const details of Object.values(contextual.component_details)) {
+    details.input_context = {
+      candidate_availability: 'AVAILABLE',
+      candidate_provenance: candidateProvenance,
+      job_provenance: jobProvenance,
+    };
+  }
+  contextual.component_details.project.input_context.candidate_project_evidence = [{
+    technologies: ['node.js'],
+    is_synthetic: true,
+    provenance: {
+      classification: 'synthetic',
+      generator_seed: 'project-test-seed',
+      generator_version: 'project-test-v1',
+    },
+  }];
+  return contextual;
+}
+
 test('DATA-03.4A: Resume Analysis Schema Acceptance Tests', async (t) => {
   await t.test('1. Valid COMPLETE analysis passes schema validation', () => {
     const fixture = createValidCompleteAnalysisFixture();
@@ -282,5 +313,37 @@ test('DATA-03.4A: Resume Analysis Schema Acceptance Tests', async (t) => {
       input_fingerprint: 'not-a-64-hex-digest',
     });
     assert.equal(resumeAnalysisDocumentSchema.safeParse(badFp).success, false);
+  });
+
+  await t.test('13. New analysis with all four input contexts passes validation', () => {
+    const contextual = withCompleteInputContexts(createValidCompleteAnalysisFixture());
+    assert.equal(resumeAnalysisDocumentSchema.safeParse(contextual).success, true);
+  });
+
+  await t.test('14. Partial component metadata is rejected while all-context legacy omission remains valid', () => {
+    const contextual = withCompleteInputContexts(createValidCompleteAnalysisFixture());
+    delete contextual.component_details.education.input_context;
+
+    const partialResult = resumeAnalysisDocumentSchema.safeParse(contextual);
+    assert.equal(partialResult.success, false);
+    assert.match(
+      partialResult.error.issues[0].message,
+      /must be present for all four components or omitted for all legacy components/,
+    );
+
+    assert.equal(
+      resumeAnalysisDocumentSchema.safeParse(createValidCompleteAnalysisFixture()).success,
+      true,
+    );
+  });
+
+  await t.test('15. Input context rejects invalid availability and unapproved fields', () => {
+    const invalidAvailability = withCompleteInputContexts(createValidCompleteAnalysisFixture());
+    invalidAvailability.component_details.skill.input_context.candidate_availability = 'UNKNOWN';
+    assert.equal(resumeAnalysisDocumentSchema.safeParse(invalidAvailability).success, false);
+
+    const extraMetadata = withCompleteInputContexts(createValidCompleteAnalysisFixture());
+    extraMetadata.component_details.experience.input_context.inferred_source = 'synthetic';
+    assert.equal(resumeAnalysisDocumentSchema.safeParse(extraMetadata).success, false);
   });
 });

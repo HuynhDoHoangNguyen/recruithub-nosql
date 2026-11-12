@@ -281,8 +281,8 @@ and TV3 Interview/scoring integration. Full backend acceptance is not complete.
 | [recruitment-it-template-handoff.md](recruitment-it-template-handoff.md) | Đúng phiên bản tham khảo IT, navigation/context/stats và ma trận bảy UC giai đoạn trước Identity |
 | [merge-dev-review-2026-10-25.md](merge-dev-review-2026-10-25.md) | Quyết định giữ/ghép UI, Auth/Public Search và giới hạn database sau merge |
 | [public-jobs-after-merge-fix.md](public-jobs-after-merge-fix.md) | Sửa nguồn đọc public bị buộc dùng private database, không coi lỗi cấu hình là mất dữ liệu |
-| [local-recruiter-testing.md](local-recruiter-testing.md) | Provision tài khoản local, scope tổ chức và kiểm chứng tạo/sửa/đăng tin thật |
-| [local-candidate-testing.md](local-candidate-testing.md) | Candidate thật, catalog hai nguồn, Apply/readback; quy tắc không nộp lại trong bản này là lịch sử |
+| [Kiểm thử Recruiter local](RP-TV2-consolidated.md#local-recruiter) | Provision tài khoản local, scope tổ chức và kiểm chứng tạo/sửa/đăng tin thật |
+| [Kiểm thử Candidate local](RP-TV2-consolidated.md#local-candidate) | Candidate thật, catalog hai nguồn, nộp CV và đọc lại |
 | [recruihub-catalog-lifecycle-handoff-2026-10-25.md](recruihub-catalog-lifecycle-handoff-2026-10-25.md) | Metadata/filter, attempt/idempotency, reopen, scope Interview theo attempt |
 | [recruiter-ui-enhancements-2026-10-25.md](recruiter-ui-enhancements-2026-10-25.md) | Cấp bậc, loại hợp đồng, lương, soft delete, profile công ty; form URL logo đã được upload thay thế |
 | [file-upload-handoff-2026-10-25.md](file-upload-handoff-2026-10-25.md) | Attachment bất biến, validation, quyền đọc, avatar/logo/CV và giới hạn lưu trữ |

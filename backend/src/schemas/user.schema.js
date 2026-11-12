@@ -10,6 +10,7 @@
  */
 
 import { z } from 'zod';
+import { userAuditOutboxSchema } from './audit-outbox.schema.js';
 import {
   DOCUMENT_TYPES,
   ID_PREFIXES,
@@ -61,9 +62,13 @@ export const userDocumentSchema = z
     created_at: isoDateTimeSchema,
     updated_at: isoDateTimeSchema,
     provenance: provenanceSchema.optional(),
+    audit_outbox: userAuditOutboxSchema.optional(),
   })
   .strict()
   .superRefine((user, ctx) => {
+    if (user.audit_outbox?.some(({ event }) => event.subject.id !== user._id)) {
+      ctx.addIssue({ code: 'custom', path: ['audit_outbox'], message: 'Audit subject must match the User document.' });
+    }
     // 1. Validate email_normalized against normalizeEmail(user.email)
     let computedNormalized;
     try {

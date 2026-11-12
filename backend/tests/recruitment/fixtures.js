@@ -54,6 +54,56 @@ export class MemoryRepository {
     const offset = afterId ? jobs.findIndex(job => job._id === afterId) + 1 : 0;
     return structuredClone(jobs.slice(offset, offset + limit));
   }
+  async allApplicationsForJob(jobId, { pageSize = 100 } = {}) {
+    const items = [];
+    const seenIds = new Set();
+    let bookmark;
+    while (true) {
+      const page = await this.find(
+        { type: 'application', job_id: jobId },
+        { limit: pageSize, bookmark, index: 'job_applications' }
+      );
+      if (!page || !Array.isArray(page.items)) {
+        throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'Không thể đọc danh sách hồ sơ ứng tuyển.');
+      }
+      let newCount = 0;
+      for (const item of page.items) {
+        if (item && typeof item._id === 'string' && !seenIds.has(item._id)) {
+          seenIds.add(item._id);
+          items.push(item);
+          newCount++;
+        }
+      }
+      if (page.has_more) {
+        const nextBookmark = page.bookmark;
+        const isStalledBookmark = typeof nextBookmark !== 'string' || !nextBookmark || nextBookmark === bookmark;
+        const isStalledPage = page.items.length === 0 || newCount === 0;
+        if (isStalledBookmark || isStalledPage) {
+          throw new ApiError(
+            503,
+            'PAGINATION_CURSOR_UNAVAILABLE',
+            'CouchDB pagination bookmark không tiến triển hoặc trùng lặp dữ liệu.'
+          );
+        }
+        bookmark = nextBookmark;
+      } else {
+        break;
+      }
+    }
+    return items;
+  }
+  async getMany(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return new Map();
+    const uniqueIds = Array.from(new Set(ids.filter(id => typeof id === 'string' && id.length > 0)));
+    const map = new Map();
+    for (const id of uniqueIds) {
+      const doc = this.docs.get(id);
+      if (doc) {
+        map.set(id, structuredClone(doc));
+      }
+    }
+    return map;
+  }
   async allInterviews(id) { return structuredClone([...this.docs.values()].filter(doc => doc.type === 'interview' && doc.application_id === id)); }
   async candidateStats(id) {
     const apps = [...this.docs.values()].filter(doc => doc.type === 'application' && doc.candidate_id === id);

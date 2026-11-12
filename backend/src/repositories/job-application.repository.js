@@ -92,6 +92,65 @@ export class JobApplicationRepository {
     if (result.items.length !== 1) throw new ApiError(403, 'PROFILE_REQUIRED', 'Hồ sơ tài khoản chưa được thiết lập hợp lệ.');
     return result.items[0];
   }
+  async allApplicationsForJob(jobId, { pageSize = 100 } = {}) {
+    const items = [];
+    const seenIds = new Set();
+    let bookmark;
+    while (true) {
+      const page = await this.find(
+        { type: 'application', job_id: jobId },
+        { limit: pageSize, bookmark, index: 'job_applications' }
+      );
+      if (!page || !Array.isArray(page.items)) {
+        throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'Không thể đọc danh sách hồ sơ ứng tuyển.');
+      }
+      let newCount = 0;
+      for (const item of page.items) {
+        if (item && typeof item._id === 'string' && !seenIds.has(item._id)) {
+          seenIds.add(item._id);
+          items.push(item);
+          newCount++;
+        }
+      }
+      if (page.has_more) {
+        const nextBookmark = page.bookmark;
+        const isStalledBookmark = typeof nextBookmark !== 'string' || !nextBookmark || nextBookmark === bookmark;
+        const isStalledPage = page.items.length === 0 || newCount === 0;
+        if (isStalledBookmark || isStalledPage) {
+          throw new ApiError(
+            503,
+            'PAGINATION_CURSOR_UNAVAILABLE',
+            'CouchDB pagination bookmark không tiến triển hoặc trùng lặp dữ liệu.'
+          );
+        }
+        bookmark = nextBookmark;
+      } else {
+        break;
+      }
+    }
+    return items;
+  }
+  async getMany(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return new Map();
+    const uniqueIds = Array.from(new Set(ids.filter(id => typeof id === 'string' && id.length > 0)));
+    if (uniqueIds.length === 0) return new Map();
+    const requestedSet = new Set(uniqueIds);
+    const map = new Map();
+    const chunkSize = 200;
+    for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+      const chunk = uniqueIds.slice(i, i + chunkSize);
+      const result = await this.http('_all_docs?include_docs=true', 'POST', { keys: chunk });
+      if (!result || !Array.isArray(result.rows)) {
+        throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'Không thể đọc dữ liệu hàng loạt.');
+      }
+      for (const row of result.rows) {
+        if (row?.doc && !row.error && !row.value?.deleted && requestedSet.has(row.doc._id)) {
+          map.set(row.doc._id, row.doc);
+        }
+      }
+    }
+    return map;
+  }
   async allInterviews(applicationId) {
     const items = [];
     let bookmark;

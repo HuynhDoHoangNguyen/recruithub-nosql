@@ -1,10 +1,13 @@
 import argon2 from 'argon2';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 import { DOCUMENT_TYPES, USER_ACCOUNT_STATUSES, USER_ROLES } from '../constants/document.constants.js';
 import { AuthServiceError, PASSWORD_HASH_OPTIONS } from './auth.service.js';
 import { formatPasswordResetHash, PASSWORD_RESET_TTL_MS } from './password-reset.js';
 import { toSafeUserDto } from './user.dto.js';
+import { appendAuditOutbox } from './audit-outbox.service.js';
+import { reportDependencyWriteFailure } from './system-event.service.js';
 
 const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
@@ -23,11 +26,12 @@ function decodeCursor(cursor) {
   catch { throw new AuthServiceError(400, 'INVALID_CURSOR', 'The page cursor is invalid.'); }
 }
 export class AdminUserService {
-  constructor({ userRepository, candidateRepository, now = () => Date.now() }) {
+  constructor({ userRepository, candidateRepository, now = () => Date.now(), systemEvents }) {
     if (!userRepository || !candidateRepository) throw new TypeError('AdminUserService requires User and Candidate repositories.');
     this.users = userRepository;
     this.candidates = candidateRepository;
     this.now = now;
+    this.systemEvents = systemEvents;
   }
 
   async list(input = {}) {
@@ -105,7 +109,7 @@ export class AdminUserService {
     return { user: toSafeUserDto(user), revision: user._rev };
   }
 
-  async setAccountStatus(id, accountStatus, expectedRevision) {
+  async setAccountStatus(id, accountStatus, expectedRevision, { actor, correlationId } = {}) {
     if (![USER_ACCOUNT_STATUSES.ACTIVE, USER_ACCOUNT_STATUSES.LOCKED].includes(accountStatus)) {
       throw new AuthServiceError(400, 'VALIDATION_ERROR', 'Only ACTIVE or LOCKED status can be selected.');
     }
@@ -124,10 +128,22 @@ export class AdminUserService {
     }
     const updated = { ...current, account_status: accountStatus, updated_at: new Date(this.now()).toISOString() };
     try {
-      const result = await this.users.update(updated, expectedRevision);
+      const audited = appendAuditOutbox(updated, {
+        schema_version: 1, kind: 'audit_trail', event_id: randomUUID(),
+        correlation_id: correlationId ?? randomUUID(), occurred_at: updated.updated_at,
+        action: 'USER_ACCOUNT_STATUS_CHANGED', outcome: 'SUCCEEDED',
+        actor: { type: 'USER', id: actor?.sub, role: actor?.role },
+        subject: { type: 'USER', id: current._id },
+        change: { field: 'account_status', from: current.account_status, to: accountStatus },
+      });
+      const result = await this.users.update(audited, expectedRevision);
       return { user: toSafeUserDto(updated), revision: result?.rev ?? expectedRevision };
     } catch (error) {
       if (error?.code === 'CONFLICT') throw new AuthServiceError(409, 'REVISION_CONFLICT', 'The account changed. Reload it and try again.');
+      if (error?.code === 'AUDIT_BACKLOG_FULL') throw new AuthServiceError(503, error.code, error.message);
+      await reportDependencyWriteFailure(this.systemEvents, error, {
+        actor, component: 'admin-user', correlationId,
+      });
       throw error;
     }
   }

@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { assetIdSchema } from './upload.schema.js';
 import { AVAILABILITY_STATES, CANONICAL_DEGREES, SENIORITY_LEVELS } from '../constants/document.constants.js';
-import { employmentItemSchema, experienceSummarySchema, projectItemSchema, skillItemSchema } from './common.schema.js';
+import { employmentItemSchema, experienceSummarySchema, projectItemSchema } from './common.schema.js';
+import { normalizeSkill } from '../utils/normalization.utils.js';
 import { personNameSchema, phoneSchema, profileText } from './profile-validation.schema.js';
 
 const profilePatchSchema = z.object({
@@ -15,12 +16,34 @@ const profilePatchSchema = z.object({
   location: profileText('Địa điểm', 160).optional(),
 }).strict().optional();
 
+const candidateSkillPatchSchema = z.object({
+  name: z.string().trim().min(1, 'Skill name cannot be empty'),
+  normalized: z.string().trim().min(1, 'Normalized skill cannot be empty').optional(),
+}).strict().transform((skill) => ({
+  ...skill,
+  normalized: normalizeSkill(skill.name),
+}));
+
+const candidateSkillListPatchSchema = z.array(candidateSkillPatchSchema).max(100).superRefine((skills, ctx) => {
+  const seen = new Set();
+  skills.forEach((skill, index) => {
+    if (seen.has(skill.normalized)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Duplicate canonical skill detected: "${skill.normalized}"`,
+        path: [index, 'normalized'],
+      });
+    }
+    seen.add(skill.normalized);
+  });
+});
+
 export const candidateProfilePatchSchema = z.object({
   resume_file_id: assetIdSchema.nullable().optional(),
   avatar_asset_id: assetIdSchema.nullable().optional(),
   languages: z.array(z.object({ name: profileText('Ngoại ngữ', 80, 1), proficiency: profileText('Trình độ ngoại ngữ', 120).optional() }).strict()).max(20).optional(),
   profile: profilePatchSchema,
-  skills: z.array(skillItemSchema.extend({ name: profileText('Kỹ năng', 120, 1), normalized: profileText('Kỹ năng chuẩn hóa', 120, 1) })).max(100).optional(),
+  skills: candidateSkillListPatchSchema.optional(),
   education: z.array(z.object({
     degree: z.enum([CANONICAL_DEGREES.HIGH_SCHOOL, CANONICAL_DEGREES.BACHELOR, CANONICAL_DEGREES.MASTER, CANONICAL_DEGREES.DOCTORATE]),
     institution: profileText('Tên trường', 200, 1).optional(),

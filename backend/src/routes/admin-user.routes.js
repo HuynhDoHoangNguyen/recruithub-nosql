@@ -4,12 +4,14 @@ import { createAuthRepositories } from '../config/auth-database.config.js';
 import { createAuthenticate, requireRole } from '../middleware/authenticate.js';
 import { AuthService } from '../services/auth.service.js';
 import { AdminUserService } from '../services/admin-user.service.js';
+import { auditReadUnavailable, createConfiguredAdminAuditService } from '../services/admin-audit.service.js';
 import { errorResponse, successResponse } from '../utils/api-response.js';
 import { sendApiError } from '../utils/send-api-error.js';
 import { createOrganizationDirectoryRepositories } from '../services/organization-lookup.service.js';
 import { createCouchDbClient } from '../services/couchdb.client.js';
 import { getDatabaseConfig } from '../config/database.config.js';
 import { AdminStatisticsRepository } from '../repositories/admin-statistics.repository.js';
+import { createConfiguredSystemEventReporter } from '../services/system-event.service.js';
 
 const statusBodySchema = z.object({ account_status: z.enum(['ACTIVE', 'LOCKED']) }).strict();
 const idSchema = z.string().regex(/^user:[a-f0-9]{64}$/);
@@ -23,17 +25,41 @@ function createDefaultServices() {
     auth: new AuthService({ userRepository: users, candidateRepository: candidates,
       companyRepository: organizations.companies, departmentRepository: organizations.departments,
       recruiterRepository: repositories.recruiters, jwtSecret: process.env.JWT_ACCESS_SECRET }),
-    admin: new AdminUserService({ userRepository: users, candidateRepository: candidates }),
+    admin: new AdminUserService({
+      userRepository: users,
+      candidateRepository: candidates,
+      systemEvents: createConfiguredSystemEventReporter(),
+    }),
     statistics: new AdminStatisticsRepository({ usersClient: repositories.client, jobsClient }),
   };
 }
 
-export function createAdminUserRouter({ servicesFactory = createDefaultServices } = {}) {
+export function createAdminUserRouter({
+  servicesFactory = createDefaultServices,
+  auditServiceFactory = createConfiguredAdminAuditService,
+} = {}) {
   let services;
+  let auditService;
   const getServices = () => (services ??= servicesFactory());
   const router = Router();
+  router.use(['/audit-trails', '/system-logs'], (_req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
   router.use(createAuthenticate({ serviceProvider: () => getServices().auth }));
   router.use(requireRole('ADMIN'));
+
+  const listEvents = kind => async (req, res) => {
+    try {
+      auditService ??= auditServiceFactory();
+      return res.json(successResponse(await auditService.list(kind, req.query), 'Đã tải nhật ký.'));
+    } catch (error) {
+      const failure = error?.status === 400 ? error : auditReadUnavailable();
+      return res.status(failure.status).json(errorResponse(failure.code, failure.message, null));
+    }
+  };
+  router.get('/audit-trails', listEvents('audit_trail'));
+  router.get('/system-logs', listEvents('system_log'));
 
   router.get('/users', async (req, res) => {
     try {
@@ -57,7 +83,9 @@ export function createAdminUserRouter({ servicesFactory = createDefaultServices 
       const parsed = statusBodySchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Account status request is invalid.', null));
       const revision = (req.get('if-match') ?? '').replace(/^"|"$/g, '');
-      const result = await getServices().admin.setAccountStatus(req.params.id, parsed.data.account_status, revision);
+      const result = await getServices().admin.setAccountStatus(req.params.id, parsed.data.account_status, revision, {
+        actor: req.auth, correlationId: req.correlationId,
+      });
       if (result.revision) res.set('ETag', `"${result.revision}"`);
       return res.json(successResponse({ user: result.user }, 'Account status updated.'));
     } catch (error) { return sendApiError(res, error); }
@@ -75,7 +103,9 @@ export function createAdminUserRouter({ servicesFactory = createDefaultServices 
 
   router.get('/stats', async (_req, res) => {
     try {
-      const stats = await getServices().statistics.getStatistics();
+      const currentServices = getServices();
+      const statisticsService = currentServices.statistics ?? currentServices.admin;
+      const stats = await statisticsService.getStatistics();
       return res.json(successResponse(stats, 'Account statistics loaded.'));
     } catch (error) { return sendApiError(res, error); }
   });

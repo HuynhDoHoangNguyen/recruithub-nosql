@@ -4,6 +4,7 @@ import express from 'express';
 import { createCandidateProfileRouter } from '../../src/routes/candidate-profile.routes.js';
 import { createAdminUserRouter } from '../../src/routes/admin-user.routes.js';
 import { AuthServiceError } from '../../src/services/auth.service.js';
+import { requestCorrelation } from '../../src/middleware/request-correlation.js';
 
 async function withServer(app, run) {
   const server = await new Promise((resolve) => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
@@ -33,12 +34,16 @@ test('Candidate profile routes require a verified Candidate principal and use ET
 });
 
 test('Admin user routes reject non-Admin principals and expose no mutation to role fields', async () => {
-  const app = express(); app.use(express.json());
+  const app = express(); app.use(requestCorrelation); app.use(express.json());
+  let mutationContext;
   app.use('/api/v1/admin', createAdminUserRouter({ servicesFactory: () => ({
     auth: { async authenticate(token) { if (token === 'invalid') throw new AuthServiceError(401, 'AUTHENTICATION_FAILED', 'Invalid session.'); return { user: {}, principal: { sub: 'user:sample', role: token === 'admin' ? 'ADMIN' : token === 'recruiter' ? 'RECRUITER' : 'CANDIDATE' } }; } },
     admin: {
-        async list(query) { assert.equal(query.search, 'sample'); assert.equal(query.role, 'CANDIDATE'); return { users: [{ id: 'user:sample', email: 'sample@example.invalid', role: 'CANDIDATE', account_status: 'ACTIVE' }], nextCursor: null }; },
-      async setAccountStatus() { throw new AuthServiceError(403, 'ADMIN_STATUS_CHANGE_FORBIDDEN', 'Admin status is operator-managed.'); },
+      async list(query) { assert.equal(query.search, 'sample'); assert.equal(query.role, 'CANDIDATE'); return { users: [{ id: 'user:sample', email: 'sample@example.invalid', role: 'CANDIDATE', account_status: 'ACTIVE' }], nextCursor: null }; },
+      async setAccountStatus(_id, _status, _revision, context) {
+        mutationContext = context;
+        throw new AuthServiceError(403, 'ADMIN_STATUS_CHANGE_FORBIDDEN', 'Admin status is operator-managed.');
+      },
     },
     statistics: { async getStatistics() { return { source: 'couchdb_mapreduce', totalUsers: 1 }; } },
   }) }));
@@ -72,6 +77,8 @@ test('Admin user routes reject non-Admin principals and expose no mutation to ro
       body: JSON.stringify({ account_status: 'LOCKED' }),
     });
     assert.equal(restricted.status, 403);
+    assert.deepEqual(mutationContext.actor, { sub: 'user:sample', role: 'ADMIN' });
+    assert.equal(mutationContext.correlationId, restricted.headers.get('x-request-id'));
     assert.equal((await restricted.json()).error.code, 'ADMIN_STATUS_CHANGE_FORBIDDEN');
   });
 });

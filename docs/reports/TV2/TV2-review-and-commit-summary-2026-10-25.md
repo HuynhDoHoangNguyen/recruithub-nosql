@@ -157,6 +157,6 @@ Trước khi commit cần bao gồm các file mới/untracked phục vụ tính 
 - [Upload file](file-upload-handoff-2026-10-25.md)
 - [CV preview/hồ sơ/phân trang](cv-profile-pagination-handoff-2026-10-25.md)
 - [Validation và trang chủ](profile-validation-home-handoff-2026-10-25.md)
-- [Tài khoản Candidate local](local-candidate-testing.md), [Recruiter local](local-recruiter-testing.md)
+- [Tài khoản Candidate local](RP-TV2-consolidated.md#local-candidate), [Recruiter local](RP-TV2-consolidated.md#local-recruiter)
 - [JSON CV/preview](../../cv-preview-profile-verification/results.json), [phân trang](../../dashboard-pagination-verification/results.json), [validation/trang chủ](../../profile-rules-home-verification/results.json)
 - [Báo cáo tổng hợp lịch sử](RP-TV2-consolidated.md): giữ để truy vết; các kết luận theo ngày cũ trong đó được thay thế bởi report hiện tại khi đánh giá code ngày 25/10/2026.

@@ -18,9 +18,7 @@
 
 > Bàn giao mới nhất: [RecruiHub — bộ lọc, Job Details, nộp lại, mở lại tin và kiểm chứng thật](docs/reports/TV2/recruihub-catalog-lifecycle-handoff-2026-10-25.md). Xem tài liệu để lấy tài khoản, ảnh và kết quả kiểm thử hiện tại.
 
-> Đã có [tài khoản Candidate local và luồng Apply thật](docs/reports/TV2/local-candidate-testing.md). Tin Recruiter local đã được nối vào danh sách/chi tiết công khai để nộp CV; tin lịch sử có nhãn tham khảo. Candidate → nộp CV → Dashboard → Recruiter đọc CV đã được kiểm chứng với Identity/CouchDB thật.
-
-> Đã chuẩn bị [tài khoản Recruiter local để test đăng tuyển](docs/reports/TV2/local-recruiter-testing.md). Đăng nhập thật và luồng tạo nháp → sửa → đăng OPEN → đăng nhập lại đọc tin đã PASS trên database test riêng. Mật khẩu nằm trong `.env` được Git ignore; các ghi nhận chưa cấu hình Auth ở báo cáo cũ là lịch sử.
+> Hướng dẫn kiểm thử local với Identity và CouchDB thật gồm [Candidate nộp và đọc lại CV](docs/reports/TV2/RP-TV2-consolidated.md#local-candidate) và [Recruiter tạo nháp, sửa và đăng tin](docs/reports/TV2/RP-TV2-consolidated.md#local-recruiter). Thông tin đăng nhập lấy từ `.env` được Git ignore.
 
 > Đã sửa Public Jobs sau merge: [nguyên nhân, bản sửa và dữ liệu live](docs/reports/TV2/public-jobs-after-merge-fix.md). GET public đọc lại recruitment_db, trả đủ 200 OPEN; không cần import. Auth và thao tác private vẫn dùng cấu hình riêng. Các ghi nhận Jobs 503 bên dưới là lịch sử trước bản sửa này.
 

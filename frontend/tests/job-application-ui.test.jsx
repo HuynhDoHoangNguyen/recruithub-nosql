@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { applicationApi, jobApi } from '../src/api/jobApplicationApi';
+import { scoringApi } from '../src/api/scoringApi';
 import ApplyModal from '../src/features/applications/components/ApplyModal';
 import ApplicantDetailModal from '../src/features/applications/components/ApplicantDetailModal';
 import ApplicationTimeline from '../src/features/applications/components/ApplicationTimeline';
@@ -17,6 +18,16 @@ import { removeAccessToken, setAccessToken } from '../src/utils/authHelper';
 vi.mock('../src/api/jobApplicationApi', () => ({
   jobApi: { metadata: vi.fn(), context: vi.fn(), list: vi.fn(), stats: vi.fn(), detail: vi.fn(), create: vi.fn(), edit: vi.fn(), status: vi.fn(), publicList: vi.fn(), publicDetail: vi.fn() },
   applicationApi: { stats: vi.fn(), context: vi.fn(), apply: vi.fn(), mine: vi.fn(), detail: vi.fn(), applicants: vi.fn(), withdraw: vi.fn(), transition: vi.fn() },
+}));
+vi.mock('../src/api/scoringApi', () => ({
+  scoringApi: {
+    getAnalysis: vi.fn(),
+    recompute: vi.fn(),
+  },
+  default: {
+    getAnalysis: vi.fn(),
+    recompute: vi.fn(),
+  },
 }));
 vi.mock('../src/context/useAuth', () => ({ useAuth: () => ({ user: window.__verifiedTestUser || null, loading: false, logout: vi.fn() }) }));
 vi.mock('react-toastify', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -231,4 +242,206 @@ it('historical catalog detail explains why Apply is disabled without submitting 
   expect(button.disabled).toBe(true);
   expect(screen.getByText(/Tin tham khảo từ bộ dữ liệu/)).toBeTruthy();
   expect(applicationApi.apply).not.toHaveBeenCalled();
+});
+
+describe('UC14 Scoring Integration in Applicants Page and Modal', () => {
+  const appComplete = {
+    ...application,
+    _id: 'application:app-1',
+    analysis_status: 'COMPLETE',
+    analysis_fresh: true,
+    analysis_total_score: 91.4,
+    analysis_recommendation: 'HIGH',
+  };
+
+  const appIncomplete = {
+    ...application,
+    _id: 'application:app-2',
+    analysis_status: 'INCOMPLETE',
+    analysis_fresh: true,
+    analysis_total_score: null,
+    analysis_recommendation: null,
+  };
+
+  const appStale = {
+    ...application,
+    _id: 'application:app-3',
+    analysis_status: 'COMPLETE',
+    analysis_fresh: false,
+    analysis_total_score: 85,
+    analysis_recommendation: 'HIGH',
+  };
+
+  const appNotAnalyzed = {
+    ...application,
+    _id: 'application:app-4',
+    analysis_status: 'NOT_ANALYZED',
+    analysis_fresh: false,
+    analysis_total_score: null,
+    analysis_recommendation: null,
+  };
+
+  it('renders "Điểm phù hợp" column with all four badge states and preserves order without sorting', async () => {
+    verifiedUserFor('RECRUITER');
+    setAccessToken('recruiter-token');
+    applicationApi.applicants.mockResolvedValue({
+      job,
+      items: [appComplete, appIncomplete, appStale, appNotAnalyzed],
+      has_more: false,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/recruiter/jobs/job%3Acms%3AJ_000001/applicants']}>
+        <AppRoutes />
+      </MemoryRouter>
+    );
+
+    // Table header
+    expect(await screen.findByText('Điểm phù hợp')).toBeTruthy();
+
+    // Four states rendered
+    expect(screen.getByText('91%')).toBeTruthy();
+    expect(screen.getByText('· Phù hợp cao')).toBeTruthy();
+    expect(screen.getByText('Thiếu dữ liệu')).toBeTruthy();
+    expect(screen.getByText('Cần tính lại')).toBeTruthy();
+    expect(screen.getByText('Chưa phân tích')).toBeTruthy();
+
+    // Does NOT pre-fetch detailed analysis for rows
+    expect(scoringApi.getAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('clicking badge in table opens ScoreBreakdownDrawer and only then calls getAnalysis', async () => {
+    verifiedUserFor('RECRUITER');
+    setAccessToken('recruiter-token');
+    applicationApi.applicants.mockResolvedValue({
+      job,
+      items: [appComplete],
+      has_more: false,
+    });
+
+    scoringApi.getAnalysis.mockResolvedValueOnce({
+      application_id: appComplete._id,
+      analysis_status: 'COMPLETE',
+      analysis_fresh: true,
+      candidate: { full_name: 'Nguyễn Văn A' },
+      job: { title: 'Kỹ sư Backend' },
+      analysis: {
+        total_score: 91.4,
+        recommendation: 'HIGH',
+        scores: { skill: 90, experience: 90, education: 100, project: 85 },
+        matched_skills: ['JavaScript'],
+        missing_skills: [],
+        algorithm_version: 'recruithub-scoring-mvp-v1',
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/recruiter/jobs/job%3Acms%3AJ_000001/applicants']}>
+        <AppRoutes />
+      </MemoryRouter>
+    );
+
+    const badge = await screen.findByRole('button', { name: /Điểm phù hợp: 91%, Phù hợp cao/i });
+    fireEvent.click(badge);
+
+    expect(scoringApi.getAnalysis).toHaveBeenCalledWith(appComplete._id);
+    expect(await screen.findByRole('heading', { name: 'Chi tiết điểm phù hợp' })).toBeTruthy();
+  });
+
+  it('ApplicantDetailModal renders MatchScoreBadge and transitions to drawer without dual dialogs', async () => {
+    verifiedUserFor('RECRUITER');
+    setAccessToken('recruiter-token');
+    applicationApi.applicants.mockResolvedValue({
+      job,
+      items: [appComplete],
+      has_more: false,
+    });
+    applicationApi.detail.mockResolvedValue(appComplete);
+
+    scoringApi.getAnalysis.mockResolvedValue({
+      application_id: appComplete._id,
+      analysis_status: 'COMPLETE',
+      analysis_fresh: true,
+      candidate: { full_name: 'Nguyễn Văn A' },
+      job: { title: 'Kỹ sư Backend' },
+      analysis: {
+        total_score: 91.4,
+        recommendation: 'HIGH',
+        scores: { skill: 90, experience: 90, education: 100, project: 85 },
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/recruiter/jobs/job%3Acms%3AJ_000001/applicants']}>
+        <AppRoutes />
+      </MemoryRouter>
+    );
+
+    // Open detail modal first
+    const reviewBtn = await screen.findByRole('button', { name: 'Xem CV và xử lý' });
+    fireEvent.click(reviewBtn);
+
+    // Verify modal is open and legacy text is replaced
+    expect(await screen.findByRole('heading', { name: 'Chi tiết hồ sơ ứng tuyển' })).toBeTruthy();
+    expect(screen.queryByText(/Chưa tích hợp dịch vụ phân tích/)).toBeNull();
+
+    // Find the badge button inside the modal and click it
+    const modalBadges = screen.getAllByRole('button', { name: /Điểm phù hợp: 91%, Phù hợp cao/i });
+    const badgeInsideModal = modalBadges.at(-1);
+    fireEvent.click(badgeInsideModal);
+
+    // Detail modal should be closed, and Drawer should be open
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Chi tiết hồ sơ ứng tuyển' })).toBeNull();
+      expect(screen.getByRole('heading', { name: 'Chi tiết điểm phù hợp' })).toBeTruthy();
+    });
+  });
+
+  it('recomputing in Drawer refreshes the applicants list table', async () => {
+    verifiedUserFor('RECRUITER');
+    setAccessToken('recruiter-token');
+    applicationApi.applicants.mockResolvedValue({
+      job,
+      items: [appStale],
+      has_more: false,
+    });
+
+    scoringApi.getAnalysis
+      .mockResolvedValueOnce({
+        application_id: appStale._id,
+        analysis_status: 'COMPLETE',
+        analysis_fresh: false,
+        candidate: { full_name: 'Trần Văn B' },
+        job: { title: 'Kỹ sư Backend' },
+        analysis: { total_score: 85, scores: {} },
+      })
+      .mockResolvedValueOnce({
+        application_id: appStale._id,
+        analysis_status: 'COMPLETE',
+        analysis_fresh: true,
+        candidate: { full_name: 'Trần Văn B' },
+        job: { title: 'Kỹ sư Backend' },
+        analysis: { total_score: 90, scores: { skill: 90 } },
+      });
+
+    scoringApi.recompute.mockResolvedValueOnce({ _id: 'analysis:test' });
+
+    render(
+      <MemoryRouter initialEntries={['/recruiter/jobs/job%3Acms%3AJ_000001/applicants']}>
+        <AppRoutes />
+      </MemoryRouter>
+    );
+
+    const staleBadge = await screen.findByRole('button', { name: /Cần tính lại/i });
+    fireEvent.click(staleBadge);
+
+    const recomputeBtn = await screen.findByRole('button', { name: /Tính lại điểm/i });
+    fireEvent.click(recomputeBtn);
+
+    await waitFor(() => {
+      expect(scoringApi.recompute).toHaveBeenCalledWith(appStale._id);
+      // Applicants list reloaded: initial mount + after recompute
+      expect(applicationApi.applicants).toHaveBeenCalledTimes(2);
+    });
+  });
 });
