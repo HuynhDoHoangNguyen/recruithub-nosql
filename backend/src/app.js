@@ -26,6 +26,7 @@ import { CandidateRankingService } from './services/scoring/candidate-ranking.se
 import { createRecruiterJobImportExportRoutes } from './routes/recruiter-job-import-export.routes.js';
 import { RecruiterJobImportExportService } from './services/recruiter-job-import-export.service.js';
 import { createConfiguredSystemEventReporter } from './services/system-event.service.js';
+import { createAdminBackupRouter } from './routes/admin-backup.routes.js';
 
 function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://127.0.0.1:5178') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
@@ -58,7 +59,7 @@ function createConfiguredRepository(environment, { readOnly = false } = {}) {
     .map(method => [method, (...args) => getRepository()[method](...args)]));
 }
 
-export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, ranking: suppliedRanking, systemEvents: suppliedSystemEvents, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
+export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, ranking: suppliedRanking, systemEvents: suppliedSystemEvents, backupService, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
   const app = express();
   const origins = configuredFrontendOrigins(jwtEnv.FRONTEND_URL);
   const repository = suppliedRepository || createConfiguredRepository(jwtEnv);
@@ -110,6 +111,8 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
   app.use('/api/health/database', databaseHealthRoutes);
 
   // Identity routes and Job/Application routes share one v1 namespace and auth contract.
+  app.use('/api/v1/admin', createAdminBackupRouter({ authenticate: dependencies.authenticate,
+    ...(backupService && { serviceProvider: () => backupService }) }));
   app.use('/api/v1', apiV1Routes);
   // Mount static recruiter job endpoints before /jobs/:id routes.
   app.use('/api/v1', createRecruiterJobImportExportRoutes({ authenticate: dependencies.authenticate, service: dependencies.jobImportExport }));

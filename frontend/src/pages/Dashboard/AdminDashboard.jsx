@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useInRouterContext, useSearchParams } from 'react-router-dom';
 import { FaUsers, FaUserTie, FaUserCheck, FaUserLock, FaSearch, FaFilter, FaEye, FaSyncAlt, FaChevronLeft, FaChevronRight, FaTimes, FaShieldAlt, FaBriefcase } from 'react-icons/fa';
 import api from '../../services/api';
 import AdminLogViewer from '../../features/admin/AdminLogViewer';
+import AdminBackupRestore from '../../features/admin/AdminBackupRestore';
+import AuthContext from '../../context/auth-context';
 
 const statCards = [
   { key: 'totalUsers', label: 'Tổng người dùng', icon: FaUsers, tone: 'blue' },
@@ -524,16 +526,42 @@ const tabs = [
   ['overview', 'Tổng quan'],
   ['audit_trail', 'Vết kiểm toán'],
   ['system_log', 'Nhật ký hệ thống'],
+  ['backup_restore', 'Sao lưu & khôi phục'],
 ];
 
 const AdminDashboard = () => {
+  const auth = useContext(AuthContext);
+  return <AdminDashboardTabs key={auth?.user?.id || 'anonymous'} userId={auth?.user?.id} />;
+};
+
+const AdminDashboardTabs = ({ userId }) => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = userId && sessionStorage.getItem(`recruithub:admin-tab:${userId}`);
+      if (tabs.some(([value]) => value === saved)) setActiveTab(saved);
+    } catch { /* storage is optional */ }
+    setRestored(true);
+  }, [userId]);
+  useEffect(() => {
+    if (userId && restored) {
+      try { sessionStorage.setItem(`recruithub:admin-tab:${userId}`, activeTab); } catch { /* storage is optional */ }
+    }
+  }, [activeTab, userId, restored]);
   return <main className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-8 text-left sm:px-6 lg:px-8">
     <div className="mx-auto max-w-7xl space-y-6">
       <nav aria-label="Khu vực quản trị" role="tablist" className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-        {tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeTab === value} className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${activeTab === value ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`} onClick={() => setActiveTab(value)}>{label}</button>)}
+        {tabs.map(([value, label], index) => <button key={value} id={`admin-tab-${value}`} type="button" role="tab" aria-selected={activeTab === value} aria-controls="admin-tab-panel" tabIndex={activeTab === value ? 0 : -1} className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${activeTab === value ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`} onClick={() => setActiveTab(value)} onKeyDown={event => {
+          const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null;
+          if (next === null) return;
+          event.preventDefault(); setActiveTab(tabs[next][0]);
+          document.getElementById(`admin-tab-${tabs[next][0]}`)?.focus();
+        }}>{label}</button>)}
       </nav>
-      {activeTab === 'overview' ? <AdminOverview /> : <AdminLogViewer key={activeTab} kind={activeTab} />}
+      <div id="admin-tab-panel" role="tabpanel" aria-labelledby={`admin-tab-${activeTab}`}>
+        {activeTab === 'overview' ? <AdminOverview /> : activeTab === 'backup_restore' ? <AdminBackupRestore /> : <AdminLogViewer key={activeTab} kind={activeTab} />}
+      </div>
     </div>
   </main>;
 };

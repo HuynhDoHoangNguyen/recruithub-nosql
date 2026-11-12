@@ -1,0 +1,55 @@
+{
+  "branch": "codex/admin-backup-restore",
+  "head": "de65be49f7363317130a2f501094099deb6ac9ac",
+  "baseline": {
+    "fail": 11,
+    "pass": 221
+  },
+  "final": {
+    "fail": 11,
+    "pass": 240
+  },
+  "addedTests": 19,
+  "failuresMatch": true,
+  "failureNames": [
+    " FAIL  tests/admin-user-list.test.jsx > Admin user list > disables the status action while a mutation is pending",
+    " FAIL  tests/admin-user-list.test.jsx > Admin user list > loads the user list and details without mutating status until confirmation",
+    " FAIL  tests/admin-user-list.test.jsx > Admin user list > offers the eligible action in user details and keeps the updated status in the detail view",
+    " FAIL  tests/admin-user-list.test.jsx > Admin user list > reports revision conflicts without retrying and offers a refresh",
+    " FAIL  tests/admin-user-list.test.jsx > Admin user list > sends the current ETag after confirmation and updates the row on success",
+    " FAIL  tests/admin-user-list.test.jsx > Admin user list > shows API failures and leaves account status unchanged",
+    " FAIL  tests/admin-user-list.test.jsx > Admin user list > shows only eligible actions, asks for confirmation, and cancel does not PATCH",
+    " FAIL  tests/catalog-lifecycle.test.jsx > home autocomplete supports keyboard selection, escape and transfers canonical skill and location",
+    " FAIL  tests/job-import-export-modal.test.jsx > Recruiter Job import/export modal > exports only after the recruiter selects the export view and submits filters",
+    " FAIL  tests/post-merge-jobs.test.jsx > keeps the dev detail layout and restores CV access, reapply revision and archived attempt history",
+    " FAIL  tests/public-jobs/job-list.test.jsx > Public Job search UI > submits skill and industry drafts together, then keeps them when selecting a location"
+  ],
+  "protectedFileCount": 22,
+  "changedProtectedFiles": [],
+  "frontendSourceSHA256": {
+    "frontend/src/features/admin/AdminBackupRestore.jsx": "f1aaa8302c82be80c2669ac706807d12af5c9c086c5978973abc2d98a019708e",
+    "frontend/src/features/admin/backupRestorePresentation.js": "fbecfb5fd518fe11849e855f94e1e27b99e4844a6595eaa3371368a0b8f02a76",
+    "frontend/src/features/admin/components/RestoreBackupForm.jsx": "7615d2e08c880f61e1b392da3185dc8a8d022e0e022c445417672da6e6848957",
+    "frontend/src/features/admin/useBackupRestoreJobs.js": "970d777c51fd7bcef4f404f7a3e6f628df4995f53f80bcdc5673fa4126b21f24",
+    "frontend/src/features/admin/components/RestoreConfirmDialog.jsx": "a172ba09ab3779d9265cc690edd1c9e2600826ba258a9e07b7b44a96efda9850",
+    "frontend/src/api/adminBackupApi.js": "b1b854348c9ccaf25e17851d2fb96091d1ea6874cf0373f185b970bf034679cd",
+    "frontend/src/features/admin/components/BackupJobStatus.jsx": "377ac29172dbf4c08dad187d7809de2a66714e58f97ad8cc443eead0dc54929f",
+    "frontend/src/pages/Dashboard/AdminDashboard.jsx": "42ffad34fe0c8990413e1b86b656f49f95f5a46ce6ffdd34cd4b30b6e11bca0d"
+  },
+  "backendFocused": {
+    "fail": 0,
+    "pass": 40
+  },
+  "frontendFocusedWithExistingAdmin": {
+    "fail": 0,
+    "pass": 26
+  },
+  "frontendNode": {
+    "fail": 0,
+    "pass": 7
+  },
+  "browserChecks": 24,
+  "lintErrors": 0,
+  "lintExistingWarnings": 2,
+  "build": "PASS"
+}
