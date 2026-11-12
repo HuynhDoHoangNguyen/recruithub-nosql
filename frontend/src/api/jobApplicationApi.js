@@ -33,6 +33,12 @@ export const recruiterProfileApi = {
   update: payload => unwrap(client.patch('/v1/recruiter/profile', payload)),
   updateCompany: payload => unwrap(client.patch('/v1/recruiter/company', payload)),
 };
+export const interviewApi = {
+  list: applicationId => unwrap(client.get('/v1/interviews', { params: { application_id: applicationId } })),
+  create: (payload, signal) => unwrap(client.post('/v1/interviews', payload, { signal })),
+  listFeedback: applicationId => unwrap(client.get('/v1/interviews/feedback', { params: { application_id: applicationId } })),
+  complete: (id, payload, signal) => unwrap(client.put(`/v1/interviews/${idPath(id)}/feedback`, payload, { signal })),
+};
 export const applicationApi = {
   stats: () => unwrap(client.get('/v1/applications/stats')),
   context: () => unwrap(client.get('/v1/applications/context')),

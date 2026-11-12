@@ -12,6 +12,8 @@ import apiV1Routes from './routes/api-v1.routes.js';
 import { getAuthDatabaseConfig } from './config/auth-database.config.js';
 import { ResumeScoringService } from './services/scoring/resume-scoring.service.js';
 import { createScoringRoutes } from './routes/scoring.routes.js';
+import { createInterviewRoutes } from './routes/interview.routes.js';
+import { createInterviewService } from './services/interview.service.js';
 import { getDatabaseConfig } from './config/database.config.js';
 import { PublicJobCatalogService } from './services/public-job-catalog.service.js';
 import { RecruiterProfileService } from './services/recruiter-profile.service.js';
@@ -79,6 +81,7 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
       getAnalysisSummary: scoringService.getAnalysisSummary,
     }),
     scoring: scoringService,
+    interviews: createInterviewService(repository, { now: scoringClock }),
     ranking: suppliedRanking || new CandidateRankingService(repository),
   };
 
@@ -99,6 +102,7 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
   app.use('/api/v1', createUploadRoutes(dependencies));
   app.use('/api/v1/applications', createApplicationRoutes(dependencies));
   app.use('/api/v1/resume-analysis', createScoringRoutes(dependencies));
+  app.use('/api/v1/interviews', createInterviewRoutes(dependencies));
   app.get('/', (req, res) => res.json({ message: 'Welcome to RecruiHub API' }));
   app.use('/api/v1', (req, res, next) => next(new ApiError(404, 'NOT_FOUND', 'Không tìm thấy API.')));
   app.use(jobApplicationErrorHandler);

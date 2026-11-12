@@ -10,6 +10,7 @@ import ApplicationTimeline from './ApplicationTimeline';
 import ViewAssetButton from '../../../components/uploads/ViewAssetButton';
 import PrivateAssetImage from '../../../components/uploads/PrivateAssetImage';
 import MatchScoreBadge from '../../scoring/components/MatchScoreBadge';
+import InterviewSchedule from '../../interviews/components/InterviewSchedule';
 const actionIcons = { SCREENING: Check, INTERVIEW: MessageSquare, OFFER: Send, HIRED: UserCheck, REJECTED: X };
 
 export default function ApplicantDetailModal({ id, initialTarget = '', onClose, onChanged, onOpenScore }) {
@@ -55,7 +56,13 @@ export default function ApplicantDetailModal({ id, initialTarget = '', onClose, 
       {application.submission?.cover_letter && <section><h3 className="mb-2 font-semibold">Thư giới thiệu</h3><p className="whitespace-pre-wrap text-sm text-gray-700">{application.submission.cover_letter}</p></section>}
       <ApplicationTimeline application={application} /><ApplicationAttempts application={application} />
       <div className="flex items-center gap-2"><span className="text-sm font-medium text-gray-700">Điểm phù hợp:</span><MatchScoreBadge status={application.analysis_status} fresh={application.analysis_fresh} totalScore={application.analysis_total_score} recommendation={application.analysis_recommendation} onOpen={onOpenScore ? () => onOpenScore(application._id) : undefined} /></div>
-      {application.current_stage === 'INTERVIEW' && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{application.interview_status === 'SCHEDULING_REQUIRED' ? 'Cần lên lịch phỏng vấn. Liên hệ bộ phận phỏng vấn để tạo vòng đánh giá.' : 'Đã có biên bản phỏng vấn. Chỉ có thể gửi offer khi tất cả các vòng hoàn tất.'}</p>}
+      {(application.current_stage === 'INTERVIEW' || application.stage_history?.some(event => event.to_stage === 'INTERVIEW')) && <InterviewSchedule
+        key={`${application._id}:${application.attempt_number ?? 1}`}
+        applicationId={application._id}
+        applicationAttempt={application.attempt_number ?? 1}
+        canEdit={application.current_stage === 'INTERVIEW'}
+        onScheduled={async () => { await Promise.all([resource.reload(), onChanged()]); }}
+      />}
       {application.offer_blocker && <p className="text-sm text-amber-800">{application.offer_blocker}</p>}
       {!!application.allowed_transitions.length && <form onSubmit={submit} className="space-y-4 border-t border-gray-200 pt-5"><fieldset disabled={busy} className="space-y-4">
         <div aria-label="Hành động xử lý hồ sơ" className="flex flex-wrap gap-2">{application.allowed_transitions.map(stage => {
