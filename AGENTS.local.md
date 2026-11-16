@@ -1,5 +1,20 @@
 # RECRUIHUB NOSQL — TV3 LOCAL AGENT WORKSPACE
 
+## AI-CHAT-02 tìm việc CouchDB — 16/11/2026
+
+- Người dùng yêu cầu nâng cấp trực tiếp. Gemini trả structured intent/filter; Zod kiểm tra, backend chỉ có scan/get đọc live domain DB, tái dùng matcher của JobService (chỉ thêm export). Loại tin closed/draft/deleted/expired; tối đa5cards và link ID thật; không gửi documents tới Gemini, không query/write tùy ý hoặc đọc CV. Scan3000/budget4s, báo partial/unsupported/DB error rõ; chat timeout20s.
+- Backend 763 PASS/0 FAIL/9 SKIP; frontend289 Vitest +7Node PASS; lint sạch/build PASS (chunk warning). Live Node.js/Hà Nội/hybrid trả4tin; browser bấm card mở detail đúng. Live empty/salary unsupported/follow-up remote/guide4/4; update_seq/doc_count25.794 trước–sau không đổi. Provider responseSchema enum rỗng đã sửa, một lượt503 tạm thời giữ fallback, không auto retry. Plan/report AI-chatbox-02 trong docs/plans và docs/reports/integration. Chưa commit/push; mobile card mới chưa recheck.
+
+## AI-CHAT-01 Gemini — 16/11/2026
+
+- Đã chuyển plan OpenAI sang Gemini Free Tier và triển khai theo yêu cầu: native fetch generateContent, model mặc định `gemini-3.5-flash-lite`, key chỉ trong `.env` local; không cài SDK/dependency. Có input tự do, transcript memory, FAQ fallback, abort/stale guard, body/history/output cap, limiter và provider-error sanitization. Không truy vấn CV/DB hay mutation nghiệp vụ qua AI.
+- Backend 754 PASS/0 FAIL/9 SKIP; frontend 278 Vitest + 7 Node PASS; focused backend17, front23; lint sạch/build PASS (chunk warning). HTTP và browser Gemini thật trả200; một live prompt ngoài phạm vi được từ chối; browser AI tắt → FAQ đúng chủ đề. Desktop1440/mobile375 không tràn qua DOM measurements, đã xem ảnh. Backend đã bật lại AI sau test. Report/plan: `docs/reports/integration/AI-chatbox-01-result.md`, `docs/plans/AI-chatbox-01-plan.md`. Chưa commit/push; quota/billing tier riêng chưa xác minh, key chia sẻ trong chat nên cần thay.
+
+## FAQ client — 16/11/2026
+
+- Theo yêu cầu người dùng, thêm chatbox FAQ ở trang public/Candidate: bốn câu hỏi gợi ý về tìm việc, hồ sơ, ứng tuyển và theo dõi đơn; CTA đúng route, khách đăng nhập rồi quay về đích. Ẩn trên trang auth và với Admin/Recruiter. Nội dung tĩnh, không gọi AI/API hoặc lưu hội thoại; hỗ trợ Escape/focus và khung cuộn theo viewport.
+- Kiểm chứng: 11 test FAQ; toàn frontend 266 Vitest + 7 Node PASS; lint/build PASS (chunk JS vẫn vượt 500 kB). UI thật đã mở FAQ, xem hướng dẫn ứng tuyển/hồ sơ và chuyển khách tới login; backend/frontend đã khởi động. Không thay backend, `.env`, database; chưa commit phần FAQ.
+
 ## Demo local — sửa lỗi và kiểm chứng 16/11/2026
 
 - Bổ sung đối chiếu báo cáo Word theo yêu cầu người dùng: `docs/demo-theo-bao-cao-word-2026-11-16.md` là hướng dẫn chính khi demo theo UC-01–UC-16 của Word. Ghi nhận chênh lệch “17”/16 mã đặc tả, UC-15 chưa có CRUD Admin, UC-13/14/16 đáp ứng giới hạn, replication thiết kế khác RHBR UI. Word gốc không sửa. Read-only live probe xác nhận ba login200 và hai ready applications APPLIED; Q1/Q4/Q5 căn selector/sort dùng JSON indexes, AQ8 score range còn `_all_docs` fallback. Evidence `usecase-current-state.json`, `word-mango-queries.json`, `word-mango-results.json`.

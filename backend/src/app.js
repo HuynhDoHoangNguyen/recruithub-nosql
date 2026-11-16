@@ -27,6 +27,8 @@ import { createRecruiterJobImportExportRoutes } from './routes/recruiter-job-imp
 import { RecruiterJobImportExportService } from './services/recruiter-job-import-export.service.js';
 import { createConfiguredSystemEventReporter } from './services/system-event.service.js';
 import { createAdminBackupRouter } from './routes/admin-backup.routes.js';
+import { createSupportChatRoutes } from './routes/support-chat.routes.js';
+import { SupportJobSearchService } from './services/support-job-search.service.js';
 
 function configuredFrontendOrigins(value = process.env.FRONTEND_URL || 'http://127.0.0.1:5178') {
   const origins = value.split(',').map(item => item.trim()).filter(Boolean);
@@ -59,7 +61,7 @@ function createConfiguredRepository(environment, { readOnly = false } = {}) {
     .map(method => [method, (...args) => getRepository()[method](...args)]));
 }
 
-export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, ranking: suppliedRanking, systemEvents: suppliedSystemEvents, backupService, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
+export function createApp({ repository: suppliedRepository, publicRepository: suppliedPublicRepository, assetRepository: suppliedAssetRepository, ranking: suppliedRanking, systemEvents: suppliedSystemEvents, backupService, supportChatService, supportChatFetch, authenticate, now, analyzeApplication, jwtEnv = process.env } = {}) {
   const app = express();
   const origins = configuredFrontendOrigins(jwtEnv.FRONTEND_URL);
   const repository = suppliedRepository || createConfiguredRepository(jwtEnv);
@@ -106,6 +108,10 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
     allowedHeaders: ['Authorization', 'Content-Type', 'If-Match', 'X-File-Name'],
     exposedHeaders: ['ETag', 'X-Request-Id'],
   }));
+  const supportJobSearch = new SupportJobSearchService(liveCatalog ? {
+    scanPublicJobs: (...args) => repository.scanPublicJobs(...args), get: (...args) => repository.get(...args),
+  } : null, { now: scoringClock });
+  app.use('/api/v1/support', createSupportChatRoutes({ env: jwtEnv, service: supportChatService, jobSearch: supportJobSearch, fetchImpl: supportChatFetch }));
   app.use(express.json({ limit: '512kb' }));
   app.use('/api/health', healthRoutes);
   app.use('/api/health/database', databaseHealthRoutes);

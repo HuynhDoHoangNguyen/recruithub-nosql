@@ -25,7 +25,7 @@ function decodePublicCursor(bookmark, filterKey) {
   }
 }
 
-function matchesPublicFilters(job, query) {
+export function matchesPublicFilters(job, query) {
   if (job.status !== 'OPEN' || job.deleted_at) return false;
   if (query.industry && job.industry.toLocaleLowerCase() !== query.industry.toLocaleLowerCase()) return false;
   if (query.seniority && job.seniority !== query.seniority) return false;
