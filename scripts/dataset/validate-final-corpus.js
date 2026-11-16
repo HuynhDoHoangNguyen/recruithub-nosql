@@ -650,7 +650,7 @@ export async function runFinalCorpusValidationAndPublication(options = {}) {
       requirement_policy_effective_at: '2026-10-21T00:00:00Z',
     },
     input_recruitment_release_digest: recruitmentManifest.release_digest,
-    immutable_release_dir: `data/processed/releases/DATA-03.4B_${releaseShortDigest}`,
+    immutable_release_dir: path.relative(REPO_ROOT, immutableReleaseDir).split(path.sep).join('/'),
     active_pointer_status: 'ACTIVE',
     output_files: {
       'users.jsonl': { record_count: totalUsers, sha256: userSha },

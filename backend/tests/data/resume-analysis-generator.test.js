@@ -32,6 +32,7 @@ import {
   isAnalysisFresh,
   rankAnalyses,
   computeInputFingerprint,
+  evaluateResumeAnalysis,
 } from '../../src/utils/resume-scoring.utils.js';
 import {
   POLICY_SEED,
@@ -60,6 +61,20 @@ async function loadJsonl(filePath) {
     docs.push(JSON.parse(trimmed));
   }
   return docs;
+}
+
+// Historical releases are immutable. Re-evaluate only in a temporary staging
+// directory when testing publication against the current fingerprint contract.
+async function refreshStagedAnalyses(directory) {
+  const candidates = new Map((await loadJsonl(path.join(directory, 'candidates.jsonl'))).map(doc => [doc._id, doc]));
+  const jobs = new Map((await loadJsonl(path.join(directory, 'jobs.jsonl'))).map(doc => [doc._id, doc]));
+  const applications = new Map((await loadJsonl(path.join(directory, 'applications.jsonl'))).map(doc => [doc._id, doc]));
+  const analyses = await loadJsonl(path.join(directory, 'resume_analyses.jsonl'));
+  const refreshed = analyses.map(analysis => evaluateResumeAnalysis({
+    application: applications.get(analysis.application_id), candidate: candidates.get(analysis.candidate_id),
+    job: jobs.get(analysis.job_id), analyzedAt: analysis.analyzed_at, provenance: analysis.provenance,
+  }));
+  fs.writeFileSync(path.join(directory, 'resume_analyses.jsonl'), refreshed.map(doc => JSON.stringify(doc)).join('\n') + '\n');
 }
 
 describe('DATA-03.4B: Resume Analysis & Final Corpus Acceptance Tests', () => {
@@ -215,11 +230,12 @@ describe('DATA-03.4B: Resume Analysis & Final Corpus Acceptance Tests', () => {
     assert.equal(recs.LOW, 503);
   });
 
-  it('6. 100% of Resume Analyses are fresh against final candidate and job state', async () => {
-    const [analyses, candidates, jobs] = await Promise.all([
+  it('6. Recomputed analyses are fresh against archived inputs; legacy fingerprints are invalidated', async () => {
+    const [analyses, candidates, jobs, applications] = await Promise.all([
       loadJsonl(path.join(releaseDir, 'resume_analyses.jsonl')),
       loadJsonl(path.join(releaseDir, 'candidates.jsonl')),
       loadJsonl(path.join(releaseDir, 'jobs.jsonl')),
+      loadJsonl(path.join(releaseDir, 'applications.jsonl')),
     ]);
 
     const candMap = new Map();
@@ -235,8 +251,11 @@ describe('DATA-03.4B: Resume Analysis & Final Corpus Acceptance Tests', () => {
       assert.ok(cand, `Candidate must exist for analysis ${analysis._id}`);
       assert.ok(job, `Job must exist for analysis ${analysis._id}`);
 
+      const fresh = evaluateResumeAnalysis({ application: applications.find(app => app._id === analysis.application_id),
+        candidate: cand, job, analyzedAt: analysis.analyzed_at, provenance: analysis.provenance });
+      assert.equal(isAnalysisFresh(analysis, cand, job), analysis.input_fingerprint === fresh.input_fingerprint);
       assert.ok(
-        isAnalysisFresh(analysis, cand, job),
+        isAnalysisFresh(fresh, cand, job),
         `Analysis ${analysis._id} must be fresh against final candidate and job`
       );
     }
@@ -252,18 +271,19 @@ describe('DATA-03.4B: Resume Analysis & Final Corpus Acceptance Tests', () => {
     const cand = candidates.find((c) => c._id === analyses[0].candidate_id);
     const job = jobs.find((j) => j._id === analyses[0].job_id);
 
-    // Baseline: fresh
-    assert.ok(isAnalysisFresh(analyses[0], cand, job));
+    // Baseline uses the current fingerprint contract, not an immutable legacy hash.
+    const baseline = { ...analyses[0], input_fingerprint: computeInputFingerprint({ candidate: cand, job }) };
+    assert.ok(isAnalysisFresh(baseline, cand, job));
 
     // Mutate candidate skills
     const mutatedCand = JSON.parse(JSON.stringify(cand));
     mutatedCand.skills.push({ name: 'quantum-computing', normalized: 'quantum-computing' });
-    assert.equal(isAnalysisFresh(analyses[0], mutatedCand, job), false);
+    assert.equal(isAnalysisFresh(baseline, mutatedCand, job), false);
 
     // Mutate job required skills
     const mutatedJob = JSON.parse(JSON.stringify(job));
     mutatedJob.required_skills.push('new-required-skill');
-    assert.equal(isAnalysisFresh(analyses[0], cand, mutatedJob), false);
+    assert.equal(isAnalysisFresh(baseline, cand, mutatedJob), false);
   });
 
   it('8. Candidate ranking on Tier 1 jobs is strictly deterministic and excludes INCOMPLETE', async () => {
@@ -343,6 +363,7 @@ describe('DATA-03.4B: Resume Analysis & Final Corpus Acceptance Tests', () => {
       for (const f of files) {
         fs.copyFileSync(path.join(releaseDir, f), path.join(testStagingDir, f));
       }
+      await refreshStagedAnalyses(testStagingDir);
 
       // 3. Inject failure right before atomic pointer switch
       // We simulate this by making the active pointer path an existing directory (triggers EISDIR at atomicWriteFile)
@@ -396,7 +417,8 @@ describe('DATA-03.4B: Resume Analysis & Final Corpus Acceptance Tests', () => {
 
   it('10. Release publication is idempotent: rerun returns UNCHANGED', async () => {
     // Stage files again
-    const stagingDir = path.resolve(REPO_ROOT, 'data/staging_test_rerun');
+    const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-corpus-idempotent-'));
+    const stagingDir = path.join(testRoot, 'staging');
     fs.mkdirSync(stagingDir, { recursive: true });
 
     try {
@@ -405,17 +427,24 @@ describe('DATA-03.4B: Resume Analysis & Final Corpus Acceptance Tests', () => {
         fs.copyFileSync(path.join(releaseDir, f), path.join(stagingDir, f));
       }
 
-      const res = await runFinalCorpusValidationAndPublication({
-        stagingDir,
-        activePointerPath: finalManifestPath,
-        recruitmentManifestPath,
-      });
-
+      await refreshStagedAnalyses(stagingDir);
+      const options = { stagingDir, releasesDir: path.join(testRoot, 'releases'), manifestsDir: path.join(testRoot, 'manifests'),
+        activePointerPath: path.join(testRoot, 'manifests', 'final-manifest.json'), recruitmentManifestPath };
+      fs.mkdirSync(options.releasesDir, { recursive: true });
+      fs.mkdirSync(options.manifestsDir, { recursive: true });
+      const first = await runFinalCorpusValidationAndPublication(options);
+      assert.equal(first.status, 'PUBLISHED');
+      // Successful publication consumes staging. Recreate identical input for rerun.
+      fs.mkdirSync(stagingDir, { recursive: true });
+      for (const file of files) fs.copyFileSync(path.join(releaseDir, file), path.join(stagingDir, file));
+      await refreshStagedAnalyses(stagingDir);
+      const res = await runFinalCorpusValidationAndPublication(options);
       assert.equal(res.status, 'UNCHANGED');
-      assert.equal(res.releaseDigest, finalManifest.release_digest);
+      assert.equal(res.releaseDigest, first.releaseDigest);
     } finally {
       try {
-        fs.rmSync(stagingDir, { recursive: true, force: true });
+        assert.ok(path.resolve(testRoot).startsWith(path.resolve(os.tmpdir()) + path.sep));
+        fs.rmSync(testRoot, { recursive: true, force: true });
       } catch (_) {}
     }
   });

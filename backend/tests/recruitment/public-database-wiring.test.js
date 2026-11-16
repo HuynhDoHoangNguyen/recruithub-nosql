@@ -19,19 +19,19 @@ test('public catalog reads the primary database without Auth config and never ro
   const couch = express();
   couch.use(express.json());
   couch.use((req, res, next) => { requests.push({ path: req.path, method: req.method }); next(); });
-  couch.post('/existing_catalog/_find', (req, res) => {
+  couch.post('/recruitment_db/_find', (req, res) => {
     assert.equal(req.body.selector.type, 'job');
     assert.equal(req.body.selector.status, 'OPEN');
     assert.equal(req.body.selector.published_at, undefined);
     res.json({ docs: [job], bookmark: 'end' });
   });
-  couch.get('/existing_catalog/_all_docs', (req, res) => res.json({ rows: [{ doc: job }] }));
-  couch.get('/existing_catalog/:id', (req, res) => {
+  couch.get('/recruitment_db/_all_docs', (req, res) => res.json({ rows: [{ doc: job }] }));
+  couch.get('/recruitment_db/:id', (req, res) => {
     const doc = fixture.repo.docs.get(req.params.id);
     return doc ? res.json(doc) : res.status(404).json({ error: 'not_found' });
   });
   const couchUrl = await listen(t, couch);
-  const environment = { COUCHDB_URL: couchUrl, COUCHDB_DATABASE: 'existing_catalog', JWT_ACCESS_SECRET: 'test-only-secret-with-at-least-32-bytes' };
+  const environment = { COUCHDB_URL: couchUrl, COUCHDB_DATABASE: 'recruitment_db', JWT_ACCESS_SECRET: 'test-only-secret-with-at-least-32-bytes' };
   const apiUrl = await listen(t, createApp({ jwtEnv: environment }));
   for (const path of ['/jobs', '/jobs/all', '/jobs?q=JavaScript']) {
     const response = await fetch(`${apiUrl}/api/v1${path}`);
@@ -50,6 +50,6 @@ test('public catalog reads the primary database without Auth config and never ro
   assert.equal(denied.status, 503);
   assert.equal((await denied.json()).error.code, 'AUTH_DATABASE_CONFIGURATION_ERROR');
   assert.equal(requests.length, readCount);
-  assert.ok(requests.every(req => req.path.startsWith('/existing_catalog/')));
+  assert.ok(requests.every(req => req.path.startsWith('/recruitment_db/')));
   assert.ok(requests.every(req => req.method === 'GET' || (req.method === 'POST' && req.path.endsWith('/_find'))));
 });

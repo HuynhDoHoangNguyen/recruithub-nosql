@@ -77,7 +77,13 @@ export class BackupJobStore {
   }
   async startup() {
     await fs.mkdir(this.root, { recursive: true, mode: 0o700 });
-    if (await fs.realpath(this.root) !== this.root) throw backupError('BACKUP_CONFIGURATION_ERROR');
+    // Windows TEMP may use an 8.3 user directory (HOANGN~1). Canonicalize
+    // spelling only after rejecting junctions/symlinks in every ancestor.
+    for (let current = this.root; ; current = path.dirname(current)) {
+      if ((await fs.lstat(current)).isSymbolicLink()) throw backupError('BACKUP_CONFIGURATION_ERROR');
+      if (path.dirname(current) === current) break;
+    }
+    this.root = await fs.realpath(this.root);
     await secureBackupDirectory(this.root);
     for (const id of await fs.readdir(this.root)) {
       if (!backupParamsSchema.safeParse({ id }).success) throw backupError('BACKUP_CONFIGURATION_ERROR');

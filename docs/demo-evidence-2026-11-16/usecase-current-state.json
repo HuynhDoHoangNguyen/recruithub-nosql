@@ -1,0 +1,66 @@
+{
+  "at": "2026-11-16T04:35:03.453Z",
+  "health": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "data": {
+        "status": "ready",
+        "database": {
+          "name": "recruitment_db",
+          "doc_count": 25794
+        }
+      },
+      "message": "CouchDB is ready"
+    }
+  },
+  "CANDIDATE": {
+    "login": 200
+  },
+  "RECRUITER": {
+    "login": 200,
+    "readyJob": {
+      "status": 200,
+      "job": "DEMO Thực hành trước lớp 2026-11-16T03-13-33.251Z",
+      "applications": [
+        {
+          "id": "application:pair:129d709e27e955180470017df3a52c3ed9b06d94a6268ff689e2bd6f5fce8bdf",
+          "stage": "APPLIED"
+        },
+        {
+          "id": "application:pair:4a3915de2c0b7190f68238780d80d792608305e421bd984e972d1211721ece0f",
+          "stage": "APPLIED"
+        }
+      ]
+    }
+  },
+  "ADMIN": {
+    "login": 200,
+    "stats": {
+      "status": 200,
+      "body": {
+        "source": "couchdb_mapreduce",
+        "totalUsers": 10154,
+        "totalCandidates": 10002,
+        "roles": {
+          "CANDIDATE": 10002,
+          "RECRUITER": 151,
+          "ADMIN": 1
+        },
+        "statuses": {
+          "ACTIVE": 4,
+          "LOCKED": 0,
+          "RESET_REQUIRED": 10150
+        },
+        "jobs": {
+          "total": 2507,
+          "statuses": {
+            "DRAFT": 2303,
+            "OPEN": 204,
+            "CLOSED": 0
+          }
+        }
+      }
+    }
+  }
+}

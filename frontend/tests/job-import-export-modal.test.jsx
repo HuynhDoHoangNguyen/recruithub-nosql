@@ -29,12 +29,15 @@ describe('Recruiter Job import/export modal', () => {
   });
 
   it('exports only after the recruiter selects the export view and submits filters', async () => {
-    jobApi.exportJobs.mockResolvedValue({ data: new Blob(['{}']), headers: { 'content-disposition': 'attachment; filename="jobs.json"' } });
+    jobApi.exportJobs.mockResolvedValue({ data: { text: async () => JSON.stringify({ jobs: [{ title: 'Platform Engineer' }], exported_at: '2026-11-16T00:00:00Z' }) }, headers: { 'content-disposition': 'attachment; filename="jobs.json"' } });
     vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:test'), revokeObjectURL: vi.fn() });
     render(<JobImportExportModal onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /Xuất/i }));
     fireEvent.change(screen.getByLabelText('Từ khóa'), { target: { value: 'Platform' } });
-    fireEvent.click(screen.getByRole('button', { name: /Tải file công việc/i }));
+    expect(screen.getByRole('button', { name: 'Tải file CSV' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /Xem trước số lượng/ }));
+    await screen.findByText('Platform Engineer');
+    fireEvent.click(screen.getByRole('button', { name: 'Tải file CSV' }));
     await waitFor(() => expect(jobApi.exportJobs).toHaveBeenCalledWith(expect.objectContaining({ format: 'csv', q: 'Platform' })));
   });
 });

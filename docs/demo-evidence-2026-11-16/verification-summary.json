@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-16",
+  "backend": {
+    "pass": 737,
+    "fail": 0,
+    "skip": 9,
+    "total": 746
+  },
+  "frontend": {
+    "vitest": 255,
+    "node": 7,
+    "fail": 0
+  },
+  "isolatedDockerIntegration": {
+    "pass": 7,
+    "fail": 0
+  },
+  "liveApi": {
+    "pass": 22,
+    "fail": 0
+  },
+  "importExport": {
+    "pass": 5,
+    "fail": 0
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "build": {
+    "status": "PASS",
+    "warning": "JS chunk above 500 kB"
+  },
+  "historicalSnapshots": "unchanged",
+  "restoredDatabase": "recruithub_restore_demo_1794798948001"
+}

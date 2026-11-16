@@ -25,6 +25,8 @@ Thumbs.db
 
 # Database backups
 database/backups/
+docs/demo-accounts.local.md
+docs/demo-evidence-*/*.rhbr.gz
 
 # Template dependencies
 docs/**/node_modules/

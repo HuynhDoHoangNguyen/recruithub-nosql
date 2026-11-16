@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/data/*.test.js tests/foundation/*.test.js tests/recruitment/*.test.js",
+    "test": "node --test tests/data/*.test.js tests/foundation/*.test.js tests/auth-foundation/*.test.js tests/recruitment/*.test.js",
+    "audit:deliver": "node ../scripts/demo/audit-worker.mjs --once",
+    "audit:watch": "node ../scripts/demo/audit-worker.mjs",
     "test:recruitment": "node --test tests/recruitment/*.test.js",
     "test:job-import-export": "node --test tests/recruitment/job-import-export.test.js tests/recruitment/job-import-export.integration.test.js",
     "db:job-application": "node src/repositories/setup-job-application.js",

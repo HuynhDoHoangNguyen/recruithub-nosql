@@ -23,13 +23,13 @@ describe('Admin user list', () => {
     renderDashboard();
     expect(await screen.findByText(user.email)).toBeTruthy();
     expect(api.get).toHaveBeenCalledWith('/v1/admin/users', { params: { limit: 20 } });
-    expect(screen.getByRole('button', { name: 'Lock' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Khóa tài khoản' })).toBeTruthy();
     expect(api.patch).not.toHaveBeenCalled();
     expect(await screen.findByText('Nguồn thống kê: CouchDB MapReduce')).toBeTruthy();
     expect(screen.getByText('Tổng tin tuyển dụng')).toBeTruthy();
     expect(screen.getByText('Tổng tin tuyển dụng').parentElement.textContent).toContain('3');
     expect(screen.getByText('Bản nháp')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Chi tiết' }));
     await screen.findByRole('dialog');
     expect(api.get).toHaveBeenCalledWith(`/v1/admin/users/${encodeURIComponent(user.id)}`);
     expect(api.patch).not.toHaveBeenCalled();
@@ -84,11 +84,11 @@ describe('Admin user list', () => {
     });
     renderDashboard();
     await screen.findByText(user.email);
-    expect(screen.getByRole('button', { name: 'Lock' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Unlock' })).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: 'Lock' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Unlock' })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
+    expect(screen.getByRole('option', { name: 'Khóa tài khoản' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Mở khóa tài khoản' })).toBeTruthy();
+    expect(screen.getAllByRole('option', { name: 'Khóa tài khoản' })).toHaveLength(1);
+    expect(screen.getAllByRole('option', { name: 'Mở khóa tài khoản' })).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText(`Thao tác cho ${user.email}`), { target: { value: 'status' } });
     expect(await screen.findByRole('alertdialog')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(api.patch).not.toHaveBeenCalled();
@@ -101,11 +101,11 @@ describe('Admin user list', () => {
     api.patch.mockImplementation(async () => { currentUser = lockedUser; return { data: { data: { user: lockedUser } }, headers: { etag: '"2-rev"' } }; });
     renderDashboard();
     await screen.findByText(user.email);
-    fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
+    fireEvent.change(screen.getByLabelText(`Thao tác cho ${user.email}`), { target: { value: 'status' } });
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm lock' }));
     await screen.findByRole('status');
     expect(api.patch).toHaveBeenCalledWith(`/v1/admin/users/${encodeURIComponent(user.id)}/status`, { account_status: 'LOCKED' }, { headers: { 'If-Match': '"1-rev"' } });
-    expect(await screen.findByRole('button', { name: 'Unlock' })).toBeTruthy();
+    expect(await screen.findByRole('option', { name: 'Mở khóa tài khoản' })).toBeTruthy();
     expect(screen.getByText('Account locked.')).toBeTruthy();
   });
 
@@ -116,12 +116,12 @@ describe('Admin user list', () => {
     api.patch.mockImplementation(async () => { currentUser = lockedUser; return { data: { data: { user: lockedUser } }, headers: { etag: '"2-rev"' } }; });
     renderDashboard();
     await screen.findByText(user.email);
-    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Chi tiết' }));
     await screen.findByRole('dialog');
-    fireEvent.click(screen.getByRole('button', { name: 'Lock account' }));
+    fireEvent.change(screen.getAllByLabelText(`Thao tác cho ${user.email}`).at(-1), { target: { value: 'status' } });
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm lock' }));
     await screen.findByRole('status');
-    expect(screen.getByRole('button', { name: 'Unlock account' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Mở khóa tài khoản' })).toBeTruthy();
   });
 
   it('reports revision conflicts without retrying and offers a refresh', async () => {
@@ -129,7 +129,7 @@ describe('Admin user list', () => {
     api.patch.mockRejectedValue({ response: { status: 409, data: { error: { code: 'REVISION_CONFLICT', message: 'Conflict.' } } } });
     renderDashboard();
     await screen.findByText(user.email);
-    fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
+    fireEvent.change(screen.getByLabelText(`Thao tác cho ${user.email}`), { target: { value: 'status' } });
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm lock' }));
     expect(await screen.findByText(/Nothing was overwritten/)).toBeTruthy();
     expect(api.patch).toHaveBeenCalledTimes(1);
@@ -141,10 +141,10 @@ describe('Admin user list', () => {
     api.patch.mockRejectedValue({ response: { status: 403, data: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } } });
     renderDashboard();
     await screen.findByText(user.email);
-    fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
+    fireEvent.change(screen.getByLabelText(`Thao tác cho ${user.email}`), { target: { value: 'status' } });
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm lock' }));
     expect(await screen.findByText('Not allowed.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Lock' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Khóa tài khoản' })).toBeTruthy();
     expect(api.patch).toHaveBeenCalledTimes(1);
   });
 
@@ -154,7 +154,7 @@ describe('Admin user list', () => {
     api.patch.mockReturnValue(new Promise((resolve) => { resolvePatch = resolve; }));
     renderDashboard();
     await screen.findByText(user.email);
-    fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
+    fireEvent.change(screen.getByLabelText(`Thao tác cho ${user.email}`), { target: { value: 'status' } });
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm lock' }));
     await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1));
     const confirmation = screen.getByRole('alertdialog');

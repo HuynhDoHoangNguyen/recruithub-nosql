@@ -50,7 +50,10 @@ test('queryView uses a read-only GET and supports MapReduce group/group_level pa
   assert.equal(calls[0].url.searchParams.get('group_level'), '2');
   assert.deepEqual(result.rows[0], { key: ['recruiter:one', 'OPEN'], value: 3 });
   await assert.rejects(() => client.queryView('_design/unsafe', 'jobs'), TypeError);
-  await assert.rejects(() => client.queryView('job_application', 'jobs', { limit: 100 }), TypeError);
+  await client.queryView('job_application', 'jobs', { limit: 100 });
+  assert.equal(calls.at(-1).url.searchParams.get('limit'), '100');
+  await assert.rejects(() => client.queryView('job_application', 'jobs', { limit: -1 }), TypeError);
+  await assert.rejects(() => client.queryView('job_application', 'jobs', { unknown: true }), TypeError);
 });
 
 test('ID-prefix document scan uses CouchDB built-in all_docs read endpoint', async () => {

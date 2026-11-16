@@ -1,0 +1,72 @@
+{
+  "at": "2026-11-16T04:36:32.727Z",
+  "initial_queries_before_index_alignment": {
+    "Q1_open_jobs": {
+      "status": 200,
+      "count": 5,
+      "warning": "No matching index found, create an index to optimize query time.\nThe number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this."
+    },
+    "Q4_applications_for_job": {
+      "status": 200,
+      "count": 2,
+      "warning": "_design/job_applications was not used because it does not contain a valid index for this query.\nNo matching index found, create an index to optimize query time.\nThe number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this.",
+      "explain": {
+        "status": 200,
+        "index": "_all_docs",
+        "type": "special"
+      }
+    },
+    "Q5_candidate_applications": {
+      "status": 200,
+      "count": 4,
+      "warning": "_design/candidate_applications was not used because it does not contain a valid index for this query.\nNo matching index found, create an index to optimize query time.\nThe number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this."
+    },
+    "AQ8_complete_score_at_least_80": {
+      "status": 200,
+      "count": 1,
+      "warning": "No matching index found, create an index to optimize query time.\nThe number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this."
+    }
+  },
+  "queries": {
+    "Q1_open_jobs": {
+      "status": 200,
+      "count": 5,
+      "warning": null,
+      "explain": {
+        "status": 200,
+        "index": "public_jobs_created_v2",
+        "type": "json"
+      }
+    },
+    "Q4_applications_for_job": {
+      "status": 200,
+      "count": 2,
+      "warning": null,
+      "explain": {
+        "status": 200,
+        "index": "job_applications",
+        "type": "json"
+      }
+    },
+    "Q5_candidate_applications": {
+      "status": 200,
+      "count": 4,
+      "warning": null,
+      "explain": {
+        "status": 200,
+        "index": "candidate_applications",
+        "type": "json"
+      }
+    },
+    "AQ8_complete_score_at_least_80": {
+      "status": 200,
+      "count": 1,
+      "warning": "No matching index found, create an index to optimize query time.\nThe number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this.",
+      "explain": {
+        "status": 200,
+        "index": "_all_docs",
+        "type": "special"
+      }
+    }
+  }
+}

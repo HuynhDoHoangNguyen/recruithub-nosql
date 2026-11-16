@@ -49,22 +49,28 @@ it('delete confirms, sends the expected revision and refreshes after a conflict'
 });
 it('profile has the requested layout and saves own contact fields with immutable email', async () => {
   render(<MemoryRouter><RecruiterProfile /></MemoryRouter>);
-  const name = await screen.findByLabelText('Họ và tên'); expect(name.value).toBe('Tên đã lưu'); expect(screen.getByLabelText('Email liên hệ').readOnly).toBe(true);
-  fireEvent.change(name, { target: { value: 'Tên mới' } }); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+  const name = await screen.findByLabelText('Họ và tên'); expect(name.value).toBe('Tên đã lưu'); expect(name.readOnly).toBe(true); expect(screen.getByLabelText('Email tài khoản').readOnly).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa mục này' }));
+  fireEvent.change(name, { target: { value: 'Tên mới' } }); fireEvent.click(screen.getByRole('button', { name: 'Lưu thông tin cá nhân' }));
   await waitFor(() => expect(recruiterProfileApi.update).toHaveBeenCalledWith({ expected_rev: '2-profile', profile: { full_name: 'Tên mới', phone: '0901234567', location: '', bio: '' } }));
   expect(await screen.findByText('Đã lưu thông tin liên hệ.')).toBeTruthy();
 });
 it('company tab saves logo/metadata to its own endpoint and cancel restores stored fields', async () => {
   render(<MemoryRouter><RecruiterProfile /></MemoryRouter>); await screen.findByLabelText('Họ và tên');
   fireEvent.click(screen.getByRole('tab', { name: 'Thông tin công ty' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa mục này' }));
   fireEvent.change(screen.getByLabelText('Tên công ty *'), { target: { value: 'Chưa lưu' } }); fireEvent.click(screen.getByRole('button', { name: 'Hủy' })); expect(screen.getByLabelText('Tên công ty *').value).toBe('Công ty thật');
-  fireEvent.change(screen.getByLabelText('Tải logo công ty từ máy tính'), { target: { files: [new File(['png-test'], 'logo.png', { type: 'image/png' })] } });
-  await screen.findByText('logo.png'); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa mục này' }));
+  fireEvent.change(screen.getByLabelText('Logo công ty'), { target: { files: [new File(['png-test'], 'logo.png', { type: 'image/png' })] } });
+  await screen.findByText('logo.png'); fireEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ công ty' }));
   await waitFor(() => expect(recruiterProfileApi.updateCompany).toHaveBeenCalledWith(expect.objectContaining({ expected_rev: '1-company', company: expect.objectContaining({ logo_asset_id: 'asset:11111111-1111-4111-8111-111111111111', name: 'Công ty thật' }) })));
 });
 it('profile conflict reloads before the next edit and reports the failure', async () => {
   recruiterProfileApi.update.mockRejectedValue(Object.assign(new Error('Hồ sơ đã thay đổi'), { status: 409 }));
-  render(<MemoryRouter><RecruiterProfile /></MemoryRouter>); await screen.findByLabelText('Họ và tên'); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+  render(<MemoryRouter><RecruiterProfile /></MemoryRouter>); const name = await screen.findByLabelText('Họ và tên');
+  fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa mục này' }));
+  fireEvent.change(name, { target: { value: 'Tên đổi trước xung đột' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu thông tin cá nhân' }));
   await screen.findByText('Hồ sơ đã thay đổi'); await waitFor(() => expect(recruiterProfileApi.get).toHaveBeenCalledTimes(2));
 });
 it('a broken company image falls back to initials instead of a broken logo', () => {

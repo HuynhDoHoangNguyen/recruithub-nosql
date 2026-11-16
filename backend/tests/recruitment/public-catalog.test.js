@@ -8,6 +8,18 @@ const service = ids => ({
   async publicDetail(id) { if (!ids.includes(id)) throw new ApiError(404, 'NOT_FOUND', 'Missing'); return { _id: id }; },
 });
 const query = { limit: 2, q: '', industry: '', skills: [] };
+
+test('shared database is paginated once and keeps every job actionable', async () => {
+  const live = service(['a', 'b', 'c']);
+  const dataset = { async publicList() { throw new Error('Shared source must not be read twice'); } };
+  const catalog = new PublicJobCatalogService({ live, dataset, sharedDatabase: true });
+  const first = await catalog.publicList(query);
+  const last = await catalog.publicList({ ...query, bookmark: first.bookmark });
+  assert.deepEqual([...first.items, ...last.items].map(job => job._id), ['a', 'b', 'c']);
+  assert.equal(last.has_more, false);
+  assert.ok([...first.items, ...last.items].every(job => job.application_available));
+  await assert.rejects(() => catalog.publicDetail('missing'), error => error.status === 404);
+});
 test('catalog fills pages across live and historical sources without skips or duplicates', async () => {
   for (const liveIds of [[], ['live:1'], ['live:1', 'live:2'], ['live:1', 'live:2', 'live:3']]) {
     const catalog = new PublicJobCatalogService({ live: service(liveIds), dataset: service(['old:1', 'old:2', 'old:3']) });

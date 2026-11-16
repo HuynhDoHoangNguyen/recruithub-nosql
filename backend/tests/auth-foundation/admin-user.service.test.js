@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { AdminUserService } from '../../src/services/admin-user.service.js';
 
+const auditContext = { actor: { sub: `user:${'f'.repeat(64)}`, role: 'ADMIN' }, correlationId: randomUUID() };
 const userId = `user:${'a'.repeat(64)}`;
 function user(overrides = {}) {
   return { _id: userId, _rev: '1-rev', type: 'user', email: 'admin@example.invalid', email_normalized: 'admin@example.invalid', role: 'ADMIN', account_status: 'ACTIVE', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', password_hash: 'secret-hash-never-return', ...overrides };
@@ -62,7 +63,7 @@ test('Admin user listing rejects invalid filters and bounds scans while preservi
 
 test('Admin status changes require current revision and cannot activate RESET_REQUIRED users', async () => {
   const { service, repo } = makeService({ users: [user({ role: 'CANDIDATE', account_status: 'RESET_REQUIRED' })] });
-  await assert.rejects(() => service.setAccountStatus(userId, 'ACTIVE', '1-rev'), { code: 'RESET_REQUIRED_PROTECTED' });
+  await assert.rejects(() => service.setAccountStatus(userId, 'ACTIVE', '1-rev', auditContext), { code: 'RESET_REQUIRED_PROTECTED' });
   assert.equal(repo.users[0].account_status, 'RESET_REQUIRED');
   assert.equal(repo.users[0].password_hash, 'secret-hash-never-return');
 });
@@ -70,9 +71,9 @@ test('Admin status changes require current revision and cannot activate RESET_RE
 test('Admin status changes are operator-managed and rejected for Admin accounts', async () => {
   const { service, repo } = makeService({ users: [user()] });
   const attempts = await Promise.allSettled([
-    service.setAccountStatus(userId, 'LOCKED', '1-rev'),
-    service.setAccountStatus(userId, 'ACTIVE', '1-rev'),
-    service.setAccountStatus(userId, 'LOCKED', undefined),
+    service.setAccountStatus(userId, 'LOCKED', '1-rev', auditContext),
+    service.setAccountStatus(userId, 'ACTIVE', '1-rev', auditContext),
+    service.setAccountStatus(userId, 'LOCKED', undefined, auditContext),
   ]);
   assert.deepEqual(attempts.map((result) => result.status), ['rejected', 'rejected', 'rejected']);
   for (const result of attempts) {
@@ -87,10 +88,10 @@ test('Admin status changes are operator-managed and rejected for Admin accounts'
 test('concurrent Admin status requests cannot lock or unlock an Admin account', async () => {
   const { service, repo } = makeService({ users: [user()] });
   const outcomes = await Promise.allSettled([
-    service.setAccountStatus(userId, 'LOCKED', '1-rev'),
-    service.setAccountStatus(userId, 'ACTIVE', '1-rev'),
-    service.setAccountStatus(userId, 'LOCKED', '1-rev'),
-    service.setAccountStatus(userId, 'ACTIVE', '1-rev'),
+    service.setAccountStatus(userId, 'LOCKED', '1-rev', auditContext),
+    service.setAccountStatus(userId, 'ACTIVE', '1-rev', auditContext),
+    service.setAccountStatus(userId, 'LOCKED', '1-rev', auditContext),
+    service.setAccountStatus(userId, 'ACTIVE', '1-rev', auditContext),
   ]);
   assert.ok(outcomes.every((outcome) => outcome.status === 'rejected'));
   assert.ok(outcomes.every((outcome) => outcome.reason.status === 403 && outcome.reason.code === 'ADMIN_STATUS_CHANGE_FORBIDDEN'));
@@ -100,11 +101,11 @@ test('concurrent Admin status requests cannot lock or unlock an Admin account', 
 
 test('Admin status changes keep ETag preconditions and update eligible accounts with _rev', async () => {
   const admins = makeService({ users: [user()] });
-  await assert.rejects(() => admins.service.setAccountStatus(userId, 'LOCKED', 'stale-rev'), { code: 'ADMIN_STATUS_CHANGE_FORBIDDEN' });
+  await assert.rejects(() => admins.service.setAccountStatus(userId, 'LOCKED', 'stale-rev', auditContext), { code: 'ADMIN_STATUS_CHANGE_FORBIDDEN' });
   assert.equal(admins.repo.users[0].account_status, 'ACTIVE');
   const accounts = makeService({ users: [user({ role: 'CANDIDATE', account_status: 'ACTIVE' }), user({ _id: `user:${'b'.repeat(64)}`, role: 'RECRUITER', account_status: 'ACTIVE' })] });
-  await assert.rejects(() => accounts.service.setAccountStatus(userId, 'LOCKED', undefined), { code: 'PRECONDITION_REQUIRED' });
-  await assert.rejects(() => accounts.service.setAccountStatus(userId, 'LOCKED', 'stale-rev'), { code: 'REVISION_CONFLICT' });
+  await assert.rejects(() => accounts.service.setAccountStatus(userId, 'LOCKED', undefined, auditContext), { code: 'PRECONDITION_REQUIRED' });
+  await assert.rejects(() => accounts.service.setAccountStatus(userId, 'LOCKED', 'stale-rev', auditContext), { code: 'REVISION_CONFLICT' });
   const target = `user:${'b'.repeat(64)}`;
   const context = { actor: { sub: userId, role: 'ADMIN' }, correlationId: randomUUID() };
   const result = await accounts.service.setAccountStatus(target, 'LOCKED', '1-rev', context);
@@ -115,7 +116,7 @@ test('Admin status changes keep ETag preconditions and update eligible accounts 
   assert.equal(locked.event.correlation_id, context.correlationId);
   assert.deepEqual(locked.event.actor, { type: 'USER', id: userId, role: 'ADMIN' });
   assert.deepEqual(locked.event.subject, { type: 'USER', id: target });
-  await accounts.service.setAccountStatus(target, 'LOCKED', '2-rev', context);
+  await assert.rejects(() => accounts.service.setAccountStatus(target, 'LOCKED', '2-rev', context), { code: 'INVALID_STATUS_TRANSITION' });
   assert.equal(accounts.repo.users[1].audit_outbox.length, 1);
   await accounts.service.setAccountStatus(target, 'ACTIVE', '2-rev', context);
   assert.deepEqual(accounts.repo.users[1].audit_outbox.map(entry => entry.event.change.to), ['LOCKED', 'ACTIVE']);
@@ -142,24 +143,24 @@ test('Admin status write outage reports a dependency event and preserves the ori
 test('UC24 permits only ACTIVE to LOCKED and LOCKED to ACTIVE, with no automatic retry', async () => {
   const account = user({ role: 'CANDIDATE', account_status: 'ACTIVE' });
   const { service, repo } = makeService({ users: [account] });
-  const locked = await service.setAccountStatus(userId, 'LOCKED', '1-rev');
+  const locked = await service.setAccountStatus(userId, 'LOCKED', '1-rev', auditContext);
   assert.equal(locked.user.account_status, 'LOCKED');
   assert.equal(locked.revision, '2-rev');
-  const unlocked = await service.setAccountStatus(userId, 'ACTIVE', '2-rev');
+  const unlocked = await service.setAccountStatus(userId, 'ACTIVE', '2-rev', auditContext);
   assert.equal(unlocked.user.account_status, 'ACTIVE');
   assert.equal(unlocked.revision, '2-rev');
-  await assert.rejects(() => service.setAccountStatus(userId, 'ACTIVE', '2-rev'), { code: 'INVALID_STATUS_TRANSITION' });
-  await assert.rejects(() => service.setAccountStatus(userId, 'RESET_REQUIRED', '2-rev'), { code: 'VALIDATION_ERROR' });
+  await assert.rejects(() => service.setAccountStatus(userId, 'ACTIVE', '2-rev', auditContext), { code: 'INVALID_STATUS_TRANSITION' });
+  await assert.rejects(() => service.setAccountStatus(userId, 'RESET_REQUIRED', '2-rev', auditContext), { code: 'VALIDATION_ERROR' });
   assert.equal(repo.users[0].account_status, 'ACTIVE');
 });
 
 test('UC24 rejects missing targets and never retries a write conflict', async () => {
   const missing = makeService({ users: [] });
-  await assert.rejects(() => missing.service.setAccountStatus(userId, 'LOCKED', '1-rev'), { code: 'NOT_FOUND' });
+  await assert.rejects(() => missing.service.setAccountStatus(userId, 'LOCKED', '1-rev', auditContext), { code: 'NOT_FOUND' });
   const account = user({ role: 'RECRUITER', account_status: 'ACTIVE' });
   const { service } = makeService({ users: [account] });
   let writes = 0;
   service.users.update = async () => { writes += 1; throw Object.assign(new Error('conflict'), { code: 'CONFLICT' }); };
-  await assert.rejects(() => service.setAccountStatus(userId, 'LOCKED', '1-rev'), { code: 'REVISION_CONFLICT' });
+  await assert.rejects(() => service.setAccountStatus(userId, 'LOCKED', '1-rev', auditContext), { code: 'REVISION_CONFLICT' });
   assert.equal(writes, 1);
 });

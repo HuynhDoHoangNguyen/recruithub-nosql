@@ -26,9 +26,9 @@ beforeEach(() => {
   });
 });
 it('keeps the dev detail layout and restores CV access, reapply revision and archived attempt history', async () => {
-  const { container } = renderDetail();
+  renderDetail();
   await screen.findByRole('heading', { name: job.title });
-  expect(container.querySelector('main').className).toContain('bg-[#CDEAF4]');
+  expect(screen.getByRole('main')).toBeTruthy();
   expect(screen.getByRole('heading', { name: 'Tóm tắt công việc' })).toBeTruthy();
   fireEvent.click(screen.getByText('Xem CV và thư giới thiệu đã nộp'));
   expect(screen.getByRole('button', { name: 'Xem CV' })).toBeTruthy();

@@ -80,7 +80,7 @@ export function createApp({ repository: suppliedRepository, publicRepository: su
     recruiterProfiles: new RecruiterProfileService(repository, now, assets),
     uploads: new UploadService(assets, repository, now),
     publicJobs: suppliedRepository || suppliedPublicRepository ? new JobService(publicRepository, now)
-      : new PublicJobCatalogService({ live: liveCatalog, dataset: new JobService(publicRepository, now) }),
+      : new PublicJobCatalogService({ live: liveCatalog, dataset: new JobService(publicRepository, now), sharedDatabase: Boolean(liveCatalog) }),
     applications: new ApplicationService(repository, {
       now,
       analyzeApplication: effectiveAnalyzeApplication,

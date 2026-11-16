@@ -29,12 +29,15 @@ it('Candidate rejects incomplete phone inline and on save, then accepts a comple
 });
 it('Recruiter blocks short phone and company website without losing values', async () => {
   render(<MemoryRouter><RecruiterProfile /></MemoryRouter>); const phone = await screen.findByLabelText('Số điện thoại');
-  fireEvent.change(phone, { target: { value: '0912345' } }); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa mục này' }));
+  fireEvent.change(phone, { target: { value: '0912345' } }); fireEvent.click(screen.getByRole('button', { name: 'Lưu thông tin cá nhân' }));
   expect(recruiterProfileApi.update).not.toHaveBeenCalled(); expect(phone.value).toBe('0912345'); expect(phone.getAttribute('aria-invalid')).toBe('true');
+  fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
   fireEvent.click(screen.getByRole('tab', { name: 'Thông tin công ty' }));
-  fireEvent.change(screen.getByLabelText('Website'), { target: { value: 'javascript:alert(1)' } }); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa mục này' }));
+  fireEvent.change(screen.getByLabelText('Website'), { target: { value: 'javascript:alert(1)' } }); fireEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ công ty' }));
   expect(recruiterProfileApi.updateCompany).not.toHaveBeenCalled(); expect(screen.getByText(/Nhập website http/)).toBeTruthy();
-  fireEvent.change(screen.getByLabelText('Website'), { target: { value: 'https://company.example.invalid' } }); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+  fireEvent.change(screen.getByLabelText('Website'), { target: { value: 'https://company.example.invalid' } }); fireEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ công ty' }));
   await waitFor(() => expect(recruiterProfileApi.updateCompany).toHaveBeenCalled());
 });
 it('Landing uses API jobs for the hero and featured cards with accessible links', async () => {

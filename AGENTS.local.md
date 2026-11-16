@@ -1,5 +1,15 @@
 # RECRUIHUB NOSQL — TV3 LOCAL AGENT WORKSPACE
 
+## Demo local — sửa lỗi và kiểm chứng 16/11/2026
+
+- Bổ sung đối chiếu báo cáo Word theo yêu cầu người dùng: `docs/demo-theo-bao-cao-word-2026-11-16.md` là hướng dẫn chính khi demo theo UC-01–UC-16 của Word. Ghi nhận chênh lệch “17”/16 mã đặc tả, UC-15 chưa có CRUD Admin, UC-13/14/16 đáp ứng giới hạn, replication thiết kế khác RHBR UI. Word gốc không sửa. Read-only live probe xác nhận ba login200 và hai ready applications APPLIED; Q1/Q4/Q5 căn selector/sort dùng JSON indexes, AQ8 score range còn `_all_docs` fallback. Evidence `usecase-current-state.json`, `word-mango-queries.json`, `word-mango-results.json`.
+
+- Người dùng yêu cầu sửa các lỗi đã phát hiện, tạo Candidate/Recruiter/Admin demo và chạy toàn bộ luồng; phạm vi gồm cấu hình, source, tests và dữ liệu demo mới.
+- Kết quả: backend mặc định đã gồm auth-foundation, 737 PASS/0 FAIL/9 SKIP; frontend 255 Vitest + 7 Node PASS; 7 integration Docker/CouchDB tùy chọn PASS; lint sạch, build PASS với chunk warning.
+- Catalog shared database không còn lặp; backup canonicalize TEMP 8.3 sau khi kiểm tra symlink/junction; publisher dùng đúng releasesDir; test legacy corpus chạy recompute trong temp sandbox, snapshot/manifests lịch sử không đổi.
+- Ba tài khoản chính và Candidate phụ ACTIVE được tạo riêng; audit store/service users được provision local. Luồng API 22 checks, import/export 5 checks, UI ba role và audit backup đã đạt. Full restore verified 25.790 docs/indexes/2 attachments vào target private mới, không cutover.
+- Báo cáo: `docs/reports/integration/RP-demo-ready-2026-11-16.md`; kịch bản: `docs/demo-script-2026-11-16.md`; evidence: `docs/demo-evidence-2026-11-16/`. Mật khẩu/backup RHBR được Git ignore. Không commit/push/drop DB hoặc sửa user release.
+
 ## ADMIN-BR — Sao lưu & khôi phục Admin (12/11/2026)
 
 - BR-005E: **ACCEPTED / DONE** theo xác nhận của người dùng; người dùng quyết định không thực hiện BR-005F, ADMIN-BR được đóng tại đây. Report `docs/reports/admin-backup-restore/BR-005E-result.md`; Edge production build qua real UI Auth/JWT/API/CouchDB cô lập đạt 15/15: guest guard, login Admin, backup/download/upload/validate/restore, reload-login/job tracking, session no token/archive, 375/768/1440 no overflow và dialog keyboard/Escape. Evidence gồm RESULT + 7 screenshots. Không sửa production/.env/DB. Live deployment gate chưa VERIFIED và là hoạt động vận hành riêng.

@@ -1,0 +1,109 @@
+{
+  "Q1_open_jobs": {
+    "selector": {
+      "type": "job",
+      "status": "OPEN",
+      "created_at": {
+        "$gte": ""
+      },
+      "_id": {
+        "$gte": ""
+      }
+    },
+    "limit": 5,
+    "fields": [
+      "_id",
+      "title",
+      "status",
+      "location"
+    ],
+    "use_index": "public_jobs_created_v2",
+    "sort": [
+      {
+        "type": "desc"
+      },
+      {
+        "status": "desc"
+      },
+      {
+        "created_at": "desc"
+      },
+      {
+        "_id": "desc"
+      }
+    ]
+  },
+  "Q4_applications_for_job": {
+    "selector": {
+      "type": "application",
+      "job_id": "job:010e40ff-c171-4c2f-a9e4-e10289ebf13b",
+      "applied_at": {
+        "$gte": ""
+      }
+    },
+    "use_index": "job_applications",
+    "limit": 10,
+    "fields": [
+      "_id",
+      "candidate_id",
+      "current_stage",
+      "applied_at"
+    ],
+    "sort": [
+      {
+        "type": "asc"
+      },
+      {
+        "job_id": "asc"
+      },
+      {
+        "applied_at": "asc"
+      }
+    ]
+  },
+  "Q5_candidate_applications": {
+    "selector": {
+      "type": "application",
+      "candidate_id": "candidate:fe0a35759b23d7feae9df8eb707635041af0eedda884cc15d42c6e80f7264717",
+      "applied_at": {
+        "$gte": ""
+      }
+    },
+    "use_index": "candidate_applications",
+    "limit": 10,
+    "fields": [
+      "_id",
+      "job_id",
+      "current_stage"
+    ],
+    "sort": [
+      {
+        "type": "asc"
+      },
+      {
+        "candidate_id": "asc"
+      },
+      {
+        "applied_at": "asc"
+      }
+    ]
+  },
+  "AQ8_complete_score_at_least_80": {
+    "selector": {
+      "type": "resume_analysis",
+      "job_id": "job:010e40ff-c171-4c2f-a9e4-e10289ebf13b",
+      "analysis_status": "COMPLETE",
+      "total_score": {
+        "$gte": 80
+      }
+    },
+    "limit": 10,
+    "fields": [
+      "_id",
+      "application_id",
+      "scores",
+      "total_score",
+      "recommendation"
+    ]
+  }
+}

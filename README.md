@@ -1,5 +1,9 @@
 # RecruiHub NoSQL
 
+> **Demo local đã kiểm chứng ngày 16/11/2026:** [báo cáo sửa lỗi và nghiệm thu](docs/reports/integration/RP-demo-ready-2026-11-16.md), [kịch bản trình bày và job có sẵn](docs/demo-script-2026-11-16.md). Backend 737 PASS/0 FAIL/9 SKIP, frontend 255 Vitest + 7 Node PASS; 7 integration Docker/CouchDB bổ sung PASS. Tài khoản/mật khẩu ở `docs/demo-accounts.local.md` (Git ignored).
+
+> **Khi trình bày theo báo cáo Word của nhóm:** dùng [ma trận UC-01–UC-16 và kịch bản theo hiện trạng](docs/demo-theo-bao-cao-word-2026-11-16.md). Tài liệu nêu rõ UC-15 chưa có CRUD Admin, các phần UC-13/14/16 đáp ứng giới hạn và khác biệt replication trong báo cáo với RHBR archive trên UI.
+
 > Trạng thái phần việc TV1 được tóm tắt tại [báo cáo tổng hợp TV1](docs/reports/TV1/RP-TV1-status-summary-2026-11-12.md). Các report có ngày 25/10 bên dưới là snapshot lịch sử của từng lượt kiểm tra, không mặc nhiên là cấu hình/runtime mới nhất.
 
 > UI verification evidence: [kết quả kiểm tra giao diện](docs/ui-verification/results.json).
@@ -178,6 +182,19 @@ COUCHDB_PASSWORD=REPLACE_WITH_LONG_RANDOM_PASSWORD
 PORT=5000
 NODE_ENV=development
 ```
+
+Đối với demo local dùng dữ liệu đã có trong `recruitment_db`, cần bổ sung:
+
+```ini
+AUTH_COUCHDB_DATABASE=recruitment_db
+AUTH_ALLOW_PRIMARY_DATABASE=true
+JWT_ACCESS_SECRET=REPLACE_WITH_AT_LEAST_32_RANDOM_BYTES
+FRONTEND_URL=http://127.0.0.1:5178
+```
+
+`AUTH_COUCHDB_DATABASE` phải trùng `COUCHDB_DATABASE` theo source hiện hành. Opt-in phía trên cho phép các thao tác đăng ký/ứng tuyển ghi vào database này. Môi trường cô lập cần đặt cả hai biến về cùng tên database riêng. Secret JWT phải là giá trị ngẫu nhiên thực tế, không để placeholder. Frontend dùng `VITE_API_BASE_URL=/api` trong `frontend/.env`; không đưa thông tin CouchDB hoặc secret vào biến `VITE_*`.
+
+Tài khoản quản trị CouchDB dùng cho kết nối database, khác tài khoản đăng nhập website. User trong dataset có thể ở `RESET_REQUIRED` và chưa có mật khẩu; cần chuẩn bị tài khoản ứng dụng trước khi demo các màn hình có phân quyền. Xem [kiểm tra cấu hình ngày 16/11/2026](docs/reports/integration/RP-local-runtime-2026-11-16.md) và [kịch bản demo](docs/demo-script-2026-11-16.md).
 
 ### 6.4. Bước 3: Import dữ liệu NoSQL vào CouchDB
 Dự án có script nạp release dataset ban đầu (snapshot 25.750 documents):
